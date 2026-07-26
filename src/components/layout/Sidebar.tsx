@@ -1,5 +1,6 @@
 import { useEffect, useState, type SVGProps } from 'react'
 import { sectionToPath } from '../../lib/appRoutes'
+import { portalHomeUrl } from '../../lib/portalUrl'
 import type { AppSection } from '../../types/wallet'
 import { AuthControls } from './AuthControls'
 
@@ -85,8 +86,8 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             style={{ animation: 'mobile-drawer-in 180ms ease-out' }}
             aria-label="Навигация"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <p className="text-sm font-semibold text-slate-900">Кошелёк</p>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+              <PortalHomeLink />
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
@@ -123,8 +124,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
         <div
           className={`shrink-0 border-b border-slate-100 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}
         >
-          {!collapsed && <p className="text-sm font-semibold text-slate-900">Кошелёк</p>}
-          {collapsed && <WalletMark className="h-5 w-5 text-blue-600" />}
+          <PortalHomeLink collapsed={collapsed} />
         </div>
         <nav
           className={`flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3 ${
@@ -158,6 +158,22 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
         </div>
       </aside>
     </div>
+  )
+}
+
+function PortalHomeLink({ collapsed = false }: { collapsed?: boolean }) {
+  return (
+    <a
+      href={portalHomeUrl()}
+      title="На главную"
+      aria-label="На главную"
+      className={`flex items-center gap-2 rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
+        collapsed ? 'justify-center p-1.5' : 'px-1 py-0.5'
+      }`}
+    >
+      <HomeIcon className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
+      {!collapsed && <span className="text-sm font-semibold text-slate-900">Портал</span>}
+    </a>
   )
 }
 
@@ -301,13 +317,13 @@ function CollapseIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-function WalletMark(props: SVGProps<SVGSVGElement>) {
+function HomeIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...iconProps(props)}>
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M4 8h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Zm0 0V7a2 2 0 0 1 2-2h10M16 13.5h.01"
+        d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
       />
     </svg>
   )
