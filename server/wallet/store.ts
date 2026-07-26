@@ -12,6 +12,7 @@ export interface DbAccount {
   kind: DbAccountKind
   creditLimit?: number
   linkedAccountId?: string
+  graceMonths?: number
 }
 
 export interface DbSnapshotLine {
@@ -63,9 +64,16 @@ type AccountRow = {
   kind: string
   credit_limit: number | string | null
   linked_account_id: string | null
+  grace_months: number | string | null
 }
 
-const ACCOUNT_SELECT = `id, name, currency, color, archived, sort_order, kind, credit_limit, linked_account_id`
+const ACCOUNT_SELECT = `id, name, currency, color, archived, sort_order, kind, credit_limit, linked_account_id, grace_months`
+
+function normalizeGraceMonths(value: unknown): number {
+  const n = num(value)
+  if (!Number.isFinite(n) || n < 1 || n > 12) return 3
+  return Math.floor(n)
+}
 
 function mapAccount(row: AccountRow): DbAccount {
   const kind: DbAccountKind = row.kind === 'credit' ? 'credit' : 'regular'
@@ -81,6 +89,7 @@ function mapAccount(row: AccountRow): DbAccount {
   if (kind === 'credit') {
     if (row.credit_limit != null) account.creditLimit = num(row.credit_limit)
     if (row.linked_account_id) account.linkedAccountId = String(row.linked_account_id)
+    account.graceMonths = normalizeGraceMonths(row.grace_months ?? 3)
   }
   return account
 }
@@ -156,6 +165,7 @@ export async function createAccount(
     kind?: DbAccountKind
     creditLimit?: number
     linkedAccountId?: string
+    graceMonths?: number
   },
 ): Promise<DbAccount> {
   const kind: DbAccountKind = input.kind === 'credit' ? 'credit' : 'regular'
@@ -177,8 +187,8 @@ export async function createAccount(
   }
   const result = await pool.query<AccountRow>(
     `INSERT INTO wallet_accounts
-       (user_id, name, currency, color, sort_order, kind, credit_limit, linked_account_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (user_id, name, currency, color, sort_order, kind, credit_limit, linked_account_id, grace_months)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING ${ACCOUNT_SELECT}`,
     [
       userId,
@@ -189,6 +199,7 @@ export async function createAccount(
       kind,
       kind === 'credit' ? input.creditLimit! : null,
       kind === 'credit' ? (input.linkedAccountId ?? null) : null,
+      kind === 'credit' ? normalizeGraceMonths(input.graceMonths ?? 3) : null,
     ],
   )
   return mapAccount(result.rows[0]!)
@@ -206,6 +217,7 @@ export async function updateAccount(
     kind: DbAccountKind
     creditLimit: number | null
     linkedAccountId: string | null
+    graceMonths: number | null
   }>,
 ): Promise<DbAccount | null> {
   const pool = getPool()
@@ -243,6 +255,18 @@ export async function updateAccount(
     nextLinked = null
   }
 
+  let nextGrace: number | null =
+    nextKind === 'credit' ? (current.graceMonths ?? 3) : null
+  if (nextKind === 'credit') {
+    if (patch.graceMonths !== undefined && patch.graceMonths != null) {
+      nextGrace = normalizeGraceMonths(patch.graceMonths)
+    } else {
+      nextGrace = normalizeGraceMonths(nextGrace ?? 3)
+    }
+  } else {
+    nextGrace = null
+  }
+
   const result = await pool.query<AccountRow>(
     `UPDATE wallet_accounts SET
        name = COALESCE($3, name),
@@ -253,6 +277,7 @@ export async function updateAccount(
        kind = $8,
        credit_limit = $9,
        linked_account_id = $10,
+       grace_months = $11,
        updated_at = now()
      WHERE id = $1 AND user_id = $2
      RETURNING ${ACCOUNT_SELECT}`,
@@ -267,6 +292,7 @@ export async function updateAccount(
       nextKind,
       nextLimit,
       nextLinked,
+      nextGrace,
     ],
   )
   return mapAccount(result.rows[0]!)
@@ -598,6 +624,7 @@ export async function importWalletData(
       kind?: DbAccountKind
       creditLimit?: number
       linkedAccountId?: string
+      graceMonths?: number
     }>
     snapshots: Array<{
       id?: string
@@ -634,8 +661,8 @@ export async function importWalletData(
       const kind: DbAccountKind = account.kind === 'credit' ? 'credit' : 'regular'
       const inserted = await query<{ id: string }>(
         `INSERT INTO wallet_accounts
-           (user_id, name, currency, color, archived, sort_order, kind, credit_limit)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           (user_id, name, currency, color, archived, sort_order, kind, credit_limit, grace_months)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id`,
         [
           userId,
@@ -646,6 +673,7 @@ export async function importWalletData(
           account.sortOrder ?? index,
           kind,
           kind === 'credit' ? (account.creditLimit ?? null) : null,
+          kind === 'credit' ? normalizeGraceMonths(account.graceMonths ?? 3) : null,
         ],
       )
       const newId = String(inserted.rows[0]!.id)

@@ -10,7 +10,7 @@ import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
 import { CheckInPanel } from '../snapshots/CheckInPanel'
-import { CreditFloatPanel } from './CreditFloatPanel'
+import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
 import { GrowthChart } from './GrowthChart'
 import { SummaryCards } from './SummaryCards'
@@ -55,7 +55,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Обзор</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Дашборд</h1>
           <p className="text-sm text-slate-500">Остатки и прирост без учёта переводов между счетами</p>
         </div>
         <Button type="button" onClick={() => setCheckInOpen(true)}>
@@ -65,7 +65,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
 
       <SummaryCards total={total} growth={growth} currency={settings.baseCurrency} />
 
-      <CreditFloatPanel />
+      <CreditFloatSummary />
 
       <GrowthChart data={series} currency={settings.baseCurrency} mode="total" />
 

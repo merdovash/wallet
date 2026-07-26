@@ -44,13 +44,15 @@ interface WalletState {
       sortOrder?: number
       creditLimit?: number
       linkedAccountId?: string
+      graceMonths?: number
     },
   ) => Promise<string>
   updateAccount: (
     id: string,
-    patch: Partial<Omit<Account, 'id' | 'creditLimit' | 'linkedAccountId'>> & {
+    patch: Partial<Omit<Account, 'id' | 'creditLimit' | 'linkedAccountId' | 'graceMonths'>> & {
       creditLimit?: number | null
       linkedAccountId?: string | null
+      graceMonths?: number | null
     },
   ) => Promise<void>
   reorderAccounts: (orderedIds: string[]) => Promise<void>
@@ -212,6 +214,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       kind: input.kind ?? 'regular',
       creditLimit: input.creditLimit,
       linkedAccountId: input.linkedAccountId,
+      graceMonths: input.graceMonths,
     })
     set((state) => ({ accounts: [...state.accounts, account] }))
     return account.id

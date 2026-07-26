@@ -104,6 +104,7 @@ flowchart TB
 | `kind` | TEXT | `regular` или `credit` (по умолчанию `regular`) |
 | `credit_limit` | NUMERIC(20, 8) | Лимит кредитки; только для `credit` |
 | `linked_account_id` | UUID FK → wallet_accounts | Кошелёк float; только для `credit`, `ON DELETE SET NULL` |
+| `grace_months` | INT | Срок грейса: траты месяца N закрыть до конца N+`grace_months` (1–12) |
 | `created_at` / `updated_at` | TIMESTAMPTZ | Метки времени |
 
 Индекс: `wallet_accounts_user_sort_idx` на `(user_id, sort_order)`.  

@@ -13,7 +13,7 @@ export function SummaryCards({ total, growth, currency }: SummaryCardsProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Card>
-        <p className="text-sm text-slate-500">Всего</p>
+        <p className="text-sm text-slate-500">Остаток</p>
         <p className="mt-1 text-xl font-semibold text-slate-900">{formatCurrency(total, currency)}</p>
       </Card>
       <Card>

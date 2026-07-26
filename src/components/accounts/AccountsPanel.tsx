@@ -1,7 +1,16 @@
-import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type DragEvent,
+  type ReactNode,
+  type TouchEvent as ReactTouchEvent,
+} from 'react'
 import { creditDebt } from '../../engine/creditFloatEngine'
 import { balanceOnDate, buildAccountSeries } from '../../engine/growthEngine'
-import { ACCOUNT_COLORS, type AccountKind } from '../../types/wallet'
+import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRatesStore } from '../../store/ratesStore'
@@ -37,9 +46,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [kind, setKind] = useState<AccountKind>('regular')
   const [creditLimit, setCreditLimit] = useState('')
   const [linkedAccountId, setLinkedAccountId] = useState('')
+  const [graceMonths, setGraceMonths] = useState('3')
   const [showArchived, setShowArchived] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null)
 
   const linkCandidates = useMemo(
     () =>
@@ -83,6 +94,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setKind('regular')
     setCreditLimit('')
     setLinkedAccountId('')
+    setGraceMonths('3')
     setFormOpen(true)
   }
 
@@ -98,6 +110,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
       account.creditLimit != null ? String(account.creditLimit) : '',
     )
     setLinkedAccountId(account.linkedAccountId ?? '')
+    setGraceMonths(String(account.graceMonths ?? 3))
     setFormOpen(true)
   }
 
@@ -106,7 +119,9 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     if (!trimmed) return
     if (kind === 'credit') {
       const limit = parseMoneyInput(creditLimit)
+      const grace = Number(graceMonths)
       if (limit == null || !(limit > 0)) return
+      if (!Number.isFinite(grace) || grace < 1 || grace > 12) return
       if (editingId) {
         await updateAccount(editingId, {
           name: trimmed,
@@ -115,6 +130,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
           kind: 'credit',
           creditLimit: limit,
           linkedAccountId: linkedAccountId || null,
+          graceMonths: grace,
         })
       } else {
         await addAccount({
@@ -124,6 +140,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
           kind: 'credit',
           creditLimit: limit,
           linkedAccountId: linkedAccountId || undefined,
+          graceMonths: grace,
         })
       }
     } else if (editingId) {
@@ -134,6 +151,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         kind: 'regular',
         creditLimit: null,
         linkedAccountId: null,
+        graceMonths: null,
       })
     } else {
       await addAccount({ name: trimmed, currency, color, kind: 'regular' })
@@ -184,7 +202,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Счета</h1>
           <p className="text-sm text-slate-500">
-            Перетащите за ⋮⋮, чтобы изменить порядок
+            Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -202,71 +220,32 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
       ) : (
         <Card className="!p-0">
           <ul className="divide-y divide-slate-100">
-            {visible.map((account) => {
-              const isDragging = dragId === account.id
-              const isOver = overId === account.id && dragId !== account.id
-              return (
-                <li
-                  key={account.id}
-                  onDragOver={(e) => handleDragOver(e, account.id)}
-                  onDrop={(e) => handleDrop(e, account.id)}
-                  className={`flex items-center gap-1 px-2 py-2 sm:gap-2 sm:px-4 sm:py-3 ${
-                    isDragging ? 'opacity-40' : ''
-                  } ${isOver ? 'bg-blue-50' : ''}`}
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, account.id)}
-                    onDragEnd={handleDragEnd}
-                    className="flex h-9 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
-                    title="Перетащить"
-                    aria-label={`Перетащить ${account.name}`}
-                  >
-                    <DragHandleIcon className="h-4 w-4" />
-                  </div>
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    onClick={() => setDetailId(account.id)}
-                  >
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: account.color }}
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-slate-900">
-                        {account.name}
-                        {account.kind === 'credit' ? (
-                          <span className="ml-2 text-xs font-normal text-slate-400">кредитка</span>
-                        ) : null}
-                        {account.archived ? (
-                          <span className="ml-2 text-xs font-normal text-slate-400">архив</span>
-                        ) : null}
-                      </span>
-                      <span className="text-xs text-slate-500">{account.currency}</span>
-                    </span>
-                  </button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="!px-2 !py-1"
-                    onClick={() => openEdit(account.id)}
-                  >
-                    Изменить
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="!px-2 !py-1"
-                    onClick={() => void archiveAccount(account.id, !account.archived)}
-                  >
-                    {account.archived ? 'Вернуть' : 'Архив'}
-                  </Button>
-                </li>
-              )
-            })}
+            {visible.map((account) => (
+              <AccountListItem
+                key={account.id}
+                account={account}
+                isDragging={dragId === account.id}
+                isOver={overId === account.id && dragId !== account.id}
+                swipeOpen={swipeOpenId === account.id}
+                onSwipeOpenChange={(open) => setSwipeOpenId(open ? account.id : null)}
+                onDragOver={(e) => handleDragOver(e, account.id)}
+                onDrop={(e) => handleDrop(e, account.id)}
+                onDragStart={(e) => handleDragStart(e, account.id)}
+                onDragEnd={handleDragEnd}
+                onOpenDetail={() => {
+                  setSwipeOpenId(null)
+                  setDetailId(account.id)
+                }}
+                onEdit={() => {
+                  setSwipeOpenId(null)
+                  openEdit(account.id)
+                }}
+                onArchive={() => {
+                  setSwipeOpenId(null)
+                  void archiveAccount(account.id, !account.archived)
+                }}
+              />
+            ))}
           </ul>
         </Card>
       )}
@@ -313,6 +292,16 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                   placeholder="300000"
                 />
               </Field>
+              <Field label="Беспроцентный период">
+                <Select value={graceMonths} onChange={(e) => setGraceMonths(e.target.value)}>
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n}{' '}
+                      {n === 1 ? 'месяц' : n < 5 ? 'месяца' : 'месяцев'} после месяца трат
+                    </option>
+                  ))}
+                </Select>
+              </Field>
               <Field label="Связанный кошелёк (float)">
                 <Select
                   value={linkedAccountId}
@@ -327,8 +316,8 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 </Select>
               </Field>
               <p className="text-xs text-slate-500">
-                В чек-ине указывайте доступный остаток лимита. Выгода float считается по
-                приросту связанного кошелька (без переводов).
+                В чек-ине — доступный остаток лимита. Траты месяца N закрыть до конца месяца
+                N+срок. Выгода float — по приросту связанного кошелька (без переводов).
               </p>
             </>
           )}
@@ -381,6 +370,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
             {detailAccount.kind === 'credit' && detailAccount.creditLimit != null && (
               <CreditDetailStats
                 limit={detailAccount.creditLimit}
+                graceMonths={detailAccount.graceMonths ?? 3}
                 available={
                   detailSeries.length > 0
                     ? detailSeries[detailSeries.length - 1]!.balance
@@ -412,20 +402,28 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
 
 function CreditDetailStats({
   limit,
+  graceMonths,
   available,
   currency,
   linkedName,
 }: {
   limit: number
+  graceMonths: number
   available: number
   currency: string
   linkedName?: string
 }) {
   const debt = creditDebt(limit, available)
+  const graceLabel =
+    graceMonths === 1 ? '1 месяц' : graceMonths < 5 ? `${graceMonths} месяца` : `${graceMonths} месяцев`
   return (
     <div className="space-y-1 text-sm text-slate-700">
       <p>
         Лимит: <span className="font-medium">{formatCurrency(limit, currency)}</span>
+      </p>
+      <p>
+        Грейс: <span className="font-medium">{graceLabel}</span>
+        <span className="text-slate-500"> (траты N → конец N+{graceMonths})</span>
       </p>
       <p>
         Доступно:{' '}
@@ -443,6 +441,207 @@ function CreditDetailStats({
   )
 }
 
+const SWIPE_ACTIONS_WIDTH = 96
+
+interface AccountListItemProps {
+  account: Account
+  isDragging: boolean
+  isOver: boolean
+  swipeOpen: boolean
+  onSwipeOpenChange: (open: boolean) => void
+  onDragOver: (e: DragEvent) => void
+  onDrop: (e: DragEvent) => void
+  onDragStart: (e: DragEvent) => void
+  onDragEnd: () => void
+  onOpenDetail: () => void
+  onEdit: () => void
+  onArchive: () => void
+}
+
+function AccountListItem({
+  account,
+  isDragging,
+  isOver,
+  swipeOpen,
+  onSwipeOpenChange,
+  onDragOver,
+  onDrop,
+  onDragStart,
+  onDragEnd,
+  onOpenDetail,
+  onEdit,
+  onArchive,
+}: AccountListItemProps) {
+  const foregroundRef = useRef<HTMLDivElement>(null)
+  const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
+  const startOffset = useRef(0)
+  const swiping = useRef(false)
+  const suppressClick = useRef(false)
+  const [dragOffset, setDragOffset] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = foregroundRef.current
+    if (!el) return
+
+    function onTouchMove(e: TouchEvent) {
+      if (window.matchMedia('(min-width: 640px)').matches) return
+      const touch = e.touches[0]
+      if (!touch) return
+
+      const dx = touchStartX.current - touch.clientX
+      const dy = Math.abs(touch.clientY - touchStartY.current)
+
+      if (!swiping.current) {
+        if (Math.abs(dx) < 8 && dy < 8) return
+        if (dy > Math.abs(dx)) return
+        swiping.current = true
+        suppressClick.current = true
+      }
+
+      const next = Math.min(SWIPE_ACTIONS_WIDTH, Math.max(0, startOffset.current + dx))
+      setDragOffset(next)
+      e.preventDefault()
+    }
+
+    function onTouchEnd() {
+      if (!swiping.current) return
+      swiping.current = false
+      setDragOffset((current) => {
+        const offset = current ?? (swipeOpen ? SWIPE_ACTIONS_WIDTH : 0)
+        onSwipeOpenChange(offset > SWIPE_ACTIONS_WIDTH / 2)
+        return null
+      })
+      window.setTimeout(() => {
+        suppressClick.current = false
+      }, 0)
+    }
+
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [onSwipeOpenChange, swipeOpen])
+
+  function handleTouchStart(e: ReactTouchEvent) {
+    if (window.matchMedia('(min-width: 640px)').matches) return
+    const touch = e.touches[0]
+    if (!touch) return
+    touchStartX.current = touch.clientX
+    touchStartY.current = touch.clientY
+    startOffset.current = swipeOpen ? SWIPE_ACTIONS_WIDTH : 0
+    swiping.current = false
+  }
+
+  const mobileOffset = dragOffset ?? (swipeOpen ? SWIPE_ACTIONS_WIDTH : 0)
+  const mobileTransform = mobileOffset > 0 ? `translateX(-${mobileOffset}px)` : undefined
+
+  return (
+    <li
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`relative overflow-hidden sm:flex sm:items-center sm:gap-2 sm:overflow-visible sm:px-4 sm:py-3 ${
+        isDragging ? 'opacity-40' : ''
+      } ${isOver ? 'bg-blue-50' : ''}`}
+    >
+      <div className="absolute inset-y-0 right-0 flex items-center gap-1 px-2 sm:static sm:order-last sm:inset-auto sm:shrink-0 sm:px-0">
+        <AccountIconButton
+          title="Изменить"
+          aria-label={`Изменить ${account.name}`}
+          onClick={onEdit}
+        >
+          <PencilIcon className="h-4 w-4" />
+        </AccountIconButton>
+        <AccountIconButton
+          title={account.archived ? 'Вернуть из архива' : 'В архив'}
+          aria-label={account.archived ? `Вернуть ${account.name} из архива` : `Архивировать ${account.name}`}
+          onClick={onArchive}
+        >
+          {account.archived ? (
+            <UnarchiveIcon className="h-4 w-4" />
+          ) : (
+            <ArchiveIcon className="h-4 w-4" />
+          )}
+        </AccountIconButton>
+      </div>
+
+      <div
+        ref={foregroundRef}
+        onTouchStart={handleTouchStart}
+        style={{ transform: mobileTransform }}
+        className={`relative flex w-full touch-pan-y items-center gap-1 bg-white px-2 py-2 transition-transform duration-200 ease-out sm:w-auto sm:flex-1 sm:translate-x-0 sm:bg-transparent sm:px-0 sm:py-0 ${
+          dragOffset === null ? '' : '!duration-0'
+        }`}
+      >
+        <div
+          role="button"
+          tabIndex={0}
+          draggable
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          className="flex h-9 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+          title="Перетащить"
+          aria-label={`Перетащить ${account.name}`}
+        >
+          <DragHandleIcon className="h-4 w-4" />
+        </div>
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          onClick={() => {
+            if (suppressClick.current) return
+            onOpenDetail()
+          }}
+        >
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: account.color }}
+          />
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-slate-900">
+              {account.name}
+              {account.kind === 'credit' ? (
+                <span className="ml-2 text-xs font-normal text-slate-400">кредитка</span>
+              ) : null}
+              {account.archived ? (
+                <span className="ml-2 text-xs font-normal text-slate-400">архив</span>
+              ) : null}
+            </span>
+            <span className="text-xs text-slate-500">{account.currency}</span>
+          </span>
+        </button>
+      </div>
+    </li>
+  )
+}
+
+function AccountIconButton({
+  title,
+  children,
+  onClick,
+  ...rest
+}: {
+  title: string
+  children: ReactNode
+  onClick: () => void
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'title' | 'children'>) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-800"
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
 function DragHandleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
@@ -455,3 +654,38 @@ function DragHandleIcon({ className }: { className?: string }) {
     </svg>
   )
 }
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className={className} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8.5 17.5 4 19l1.5-4.5L16.5 3.5Z"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.5 5.5l4 4" />
+    </svg>
+  )
+}
+
+function ArchiveIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className={className} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M6 7V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 7l1 14h12l1-14" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 11h4" />
+    </svg>
+  )
+}
+
+function UnarchiveIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className={className} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 6 12 3l3.5 3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M6 7V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 7l1 14h12l1-14" />
+    </svg>
+  )
+}
+

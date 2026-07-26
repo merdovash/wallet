@@ -3,6 +3,7 @@ import { AccountsPanel } from './components/accounts/AccountsPanel'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { Sidebar } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import { FloatPanel } from './components/float/FloatPanel'
 import { SnapshotsPanel } from './components/snapshots/SnapshotsPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { snapshotDates } from './engine/growthEngine'
@@ -129,6 +130,8 @@ function SectionContent({
       return (
         <AccountsPanel focusAccountId={focusAccountId} onFocusConsumed={onFocusConsumed} />
       )
+    case 'float':
+      return <FloatPanel />
     case 'settings':
       return <SettingsPanel />
   }

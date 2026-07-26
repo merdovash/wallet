@@ -31,8 +31,11 @@ describe('creditFloatEngine', () => {
     expect(creditDebt(300_000, 350_000)).toBe(0)
   })
 
-  it('grace due date is end of month N+3', () => {
+  it('grace due date is end of month N+graceMonths', () => {
     expect(graceDueDate('2026-03')).toBe('2026-06-30')
+    expect(graceDueDate('2026-03', 3)).toBe('2026-06-30')
+    expect(graceDueDate('2026-03', 2)).toBe('2026-05-31')
+    expect(graceDueDate('2026-03', 4)).toBe('2026-07-31')
     expect(graceDueDate('2025-11')).toBe('2026-02-28')
     expect(graceDueDate('2024-11')).toBe('2025-02-28')
   })
@@ -186,6 +189,7 @@ describe('creditFloatEngine', () => {
       name: 'Card',
       kind: 'credit',
       creditLimit: 300,
+      graceMonths: 3,
     })
     const snapshots: BalanceSnapshot[] = [
       {
@@ -200,6 +204,29 @@ describe('creditFloatEngine', () => {
       remaining: 100,
       dueDate: '2026-06-30',
       overdue: true,
+    })
+  })
+
+  it('uses per-card grace months for due dates', () => {
+    const credit = account({
+      id: 'cc',
+      name: 'Card',
+      kind: 'credit',
+      creditLimit: 300,
+      graceMonths: 2,
+    })
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-03-31',
+        lines: [{ accountId: 'cc', amount: 200 }],
+      },
+    ]
+    const buckets = buildCreditBuckets(credit, snapshots, [], [credit], '2026-05-15', settings)
+    expect(buckets[0]).toMatchObject({
+      month: '2026-03',
+      dueDate: '2026-05-31',
+      overdue: false,
     })
   })
 })

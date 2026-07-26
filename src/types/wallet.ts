@@ -1,4 +1,4 @@
-export type AppSection = 'dashboard' | 'checkins' | 'accounts' | 'settings'
+export type AppSection = 'dashboard' | 'checkins' | 'accounts' | 'float' | 'settings'
 
 export type SnapshotOrigin = 'manual' | 'transfer'
 
@@ -16,6 +16,11 @@ export interface Account {
   creditLimit?: number
   /** Float parking wallet; set when kind === 'credit'. */
   linkedAccountId?: string
+  /**
+   * Interest-free period in calendar months after the spend month.
+   * Spend in month N is due by end of month N+graceMonths (e.g. 3 → March→30 Jun).
+   */
+  graceMonths?: number
 }
 
 export interface SnapshotLine {

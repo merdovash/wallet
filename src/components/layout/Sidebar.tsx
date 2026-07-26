@@ -7,9 +7,10 @@ import { AuthControls } from './AuthControls'
 type NavIcon = (props: SVGProps<SVGSVGElement>) => React.ReactElement
 
 const NAV_ITEMS: { id: AppSection; label: string; Icon: NavIcon }[] = [
-  { id: 'dashboard', label: 'Обзор', Icon: ChartIcon },
+  { id: 'dashboard', label: 'Дашборд', Icon: ChartIcon },
   { id: 'checkins', label: 'Чек-ины', Icon: CheckInIcon },
   { id: 'accounts', label: 'Счета', Icon: AccountsIcon },
+  { id: 'float', label: 'Float', Icon: FloatIcon },
   { id: 'settings', label: 'Настройки', Icon: SettingsIcon },
 ]
 
@@ -257,6 +258,18 @@ function AccountsIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M8 11h8M8 15h5"
+      />
+    </svg>
+  )
+}
+
+function FloatIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 19V5M4 19h16M7 15c1.5-2 3-3 5-3s3.5 1 5 3M7 10c1.5-2 3-3 5-3s3.5 1 5 3"
       />
     </svg>
   )

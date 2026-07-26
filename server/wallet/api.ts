@@ -59,6 +59,7 @@ export async function handleWalletApi(
         kind?: store.DbAccountKind
         creditLimit?: number
         linkedAccountId?: string
+        graceMonths?: number
       }>(req)
       if (!body.name?.trim() || !body.currency || !body.color) {
         sendJson(res, 400, { error: 'Нужны name, currency, color' })
@@ -72,6 +73,7 @@ export async function handleWalletApi(
         kind: body.kind,
         creditLimit: body.creditLimit != null ? Number(body.creditLimit) : undefined,
         linkedAccountId: body.linkedAccountId,
+        graceMonths: body.graceMonths != null ? Number(body.graceMonths) : undefined,
       })
       sendJson(res, 201, { account })
       return true
@@ -101,6 +103,7 @@ export async function handleWalletApi(
             kind?: store.DbAccountKind
             creditLimit?: number | null
             linkedAccountId?: string | null
+            graceMonths?: number | null
           }>(req)
           const account = await store.updateAccount(user.id, params.id!, {
             name: body.name?.trim(),
@@ -116,6 +119,12 @@ export async function handleWalletApi(
                   ? null
                   : Number(body.creditLimit),
             linkedAccountId: body.linkedAccountId,
+            graceMonths:
+              body.graceMonths === undefined
+                ? undefined
+                : body.graceMonths == null
+                  ? null
+                  : Number(body.graceMonths),
           })
           if (!account) {
             sendJson(res, 404, { error: 'Счёт не найден' })

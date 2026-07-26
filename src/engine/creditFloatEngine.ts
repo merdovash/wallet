@@ -70,16 +70,26 @@ export function lastDayOfMonth(year: number, month1to12: number): string {
   return `${y}-${m}-${d}`
 }
 
+export const DEFAULT_GRACE_MONTHS = 3
+
+/** Clamp / default grace length for a credit account. */
+export function resolveGraceMonths(account: Pick<Account, 'graceMonths'>): number {
+  const n = account.graceMonths
+  if (n != null && Number.isFinite(n) && n >= 1 && n <= 12) return Math.floor(n)
+  return DEFAULT_GRACE_MONTHS
+}
+
 /**
- * Grace due date: spending in calendar month N must be closed by end of month N+3.
- * March 2026 → 2026-06-30.
+ * Grace due date: spending in calendar month N must be closed by end of month N+graceMonths.
+ * Default graceMonths=3: March 2026 → 2026-06-30.
  */
-export function graceDueDate(spendMonth: string): string {
+export function graceDueDate(spendMonth: string, graceMonths = DEFAULT_GRACE_MONTHS): string {
   const [ys, ms] = spendMonth.split('-')
   const year = Number(ys)
   const month = Number(ms)
+  const months = graceMonths >= 1 && graceMonths <= 12 ? Math.floor(graceMonths) : DEFAULT_GRACE_MONTHS
   if (!year || !month) return spendMonth
-  const due = new Date(Date.UTC(year, month - 1 + 3, 1))
+  const due = new Date(Date.UTC(year, month - 1 + months, 1))
   return lastDayOfMonth(due.getUTCFullYear(), due.getUTCMonth() + 1)
 }
 
@@ -193,10 +203,11 @@ export function buildCreditBuckets(
     repayQueue -= apply
   }
 
+  const graceMonths = resolveGraceMonths(credit)
   return ordered.map((m) => {
     const b = buckets.get(m)!
     const remaining = Math.max(0, b.spent - b.repaid)
-    const dueDate = graceDueDate(m)
+    const dueDate = graceDueDate(m, graceMonths)
     return {
       month: m,
       spent: b.spent,
@@ -307,7 +318,7 @@ export function buildCreditFloatSummary(
       spent: bucket?.spent ?? 0,
       repaid: bucket?.repaid ?? 0,
       remaining: bucket?.remaining ?? 0,
-      dueDate: bucket?.dueDate ?? graceDueDate(ym),
+      dueDate: bucket?.dueDate ?? graceDueDate(ym, resolveGraceMonths(credit)),
       overdue: bucket?.overdue ?? false,
       avgDebt,
       maxDebt,
