@@ -149,7 +149,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         </Field>
         <p className="text-xs text-slate-500">
           Серым — текущий остаток. Введите новое значение только для изменившихся счетов;
-          пустое поле оставляет остаток без изменений.
+          пустое поле оставляет остаток без изменений. Для кредитки — доступный остаток
+          лимита.
         </p>
         {formAccounts.length === 0 ? (
           <p className="text-sm text-slate-500">Сначала добавьте хотя бы один счёт.</p>
@@ -157,10 +158,16 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           <div className="space-y-3">
             {formAccounts.map((account) => {
               const typed = amounts[account.id] ?? ''
+              const creditHint =
+                account.kind === 'credit' && account.creditLimit != null
+                  ? ` · лимит ${formatHintAmount(account.creditLimit)}`
+                  : ''
               return (
                 <Field
                   key={account.id}
-                  label={`${account.name} (${account.currency})${account.archived ? ' · архив' : ''}`}
+                  label={`${account.name} (${account.currency})${
+                    account.kind === 'credit' ? ' · остаток лимита' : ''
+                  }${creditHint}${account.archived ? ' · архив' : ''}`}
                 >
                   <MoneyInput
                     value={typed}

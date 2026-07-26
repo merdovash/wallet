@@ -70,7 +70,10 @@ export async function createAccountApi(
 
 export async function updateAccountApi(
   id: string,
-  patch: Partial<Omit<Account, 'id'>>,
+  patch: Partial<Omit<Account, 'id'>> & {
+    creditLimit?: number | null
+    linkedAccountId?: string | null
+  },
 ): Promise<Account> {
   const body = await api<{ account: Account }>(`/api/wallet/accounts/${id}`, {
     method: 'PATCH',

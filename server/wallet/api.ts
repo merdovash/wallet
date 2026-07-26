@@ -56,6 +56,9 @@ export async function handleWalletApi(
         currency?: string
         color?: string
         sortOrder?: number
+        kind?: store.DbAccountKind
+        creditLimit?: number
+        linkedAccountId?: string
       }>(req)
       if (!body.name?.trim() || !body.currency || !body.color) {
         sendJson(res, 400, { error: 'Нужны name, currency, color' })
@@ -66,6 +69,9 @@ export async function handleWalletApi(
         currency: body.currency.toUpperCase(),
         color: body.color,
         sortOrder: body.sortOrder,
+        kind: body.kind,
+        creditLimit: body.creditLimit != null ? Number(body.creditLimit) : undefined,
+        linkedAccountId: body.linkedAccountId,
       })
       sendJson(res, 201, { account })
       return true
@@ -92,6 +98,9 @@ export async function handleWalletApi(
             color?: string
             archived?: boolean
             sortOrder?: number
+            kind?: store.DbAccountKind
+            creditLimit?: number | null
+            linkedAccountId?: string | null
           }>(req)
           const account = await store.updateAccount(user.id, params.id!, {
             name: body.name?.trim(),
@@ -99,6 +108,14 @@ export async function handleWalletApi(
             color: body.color,
             archived: body.archived,
             sortOrder: body.sortOrder,
+            kind: body.kind,
+            creditLimit:
+              body.creditLimit === undefined
+                ? undefined
+                : body.creditLimit == null
+                  ? null
+                  : Number(body.creditLimit),
+            linkedAccountId: body.linkedAccountId,
           })
           if (!account) {
             sendJson(res, 404, { error: 'Счёт не найден' })

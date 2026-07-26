@@ -37,9 +37,19 @@ interface WalletState {
   clear: () => void
   setSettings: (patch: Partial<WalletSettings>) => Promise<void>
   addAccount: (
-    input: Omit<Account, 'id' | 'archived' | 'sortOrder'> & { sortOrder?: number },
+    input: Omit<Account, 'id' | 'archived' | 'sortOrder'> & {
+      sortOrder?: number
+      creditLimit?: number
+      linkedAccountId?: string
+    },
   ) => Promise<string>
-  updateAccount: (id: string, patch: Partial<Omit<Account, 'id'>>) => Promise<void>
+  updateAccount: (
+    id: string,
+    patch: Partial<Omit<Account, 'id'>> & {
+      creditLimit?: number | null
+      linkedAccountId?: string | null
+    },
+  ) => Promise<void>
   reorderAccounts: (orderedIds: string[]) => Promise<void>
   archiveAccount: (id: string, archived?: boolean) => Promise<void>
   deleteAccount: (id: string) => Promise<void>
@@ -57,6 +67,13 @@ function nextColor(accounts: Account[]): string {
   const used = new Set(accounts.map((a) => a.color))
   const free = ACCOUNT_COLORS.find((c) => !used.has(c))
   return free ?? ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!
+}
+
+function normalizeAccount(account: Account): Account {
+  return {
+    ...account,
+    kind: account.kind === 'credit' ? 'credit' : 'regular',
+  }
 }
 
 function readLegacyLocalStorage(): {
@@ -144,7 +161,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       }
       set({
         settings: withFallbackRates(bundle.settings.baseCurrency),
-        accounts: bundle.accounts,
+        accounts: bundle.accounts.map(normalizeAccount),
         snapshots: bundle.snapshots,
         transfers: bundle.transfers,
         loaded: true,
@@ -172,6 +189,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       currency: input.currency,
       color: input.color || nextColor(get().accounts),
       sortOrder: input.sortOrder,
+      kind: input.kind ?? 'regular',
+      creditLimit: input.creditLimit,
+      linkedAccountId: input.linkedAccountId,
     })
     set((state) => ({ accounts: [...state.accounts, account] }))
     return account.id

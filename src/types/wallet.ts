@@ -1,5 +1,7 @@
 export type AppSection = 'dashboard' | 'checkins' | 'accounts' | 'transfers' | 'report' | 'settings'
 
+export type AccountKind = 'regular' | 'credit'
+
 export interface Account {
   id: string
   name: string
@@ -7,6 +9,11 @@ export interface Account {
   color: string
   archived: boolean
   sortOrder: number
+  kind: AccountKind
+  /** Credit limit; set when kind === 'credit'. */
+  creditLimit?: number
+  /** Float parking wallet; set when kind === 'credit'. */
+  linkedAccountId?: string
 }
 
 export interface SnapshotLine {

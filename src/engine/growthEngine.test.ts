@@ -21,6 +21,7 @@ function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Acco
     color: '#2563eb',
     archived: false,
     sortOrder: 0,
+    kind: 'regular',
     ...partial,
   }
 }

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
-import { buildAccountSeries } from '../../engine/growthEngine'
-import { ACCOUNT_COLORS } from '../../types/wallet'
+import { creditDebt } from '../../engine/creditFloatEngine'
+import { balanceOnDate, buildAccountSeries } from '../../engine/growthEngine'
+import { ACCOUNT_COLORS, type AccountKind } from '../../types/wallet'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
+import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { Button, Card, EmptyState, Field, Input, Select } from '../ui/FormControls'
+import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { StackPanel } from '../ui/StackPanel'
 import { GrowthChart } from '../dashboard/GrowthChart'
-import { formatCurrency } from '../../lib/format'
+import { formatCurrency, todayIsoDate } from '../../lib/format'
 
 interface AccountsPanelProps {
   focusAccountId?: string | null
@@ -32,9 +34,25 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('RUB')
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
+  const [kind, setKind] = useState<AccountKind>('regular')
+  const [creditLimit, setCreditLimit] = useState('')
+  const [linkedAccountId, setLinkedAccountId] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+
+  const linkCandidates = useMemo(
+    () =>
+      accounts
+        .filter(
+          (a) =>
+            a.kind !== 'credit' &&
+            !a.archived &&
+            a.id !== editingId,
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+    [accounts, editingId],
+  )
 
   useEffect(() => {
     if (!focusAccountId) return
@@ -62,6 +80,9 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setName('')
     setCurrency('RUB')
     setColor(ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)
+    setKind('regular')
+    setCreditLimit('')
+    setLinkedAccountId('')
     setFormOpen(true)
   }
 
@@ -72,16 +93,50 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setName(account.name)
     setCurrency(account.currency)
     setColor(account.color)
+    setKind(account.kind ?? 'regular')
+    setCreditLimit(
+      account.creditLimit != null ? String(account.creditLimit) : '',
+    )
+    setLinkedAccountId(account.linkedAccountId ?? '')
     setFormOpen(true)
   }
 
   async function handleSave() {
     const trimmed = name.trim()
     if (!trimmed) return
-    if (editingId) {
-      await updateAccount(editingId, { name: trimmed, currency, color })
+    if (kind === 'credit') {
+      const limit = parseMoneyInput(creditLimit)
+      if (limit == null || !(limit > 0)) return
+      if (editingId) {
+        await updateAccount(editingId, {
+          name: trimmed,
+          currency,
+          color,
+          kind: 'credit',
+          creditLimit: limit,
+          linkedAccountId: linkedAccountId || null,
+        })
+      } else {
+        await addAccount({
+          name: trimmed,
+          currency,
+          color,
+          kind: 'credit',
+          creditLimit: limit,
+          linkedAccountId: linkedAccountId || undefined,
+        })
+      }
+    } else if (editingId) {
+      await updateAccount(editingId, {
+        name: trimmed,
+        currency,
+        color,
+        kind: 'regular',
+        creditLimit: null,
+        linkedAccountId: null,
+      })
     } else {
-      await addAccount({ name: trimmed, currency, color })
+      await addAccount({ name: trimmed, currency, color, kind: 'regular' })
     }
     setFormOpen(false)
   }
@@ -183,6 +238,9 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                     <span className="min-w-0">
                       <span className="block truncate font-medium text-slate-900">
                         {account.name}
+                        {account.kind === 'credit' ? (
+                          <span className="ml-2 text-xs font-normal text-slate-400">кредитка</span>
+                        ) : null}
                         {account.archived ? (
                           <span className="ml-2 text-xs font-normal text-slate-400">архив</span>
                         ) : null}
@@ -227,6 +285,15 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
           <Field label="Название">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Накопительный" />
           </Field>
+          <Field label="Тип">
+            <Select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as AccountKind)}
+            >
+              <option value="regular">Обычный</option>
+              <option value="credit">Кредитка</option>
+            </Select>
+          </Field>
           <Field label="Валюта">
             <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
               {CURRENCY_OPTIONS.map((c) => (
@@ -236,6 +303,35 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               ))}
             </Select>
           </Field>
+          {kind === 'credit' && (
+            <>
+              <Field label="Лимит">
+                <MoneyInput
+                  value={creditLimit}
+                  onChange={setCreditLimit}
+                  allowNegative={false}
+                  placeholder="300000"
+                />
+              </Field>
+              <Field label="Связанный кошелёк (float)">
+                <Select
+                  value={linkedAccountId}
+                  onChange={(e) => setLinkedAccountId(e.target.value)}
+                >
+                  <option value="">Не выбран</option>
+                  {linkCandidates.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <p className="text-xs text-slate-500">
+                В чек-ине указывайте доступный остаток лимита. Выгода float считается по
+                приросту связанного кошелька (без переводов).
+              </p>
+            </>
+          )}
           <Field label="Цвет">
             <div className="flex flex-wrap gap-2">
               {ACCOUNT_COLORS.map((c) => (
@@ -277,9 +373,28 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         {detailAccount && (
           <div className="space-y-4">
             <p className="text-sm text-slate-500">
-              Валюта: {detailAccount.currency}. Зелёная линия — прирост без переводов.
+              Валюта: {detailAccount.currency}.
+              {detailAccount.kind === 'credit'
+                ? ' На графике — доступный остаток лимита; прирост без переводов.'
+                : ' Зелёная линия — прирост без переводов.'}
             </p>
-            {detailSeries.length > 0 && (
+            {detailAccount.kind === 'credit' && detailAccount.creditLimit != null && (
+              <CreditDetailStats
+                limit={detailAccount.creditLimit}
+                available={
+                  detailSeries.length > 0
+                    ? detailSeries[detailSeries.length - 1]!.balance
+                    : (balanceOnDate(detailAccount.id, todayIsoDate(), snapshots) ?? 0)
+                }
+                currency={detailAccount.currency}
+                linkedName={
+                  detailAccount.linkedAccountId
+                    ? accounts.find((a) => a.id === detailAccount.linkedAccountId)?.name
+                    : undefined
+                }
+              />
+            )}
+            {detailSeries.length > 0 && detailAccount.kind !== 'credit' && (
               <p className="text-sm text-slate-700">
                 Последний остаток:{' '}
                 <span className="font-medium">
@@ -291,6 +406,39 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
           </div>
         )}
       </StackPanel>
+    </div>
+  )
+}
+
+function CreditDetailStats({
+  limit,
+  available,
+  currency,
+  linkedName,
+}: {
+  limit: number
+  available: number
+  currency: string
+  linkedName?: string
+}) {
+  const debt = creditDebt(limit, available)
+  return (
+    <div className="space-y-1 text-sm text-slate-700">
+      <p>
+        Лимит: <span className="font-medium">{formatCurrency(limit, currency)}</span>
+      </p>
+      <p>
+        Доступно:{' '}
+        <span className="font-medium">{formatCurrency(available, currency)}</span>
+      </p>
+      <p>
+        Долг: <span className="font-medium">{formatCurrency(debt, currency)}</span>
+      </p>
+      {linkedName ? (
+        <p className="text-slate-500">Float-кошелёк: {linkedName}</p>
+      ) : (
+        <p className="text-slate-500">Float-кошелёк не выбран</p>
+      )}
     </div>
   )
 }

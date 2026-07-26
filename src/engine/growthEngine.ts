@@ -153,6 +153,19 @@ function accountById(accounts: Account[]): Map<string, Account> {
   return new Map(accounts.map((a) => [a.id, a]))
 }
 
+/**
+ * Amount that contributes to net worth for a recorded balance.
+ * Credit check-ins store available limit remainder; NW uses −debt.
+ */
+export function netWorthAmount(account: Account, recordedBalance: number): number {
+  if (account.kind === 'credit') {
+    const limit = account.creditLimit ?? 0
+    const debt = Math.max(0, limit - recordedBalance)
+    return -debt
+  }
+  return recordedBalance
+}
+
 export function totalOnDate(
   date: string,
   accounts: Account[],
@@ -167,7 +180,8 @@ export function totalOnDate(
     if (!includeArchived && account.archived) continue
     const bal = balanceOnDate(account.id, date, snapshots)
     if (bal == null) continue
-    total += toBase(bal, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
+    const nw = netWorthAmount(account, bal)
+    total += toBase(nw, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
   }
   return total
 }
@@ -265,7 +279,11 @@ export function summarizeAccounts(
     .filter((a) => !a.archived)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
     .map((account) => {
-      const balance = balanceOnDate(account.id, t1, snapshots) ?? 0
+      const available = balanceOnDate(account.id, t1, snapshots) ?? 0
+      const balance =
+        account.kind === 'credit'
+          ? Math.max(0, (account.creditLimit ?? 0) - available)
+          : available
       const growth =
         accountGrowth(account.id, t0, t1, snapshots, transfers, accounts, settings, rateBook) ?? 0
       const acc = map.get(account.id)!

@@ -12,6 +12,7 @@ import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState } from '../ui/FormControls'
 import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { GrowthChart } from './GrowthChart'
+import { CreditFloatPanel } from './CreditFloatPanel'
 import { SummaryCards } from './SummaryCards'
 
 interface DashboardProps {
@@ -76,6 +77,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         currency={settings.baseCurrency}
       />
 
+      <CreditFloatPanel />
+
       <GrowthChart data={series} currency={settings.baseCurrency} mode="total" />
 
       <Card>
@@ -96,6 +99,11 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
                   : row.growthBase < 0
                     ? 'text-red-600'
                     : 'text-slate-600'
+              const isCredit = account.kind === 'credit'
+              const available =
+                isCredit && account.creditLimit != null
+                  ? Math.max(0, account.creditLimit - row.balance)
+                  : null
               return (
                 <li key={row.accountId}>
                   <button
@@ -108,11 +116,22 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
                       style={{ backgroundColor: account.color }}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-slate-900">{account.name}</span>
-                      <span className="text-xs text-slate-500">{account.currency}</span>
+                      <span className="block truncate font-medium text-slate-900">
+                        {account.name}
+                        {isCredit ? (
+                          <span className="ml-2 text-xs font-normal text-slate-400">кредитка</span>
+                        ) : null}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {account.currency}
+                        {available != null
+                          ? ` · доступно ${formatCurrency(available, account.currency)}`
+                          : ''}
+                      </span>
                     </span>
                     <span className="text-right">
                       <span className="block font-medium text-slate-900">
+                        {isCredit ? 'долг ' : ''}
                         {formatCurrency(row.balance, account.currency)}
                       </span>
                       {account.currency !== settings.baseCurrency && (

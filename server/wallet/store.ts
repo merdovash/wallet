@@ -1,5 +1,7 @@
 import { getPool } from '../db/pool'
 
+export type DbAccountKind = 'regular' | 'credit'
+
 export interface DbAccount {
   id: string
   name: string
@@ -7,6 +9,9 @@ export interface DbAccount {
   color: string
   archived: boolean
   sortOrder: number
+  kind: DbAccountKind
+  creditLimit?: number
+  linkedAccountId?: string
 }
 
 export interface DbSnapshotLine {
@@ -45,6 +50,57 @@ function num(value: unknown): number {
   return typeof value === 'number' ? value : Number(value)
 }
 
+type AccountRow = {
+  id: string
+  name: string
+  currency: string
+  color: string
+  archived: boolean
+  sort_order: number
+  kind: string
+  credit_limit: number | string | null
+  linked_account_id: string | null
+}
+
+const ACCOUNT_SELECT = `id, name, currency, color, archived, sort_order, kind, credit_limit, linked_account_id`
+
+function mapAccount(row: AccountRow): DbAccount {
+  const kind: DbAccountKind = row.kind === 'credit' ? 'credit' : 'regular'
+  const account: DbAccount = {
+    id: String(row.id),
+    name: String(row.name),
+    currency: String(row.currency),
+    color: String(row.color),
+    archived: Boolean(row.archived),
+    sortOrder: num(row.sort_order),
+    kind,
+  }
+  if (kind === 'credit') {
+    if (row.credit_limit != null) account.creditLimit = num(row.credit_limit)
+    if (row.linked_account_id) account.linkedAccountId = String(row.linked_account_id)
+  }
+  return account
+}
+
+async function assertLinkedAccount(
+  userId: string,
+  accountId: string,
+  linkedAccountId: string | null | undefined,
+): Promise<void> {
+  if (!linkedAccountId) return
+  if (linkedAccountId === accountId) {
+    throw new Error('Связанный счёт не может совпадать с кредиткой')
+  }
+  const pool = getPool()
+  const result = await pool.query<{ kind: string }>(
+    `SELECT kind FROM wallet_accounts WHERE id = $1 AND user_id = $2`,
+    [linkedAccountId, userId],
+  )
+  const row = result.rows[0]
+  if (!row) throw new Error('Связанный счёт не найден')
+  if (row.kind === 'credit') throw new Error('Связанный счёт не может быть кредиткой')
+}
+
 export async function ensureUserSettings(userId: string): Promise<DbSettings> {
   const pool = getPool()
   await pool.query(
@@ -77,34 +133,36 @@ export async function updateSettings(
 
 export async function listAccounts(userId: string): Promise<DbAccount[]> {
   const pool = getPool()
-  const result = await pool.query<{
-    id: string
-    name: string
-    currency: string
-    color: string
-    archived: boolean
-    sort_order: number
-  }>(
-    `SELECT id, name, currency, color, archived, sort_order
+  const result = await pool.query<AccountRow>(
+    `SELECT ${ACCOUNT_SELECT}
      FROM wallet_accounts
      WHERE user_id = $1
      ORDER BY sort_order ASC, name ASC`,
     [userId],
   )
-  return result.rows.map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-    currency: String(row.currency),
-    color: String(row.color),
-    archived: Boolean(row.archived),
-    sortOrder: num(row.sort_order),
-  }))
+  return result.rows.map(mapAccount)
 }
 
 export async function createAccount(
   userId: string,
-  input: { name: string; currency: string; color: string; sortOrder?: number },
+  input: {
+    name: string
+    currency: string
+    color: string
+    sortOrder?: number
+    kind?: DbAccountKind
+    creditLimit?: number
+    linkedAccountId?: string
+  },
 ): Promise<DbAccount> {
+  const kind: DbAccountKind = input.kind === 'credit' ? 'credit' : 'regular'
+  if (kind === 'credit') {
+    if (input.creditLimit == null || !(input.creditLimit > 0)) {
+      throw new Error('Для кредитки нужен creditLimit > 0')
+    }
+    await assertLinkedAccount(userId, '', input.linkedAccountId)
+  }
+
   const pool = getPool()
   let sortOrder = input.sortOrder
   if (sortOrder == null) {
@@ -114,59 +172,87 @@ export async function createAccount(
     )
     sortOrder = (max.rows[0]?.m == null ? -1 : num(max.rows[0].m)) + 1
   }
-  const result = await pool.query<{
-    id: string
-    name: string
-    currency: string
-    color: string
-    archived: boolean
-    sort_order: number
-  }>(
-    `INSERT INTO wallet_accounts (user_id, name, currency, color, sort_order)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, name, currency, color, archived, sort_order`,
-    [userId, input.name, input.currency, input.color, sortOrder],
+  const result = await pool.query<AccountRow>(
+    `INSERT INTO wallet_accounts
+       (user_id, name, currency, color, sort_order, kind, credit_limit, linked_account_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING ${ACCOUNT_SELECT}`,
+    [
+      userId,
+      input.name,
+      input.currency,
+      input.color,
+      sortOrder,
+      kind,
+      kind === 'credit' ? input.creditLimit! : null,
+      kind === 'credit' ? (input.linkedAccountId ?? null) : null,
+    ],
   )
-  const row = result.rows[0]!
-  return {
-    id: String(row.id),
-    name: String(row.name),
-    currency: String(row.currency),
-    color: String(row.color),
-    archived: Boolean(row.archived),
-    sortOrder: num(row.sort_order),
-  }
+  return mapAccount(result.rows[0]!)
 }
 
 export async function updateAccount(
   userId: string,
   id: string,
-  patch: Partial<{ name: string; currency: string; color: string; archived: boolean; sortOrder: number }>,
-): Promise<DbAccount | null> {
-  const pool = getPool()
-  const existing = await pool.query(`SELECT id FROM wallet_accounts WHERE id = $1 AND user_id = $2`, [
-    id,
-    userId,
-  ])
-  if (existing.rows.length === 0) return null
-
-  const result = await pool.query<{
-    id: string
+  patch: Partial<{
     name: string
     currency: string
     color: string
     archived: boolean
-    sort_order: number
-  }>(
+    sortOrder: number
+    kind: DbAccountKind
+    creditLimit: number | null
+    linkedAccountId: string | null
+  }>,
+): Promise<DbAccount | null> {
+  const pool = getPool()
+  const existing = await pool.query<AccountRow>(
+    `SELECT ${ACCOUNT_SELECT} FROM wallet_accounts WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  if (existing.rows.length === 0) return null
+
+  const current = mapAccount(existing.rows[0]!)
+  const nextKind: DbAccountKind =
+    patch.kind === 'credit' || patch.kind === 'regular' ? patch.kind : current.kind
+
+  let nextLimit: number | null =
+    nextKind === 'credit' ? (current.creditLimit ?? null) : null
+  if (nextKind === 'credit') {
+    if (patch.creditLimit !== undefined) {
+      nextLimit = patch.creditLimit
+    }
+    if (nextLimit == null || !(nextLimit > 0)) {
+      throw new Error('Для кредитки нужен creditLimit > 0')
+    }
+  } else {
+    nextLimit = null
+  }
+
+  let nextLinked: string | null =
+    nextKind === 'credit' ? (current.linkedAccountId ?? null) : null
+  if (nextKind === 'credit') {
+    if (patch.linkedAccountId !== undefined) {
+      nextLinked = patch.linkedAccountId
+    }
+    await assertLinkedAccount(userId, id, nextLinked)
+  } else {
+    nextLinked = null
+  }
+
+  const result = await pool.query<AccountRow>(
     `UPDATE wallet_accounts SET
        name = COALESCE($3, name),
        currency = COALESCE($4, currency),
        color = COALESCE($5, color),
        archived = COALESCE($6, archived),
        sort_order = COALESCE($7, sort_order),
+       kind = $8,
+       credit_limit = $9,
+       linked_account_id = $10,
        updated_at = now()
      WHERE id = $1 AND user_id = $2
-     RETURNING id, name, currency, color, archived, sort_order`,
+     RETURNING ${ACCOUNT_SELECT}`,
     [
       id,
       userId,
@@ -175,17 +261,12 @@ export async function updateAccount(
       patch.color ?? null,
       patch.archived ?? null,
       patch.sortOrder ?? null,
+      nextKind,
+      nextLimit,
+      nextLinked,
     ],
   )
-  const row = result.rows[0]!
-  return {
-    id: String(row.id),
-    name: String(row.name),
-    currency: String(row.currency),
-    color: String(row.color),
-    archived: Boolean(row.archived),
-    sortOrder: num(row.sort_order),
-  }
+  return mapAccount(result.rows[0]!)
 }
 
 export async function deleteAccount(userId: string, id: string): Promise<boolean> {
@@ -487,6 +568,9 @@ export async function importWalletData(
       color: string
       archived?: boolean
       sortOrder?: number
+      kind?: DbAccountKind
+      creditLimit?: number
+      linkedAccountId?: string
     }>
     snapshots: Array<{
       id?: string
@@ -520,9 +604,11 @@ export async function importWalletData(
     )
 
     for (const [index, account] of payload.accounts.entries()) {
+      const kind: DbAccountKind = account.kind === 'credit' ? 'credit' : 'regular'
       const inserted = await query<{ id: string }>(
-        `INSERT INTO wallet_accounts (user_id, name, currency, color, archived, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO wallet_accounts
+           (user_id, name, currency, color, archived, sort_order, kind, credit_limit)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
           userId,
@@ -531,10 +617,24 @@ export async function importWalletData(
           account.color,
           account.archived ?? false,
           account.sortOrder ?? index,
+          kind,
+          kind === 'credit' ? (account.creditLimit ?? null) : null,
         ],
       )
       const newId = String(inserted.rows[0]!.id)
       if (account.id) idMap.set(account.id, newId)
+    }
+
+    for (const account of payload.accounts) {
+      if (account.kind !== 'credit' || !account.linkedAccountId || !account.id) continue
+      const newId = idMap.get(account.id)
+      const linkedId = idMap.get(account.linkedAccountId) ?? account.linkedAccountId
+      if (!newId || !linkedId || linkedId === newId) continue
+      await query(
+        `UPDATE wallet_accounts SET linked_account_id = $2, updated_at = now()
+         WHERE id = $1 AND user_id = $3`,
+        [newId, linkedId, userId],
+      )
     }
 
     for (const snap of payload.snapshots) {
