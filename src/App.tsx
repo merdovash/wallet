@@ -93,7 +93,7 @@ export default function App() {
           ) : !user ? (
             <EmptyState
               title="Войдите в аккаунт"
-              description="Данные кошелька хранятся в PostgreSQL. Войдите или зарегистрируйтесь в меню слева."
+              description="Войдите или зарегистрируйтесь в меню слева."
             />
           ) : walletError ? (
             <EmptyState title="Ошибка загрузки" description={walletError} />
