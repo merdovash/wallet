@@ -1,0 +1,143 @@
+import type {
+  Account,
+  BalanceSnapshot,
+  SnapshotLine,
+  Transfer,
+  WalletSettings,
+} from '../types/wallet'
+import { DEFAULT_SETTINGS } from '../types/wallet'
+
+export interface WalletBundle {
+  settings: { baseCurrency: string }
+  accounts: Account[]
+  snapshots: BalanceSnapshot[]
+  transfers: Transfer[]
+}
+
+async function parseError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: string }
+    return body.error ?? response.statusText
+  } catch {
+    return response.statusText
+  }
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  })
+  if (!response.ok) throw new Error(await parseError(response))
+  return (await response.json()) as T
+}
+
+export function withFallbackRates(baseCurrency: string): WalletSettings {
+  return {
+    baseCurrency,
+    exchangeRates: {
+      ...DEFAULT_SETTINGS.exchangeRates,
+      [baseCurrency]: 1,
+    },
+  }
+}
+
+export async function fetchWallet(): Promise<WalletBundle> {
+  return api<WalletBundle>('/api/wallet')
+}
+
+export async function patchSettings(baseCurrency: string): Promise<WalletSettings> {
+  const body = await api<{ settings: { baseCurrency: string } }>('/api/wallet/settings', {
+    method: 'PATCH',
+    body: JSON.stringify({ baseCurrency }),
+  })
+  return withFallbackRates(body.settings.baseCurrency)
+}
+
+export async function createAccountApi(
+  input: Omit<Account, 'id' | 'archived' | 'sortOrder'> & { sortOrder?: number },
+): Promise<Account> {
+  const body = await api<{ account: Account }>('/api/wallet/accounts', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return body.account
+}
+
+export async function updateAccountApi(
+  id: string,
+  patch: Partial<Omit<Account, 'id'>>,
+): Promise<Account> {
+  const body = await api<{ account: Account }>(`/api/wallet/accounts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return body.account
+}
+
+export async function deleteAccountApi(id: string): Promise<void> {
+  await api(`/api/wallet/accounts/${id}`, { method: 'DELETE' })
+}
+
+export async function reorderAccountsApi(orderedIds: string[]): Promise<Account[]> {
+  const body = await api<{ accounts: Account[] }>('/api/wallet/accounts/order', {
+    method: 'PUT',
+    body: JSON.stringify({ orderedIds }),
+  })
+  return body.accounts
+}
+
+export async function upsertSnapshotApi(input: {
+  date: string
+  note?: string
+  lines: SnapshotLine[]
+}): Promise<BalanceSnapshot> {
+  const body = await api<{ snapshot: BalanceSnapshot }>('/api/wallet/snapshots', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return body.snapshot
+}
+
+export async function updateSnapshotApi(
+  id: string,
+  patch: { date?: string; note?: string; lines?: SnapshotLine[] },
+): Promise<BalanceSnapshot> {
+  const body = await api<{ snapshot: BalanceSnapshot }>(`/api/wallet/snapshots/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return body.snapshot
+}
+
+export async function deleteSnapshotApi(id: string): Promise<void> {
+  await api(`/api/wallet/snapshots/${id}`, { method: 'DELETE' })
+}
+
+export async function createTransferApi(input: Omit<Transfer, 'id'>): Promise<Transfer> {
+  const body = await api<{ transfer: Transfer }>('/api/wallet/transfers', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return body.transfer
+}
+
+export async function deleteTransferApi(id: string): Promise<void> {
+  await api(`/api/wallet/transfers/${id}`, { method: 'DELETE' })
+}
+
+export async function importWalletApi(payload: {
+  settings?: { baseCurrency?: string }
+  accounts: Account[]
+  snapshots: BalanceSnapshot[]
+  transfers: Transfer[]
+}): Promise<WalletBundle> {
+  return api<WalletBundle>('/api/wallet/import', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
