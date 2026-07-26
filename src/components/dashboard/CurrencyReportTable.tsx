@@ -9,6 +9,12 @@ function formatShare(share: number): string {
   return `${(share * 100).toFixed(1).replace('.', ',')}%`
 }
 
+function accountCountLabel(count: number): string {
+  if (count === 1) return '1 счёт'
+  if (count > 1 && count < 5) return `${count} счёта`
+  return `${count} счетов`
+}
+
 interface CurrencyReportTableProps {
   accountCount: number
   onOpenAccount: (accountId: string) => void
@@ -31,14 +37,13 @@ export function CurrencyReportTable({ accountCount, onOpenAccount }: CurrencyRep
     setExpanded((prev) => ({ ...prev, [currency]: !prev[currency] }))
   }
 
+  const totalAccounts = report.rows.reduce((s, r) => s + r.accountCount, 0)
+
   return (
-    <Card className="!p-0 overflow-x-auto">
+    <Card className="!p-0">
       <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-800">Счета</h2>
-        <p className="text-sm text-slate-500">
-          {accountCount}{' '}
-          {accountCount === 1 ? 'счёт' : accountCount > 1 && accountCount < 5 ? 'счёта' : 'счетов'}
-        </p>
+        <p className="text-sm text-slate-500">{accountCountLabel(accountCount)}</p>
       </div>
       {report.rows.length === 0 ? (
         <div className="p-4">
@@ -48,15 +53,19 @@ export function CurrencyReportTable({ accountCount, onOpenAccount }: CurrencyRep
           />
         </div>
       ) : (
-        <table className="w-full min-w-[36rem] text-sm">
+        <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="px-4 py-3 font-medium">Валюта</th>
-              <th className="px-4 py-3 font-medium tabular-nums">Счетов</th>
-              <th className="px-4 py-3 font-medium tabular-nums">Остаток</th>
-              <th className="px-4 py-3 font-medium tabular-nums">В {report.baseCurrency}</th>
-              <th className="px-4 py-3 font-medium tabular-nums">Доля</th>
-              <th className="px-4 py-3 font-medium tabular-nums">Прирост</th>
+              <th className="w-[42%] px-3 py-3 font-medium sm:w-auto sm:px-4">Валюта</th>
+              <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Счетов</th>
+              <th className="w-[32%] px-3 py-3 font-medium tabular-nums sm:px-4">Остаток</th>
+              <th className="hidden px-4 py-3 font-medium tabular-nums lg:table-cell">
+                В {report.baseCurrency}
+              </th>
+              <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Доля</th>
+              <th className="w-[26%] px-3 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
+                Прирост
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -91,16 +100,24 @@ export function CurrencyReportTable({ accountCount, onOpenAccount }: CurrencyRep
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
-              <td className="px-4 py-3">Итого</td>
-              <td className="px-4 py-3 tabular-nums">
-                {report.rows.reduce((s, r) => s + r.accountCount, 0)}
+              <td className="px-3 py-3 sm:px-4">
+                <div>Итого</div>
+                <div className="text-xs font-normal text-slate-500 md:hidden">
+                  {accountCountLabel(totalAccounts)} · 100%
+                </div>
               </td>
-              <td className="px-4 py-3 text-slate-400">—</td>
-              <td className="px-4 py-3 tabular-nums">
+              <td className="hidden px-4 py-3 tabular-nums md:table-cell">{totalAccounts}</td>
+              <td className="px-3 py-3 tabular-nums sm:px-4">
+                <div className="lg:hidden">
+                  {formatCurrency(report.grandTotalBase, report.baseCurrency)}
+                </div>
+                <div className="hidden text-slate-400 lg:block">—</div>
+              </td>
+              <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
                 {formatCurrency(report.grandTotalBase, report.baseCurrency)}
               </td>
-              <td className="px-4 py-3 tabular-nums">100%</td>
-              <td className="px-4 py-3 tabular-nums">
+              <td className="hidden px-4 py-3 tabular-nums md:table-cell">100%</td>
+              <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
                 {signedAmount(report.grandGrowthBase, report.baseCurrency)}
               </td>
             </tr>
@@ -152,31 +169,47 @@ function CurrencyGroup({
   return (
     <>
       <tr className="border-b border-slate-100 hover:bg-slate-50">
-        <td className="px-4 py-3">
+        <td className="px-3 py-3 sm:px-4">
           <button
             type="button"
             onClick={onToggle}
-            className="flex items-center gap-2 text-left font-medium text-slate-900"
+            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900"
           >
-            <span className="inline-block w-3 text-slate-400">{open ? '▾' : '▸'}</span>
-            <span>
-              {currency}
-              <span className="ml-2 font-normal text-slate-500">{label}</span>
+            <span className="inline-block w-3 shrink-0 text-slate-400">{open ? '▾' : '▸'}</span>
+            <span className="min-w-0">
+              <span className="block truncate">
+                {currency}
+                <span className="ml-1.5 hidden font-normal text-slate-500 sm:inline">{label}</span>
+              </span>
+              <span className="mt-0.5 block text-xs font-normal text-slate-500 md:hidden">
+                {accountCountLabel(accountCount)} · {formatShare(share)}
+              </span>
             </span>
           </button>
         </td>
-        <td className="px-4 py-3 tabular-nums text-slate-700">{accountCount}</td>
-        <td className="px-4 py-3 tabular-nums text-slate-900">
-          {formatCurrency(balance, currency)}
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
+          {accountCount}
         </td>
-        <td className="px-4 py-3 tabular-nums text-slate-900">
+        <td className="px-3 py-3 tabular-nums text-slate-900 sm:px-4">
+          <div className="break-words">{formatCurrency(balance, currency)}</div>
+          {currency !== baseCurrency && (
+            <div className="mt-0.5 text-xs text-slate-500 lg:hidden">
+              ≈ {formatCurrency(balanceBase, baseCurrency)}
+            </div>
+          )}
+        </td>
+        <td className="hidden px-4 py-3 tabular-nums text-slate-900 lg:table-cell">
           {formatCurrency(balanceBase, baseCurrency)}
         </td>
-        <td className="px-4 py-3 tabular-nums text-slate-700">{formatShare(share)}</td>
-        <td className={`px-4 py-3 tabular-nums ${growthColor}`}>
-          <div>{signedAmount(growth, currency)}</div>
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
+          {formatShare(share)}
+        </td>
+        <td className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${growthColor}`}>
+          <div className="break-words">{signedAmount(growth, currency)}</div>
           {currency !== baseCurrency && (
-            <div className="text-xs opacity-80">≈ {signedAmount(growthBase, baseCurrency)}</div>
+            <div className="mt-0.5 text-xs opacity-80">
+              ≈ {signedAmount(growthBase, baseCurrency)}
+            </div>
           )}
         </td>
       </tr>
@@ -190,7 +223,7 @@ function CurrencyGroup({
                 : 'text-slate-600'
           return (
             <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50/70">
-              <td className="px-4 py-2 pl-10">
+              <td className="px-3 py-2 pl-9 sm:px-4 sm:pl-10">
                 <button
                   type="button"
                   onClick={() => onOpenAccount(acc.accountId)}
@@ -199,18 +232,25 @@ function CurrencyGroup({
                   {acc.name}
                 </button>
               </td>
-              <td className="px-4 py-2 text-slate-400">—</td>
-              <td className="px-4 py-2 tabular-nums text-slate-700">
-                {formatCurrency(acc.balance, currency)}
+              <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 sm:px-4">
+                <div className="break-words">{formatCurrency(acc.balance, currency)}</div>
+                {currency !== baseCurrency && (
+                  <div className="mt-0.5 text-xs text-slate-500 lg:hidden">
+                    ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
+                  </div>
+                )}
               </td>
-              <td className="px-4 py-2 tabular-nums text-slate-700">
+              <td className="hidden px-4 py-2 tabular-nums text-slate-700 lg:table-cell">
                 {formatCurrency(acc.balanceBase, baseCurrency)}
               </td>
-              <td className="px-4 py-2 text-slate-400">—</td>
-              <td className={`px-4 py-2 tabular-nums ${accGrowthColor}`}>
-                <div>{signedAmount(acc.growth, currency)}</div>
+              <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
+              <td
+                className={`px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left ${accGrowthColor}`}
+              >
+                <div className="break-words">{signedAmount(acc.growth, currency)}</div>
                 {currency !== baseCurrency && (
-                  <div className="text-xs opacity-80">
+                  <div className="mt-0.5 text-xs opacity-80">
                     ≈ {signedAmount(acc.growthBase, baseCurrency)}
                   </div>
                 )}
