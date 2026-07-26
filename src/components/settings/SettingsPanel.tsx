@@ -94,9 +94,7 @@ export function SettingsPanel() {
 
         <p className="text-xs text-slate-500">
           Для каждого чек-ина берётся курс ЦБ на эту дату (в выходные — последний рабочий день).
-          USDT считается как USD. Кэш хранится локально и в общей БД Postgres (таблица{' '}
-          <code className="rounded bg-slate-100 px-1">cbr_rate_days</code>), если задан{' '}
-          <code className="rounded bg-slate-100 px-1">DATABASE_URL</code>.
+          USDT считается как USD.
         </p>
 
         {pivot && (
