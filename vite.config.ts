@@ -8,6 +8,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), apiPlugin()],
   server: {
     host: true,
+    watch: {
+      ignored: ['**/dist/**', '**/logs/**', '**/.git/**'],
+    },
   },
   preview: {
     host: true,

@@ -14,7 +14,6 @@ function apiMiddleware() {
 
     const url = new URL(req.url, 'http://localhost')
     const pathname = url.pathname
-    loadEnvFile()
 
     const run = async () => {
       if (pathname.startsWith('/api/auth')) {
@@ -54,9 +53,11 @@ export function apiPlugin(): Plugin {
   return {
     name: 'wallet-api',
     configureServer(server) {
+      loadEnvFile()
       server.middlewares.use(apiMiddleware())
     },
     configurePreviewServer(server) {
+      loadEnvFile()
       server.middlewares.use(apiMiddleware())
     },
   }
