@@ -3,16 +3,16 @@ import {
   buildTotalSeries,
   periodGrowth,
   snapshotDates,
-  summarizeAccounts,
   totalOnDate,
 } from '../../engine/growthEngine'
-import { formatCurrency, signedAmount, todayIsoDate } from '../../lib/format'
+import { todayIsoDate } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { Button, Card, EmptyState } from '../ui/FormControls'
+import { Button } from '../ui/FormControls'
 import { CheckInPanel } from '../snapshots/CheckInPanel'
-import { GrowthChart } from './GrowthChart'
 import { CreditFloatPanel } from './CreditFloatPanel'
+import { CurrencyReportTable } from './CurrencyReportTable'
+import { GrowthChart } from './GrowthChart'
 import { SummaryCards } from './SummaryCards'
 
 interface DashboardProps {
@@ -22,7 +22,6 @@ interface DashboardProps {
 export function Dashboard({ onOpenAccount }: DashboardProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
-  const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
@@ -51,12 +50,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     () => buildTotalSeries(accounts, snapshots, settings, rateBook),
     [accounts, snapshots, settings, rateBook],
   )
-  const summaries = useMemo(
-    () => summarizeAccounts(accounts, snapshots, transfers, settings, rateBook),
-    [accounts, snapshots, transfers, settings, rateBook],
-  )
-
-  const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -70,91 +63,16 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         </Button>
       </div>
 
-      <SummaryCards
-        total={total}
-        growth={growth}
-        accountCount={activeAccounts.length}
-        currency={settings.baseCurrency}
-      />
+      <SummaryCards total={total} growth={growth} currency={settings.baseCurrency} />
 
       <CreditFloatPanel />
 
       <GrowthChart data={series} currency={settings.baseCurrency} mode="total" />
 
-      <Card>
-        <h2 className="mb-3 text-sm font-semibold text-slate-800">Счета</h2>
-        {summaries.length === 0 ? (
-          <EmptyState
-            title="Нет счетов"
-            description="Добавьте счета во вкладке «Счета», затем зафиксируйте остатки через чек-ин."
-          />
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {summaries.map((row) => {
-              const account = accountMap.get(row.accountId)
-              if (!account) return null
-              const growthColor =
-                row.growthBase > 0
-                  ? 'text-emerald-700'
-                  : row.growthBase < 0
-                    ? 'text-red-600'
-                    : 'text-slate-600'
-              const isCredit = account.kind === 'credit'
-              const available =
-                isCredit && account.creditLimit != null
-                  ? Math.max(0, account.creditLimit - row.balance)
-                  : null
-              return (
-                <li key={row.accountId}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenAccount(row.accountId)}
-                    className="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
-                  >
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: account.color }}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-slate-900">
-                        {account.name}
-                        {isCredit ? (
-                          <span className="ml-2 text-xs font-normal text-slate-400">кредитка</span>
-                        ) : null}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {account.currency}
-                        {available != null
-                          ? ` · доступно ${formatCurrency(available, account.currency)}`
-                          : ''}
-                      </span>
-                    </span>
-                    <span className="text-right">
-                      <span className="block font-medium text-slate-900">
-                        {isCredit ? 'долг ' : ''}
-                        {formatCurrency(row.balance, account.currency)}
-                      </span>
-                      {account.currency !== settings.baseCurrency && (
-                        <span className="block text-xs text-slate-500">
-                          ≈ {formatCurrency(row.balanceBase, settings.baseCurrency)}
-                        </span>
-                      )}
-                      <span className={`block text-xs ${growthColor}`}>
-                        {signedAmount(row.growth, account.currency)}
-                      </span>
-                      {account.currency !== settings.baseCurrency && (
-                        <span className={`block text-xs ${growthColor} opacity-80`}>
-                          ≈ {signedAmount(row.growthBase, settings.baseCurrency)}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Card>
+      <CurrencyReportTable
+        accountCount={activeAccounts.length}
+        onOpenAccount={onOpenAccount}
+      />
 
       <CheckInPanel open={checkInOpen} onClose={() => setCheckInOpen(false)} />
     </div>

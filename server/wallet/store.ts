@@ -19,10 +19,13 @@ export interface DbSnapshotLine {
   amount: number
 }
 
+export type DbSnapshotOrigin = 'manual' | 'transfer'
+
 export interface DbSnapshot {
   id: string
   date: string
   note?: string
+  origin: DbSnapshotOrigin
   lines: DbSnapshotLine[]
 }
 
@@ -298,8 +301,9 @@ export async function listSnapshots(userId: string): Promise<DbSnapshot[]> {
     id: string
     snapshot_date: string
     note: string | null
+    origin: string | null
   }>(
-    `SELECT id, snapshot_date::text AS snapshot_date, note
+    `SELECT id, snapshot_date::text AS snapshot_date, note, origin
      FROM wallet_snapshots
      WHERE user_id = $1
      ORDER BY snapshot_date ASC`,
@@ -332,6 +336,7 @@ export async function listSnapshots(userId: string): Promise<DbSnapshot[]> {
     id: String(row.id),
     date: String(row.snapshot_date).slice(0, 10),
     note: row.note ? String(row.note) : undefined,
+    origin: row.origin === 'transfer' ? 'transfer' : 'manual',
     lines: bySnap.get(String(row.id)) ?? [],
   }))
 }
@@ -359,9 +364,15 @@ async function replaceSnapshotLines(
 
 export async function upsertSnapshot(
   userId: string,
-  input: { date: string; note?: string; lines: DbSnapshotLine[] },
+  input: {
+    date: string
+    note?: string
+    lines: DbSnapshotLine[]
+    origin?: DbSnapshotOrigin
+  },
 ): Promise<DbSnapshot> {
   const pool = getPool()
+  const origin: DbSnapshotOrigin = input.origin === 'transfer' ? 'transfer' : 'manual'
   const existing = await pool.query<{ id: string }>(
     `SELECT id FROM wallet_snapshots WHERE user_id = $1 AND snapshot_date = $2::date`,
     [userId, input.date],
@@ -370,19 +381,28 @@ export async function upsertSnapshot(
   let snapshotId: string
   if (existing.rows[0]) {
     snapshotId = String(existing.rows[0].id)
-    await pool.query(
-      `UPDATE wallet_snapshots
-       SET note = $3, updated_at = now()
-       WHERE id = $1 AND user_id = $2`,
-      [snapshotId, userId, input.note ?? null],
-    )
+    if (input.origin !== undefined) {
+      await pool.query(
+        `UPDATE wallet_snapshots
+         SET note = $3, origin = $4, updated_at = now()
+         WHERE id = $1 AND user_id = $2`,
+        [snapshotId, userId, input.note ?? null, origin],
+      )
+    } else {
+      await pool.query(
+        `UPDATE wallet_snapshots
+         SET note = $3, updated_at = now()
+         WHERE id = $1 AND user_id = $2`,
+        [snapshotId, userId, input.note ?? null],
+      )
+    }
     await replaceSnapshotLines(snapshotId, input.lines, 'merge')
   } else {
     const inserted = await pool.query<{ id: string }>(
-      `INSERT INTO wallet_snapshots (user_id, snapshot_date, note)
-       VALUES ($1, $2::date, $3)
+      `INSERT INTO wallet_snapshots (user_id, snapshot_date, note, origin)
+       VALUES ($1, $2::date, $3, $4)
        RETURNING id`,
-      [userId, input.date, input.note ?? null],
+      [userId, input.date, input.note ?? null, origin],
     )
     snapshotId = String(inserted.rows[0]!.id)
     await replaceSnapshotLines(snapshotId, input.lines, 'replace')
@@ -395,7 +415,12 @@ export async function upsertSnapshot(
 export async function updateSnapshot(
   userId: string,
   id: string,
-  patch: { date?: string; note?: string | null; lines?: DbSnapshotLine[] },
+  patch: {
+    date?: string
+    note?: string | null
+    lines?: DbSnapshotLine[]
+    origin?: DbSnapshotOrigin
+  },
 ): Promise<DbSnapshot | null> {
   const pool = getPool()
   const existing = await pool.query<{ id: string }>(
@@ -404,11 +429,12 @@ export async function updateSnapshot(
   )
   if (existing.rows.length === 0) return null
 
-  if (patch.date !== undefined || patch.note !== undefined) {
+  if (patch.date !== undefined || patch.note !== undefined || patch.origin !== undefined) {
     await pool.query(
       `UPDATE wallet_snapshots SET
          snapshot_date = COALESCE($3::date, snapshot_date),
          note = CASE WHEN $4::boolean THEN $5 ELSE note END,
+         origin = COALESCE($6, origin),
          updated_at = now()
        WHERE id = $1 AND user_id = $2`,
       [
@@ -417,6 +443,7 @@ export async function updateSnapshot(
         patch.date ?? null,
         patch.note !== undefined,
         patch.note === undefined ? null : patch.note,
+        patch.origin ?? null,
       ],
     )
   }

@@ -1,4 +1,6 @@
-export type AppSection = 'dashboard' | 'checkins' | 'accounts' | 'transfers' | 'report' | 'settings'
+export type AppSection = 'dashboard' | 'checkins' | 'accounts' | 'settings'
+
+export type SnapshotOrigin = 'manual' | 'transfer'
 
 export type AccountKind = 'regular' | 'credit'
 
@@ -25,6 +27,8 @@ export interface BalanceSnapshot {
   id: string
   date: string
   note?: string
+  /** manual = editable check-in; transfer = created via transfer, amounts locked */
+  origin?: SnapshotOrigin
   lines: SnapshotLine[]
 }
 

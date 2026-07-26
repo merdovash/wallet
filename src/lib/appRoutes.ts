@@ -4,8 +4,6 @@ export const APP_SECTION_PATHS: Record<AppSection, string> = {
   dashboard: '/',
   checkins: '/checkins',
   accounts: '/accounts',
-  transfers: '/transfers',
-  report: '/report',
   settings: '/settings',
 }
 

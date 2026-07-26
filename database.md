@@ -119,6 +119,7 @@ flowchart TB
 | `user_id` | UUID FK → users | Владелец, `ON DELETE CASCADE` |
 | `snapshot_date` | DATE | Дата чек-ина |
 | `note` | TEXT | Комментарий (nullable) |
+| `origin` | TEXT | `manual` или `transfer` (чек-ин от перевода, суммы locked) |
 | `created_at` / `updated_at` | TIMESTAMPTZ | Метки времени |
 
 Ограничение: `UNIQUE (user_id, snapshot_date)`.  

@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { AccountsPanel } from './components/accounts/AccountsPanel'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { Sidebar } from './components/layout/Sidebar'
-import { CurrencyReportPanel } from './components/reports/CurrencyReportPanel'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { SnapshotsPanel } from './components/snapshots/SnapshotsPanel'
-import { TransfersPanel } from './components/transfers/TransfersPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
@@ -131,10 +129,6 @@ function SectionContent({
       return (
         <AccountsPanel focusAccountId={focusAccountId} onFocusConsumed={onFocusConsumed} />
       )
-    case 'transfers':
-      return <TransfersPanel />
-    case 'report':
-      return <CurrencyReportPanel />
     case 'settings':
       return <SettingsPanel />
   }

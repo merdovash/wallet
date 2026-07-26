@@ -145,6 +145,7 @@ export async function handleWalletApi(
       const body = await readJsonBody<{
         date?: string
         note?: string
+        origin?: store.DbSnapshotOrigin
         lines?: Array<{ accountId: string; amount: number }>
       }>(req)
       if (!body.date || !Array.isArray(body.lines) || body.lines.length === 0) {
@@ -154,6 +155,7 @@ export async function handleWalletApi(
       const snapshot = await store.upsertSnapshot(user.id, {
         date: body.date,
         note: body.note,
+        origin: body.origin,
         lines: body.lines.map((l) => ({
           accountId: l.accountId,
           amount: Number(l.amount),
@@ -170,11 +172,13 @@ export async function handleWalletApi(
           const body = await readJsonBody<{
             date?: string
             note?: string | null
+            origin?: store.DbSnapshotOrigin
             lines?: Array<{ accountId: string; amount: number }>
           }>(req)
           const snapshot = await store.updateSnapshot(user.id, params.id!, {
             date: body.date,
             note: body.note,
+            origin: body.origin,
             lines: body.lines?.map((l) => ({
               accountId: l.accountId,
               amount: Number(l.amount),

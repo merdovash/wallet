@@ -1,0 +1,223 @@
+import { useMemo, useState } from 'react'
+import { buildCurrencyReport } from '../../lib/currencyReport'
+import { formatCurrency, signedAmount } from '../../lib/format'
+import { useRatesStore } from '../../store/ratesStore'
+import { useWalletStore } from '../../store/walletStore'
+import { Card, EmptyState } from '../ui/FormControls'
+
+function formatShare(share: number): string {
+  return `${(share * 100).toFixed(1).replace('.', ',')}%`
+}
+
+interface CurrencyReportTableProps {
+  accountCount: number
+  onOpenAccount: (accountId: string) => void
+}
+
+export function CurrencyReportTable({ accountCount, onOpenAccount }: CurrencyReportTableProps) {
+  const accounts = useWalletStore((s) => s.accounts)
+  const snapshots = useWalletStore((s) => s.snapshots)
+  const transfers = useWalletStore((s) => s.transfers)
+  const settings = useWalletStore((s) => s.settings)
+  const rateBook = useRatesStore((s) => s.byDate)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  const report = useMemo(
+    () => buildCurrencyReport(accounts, snapshots, transfers, settings, rateBook),
+    [accounts, snapshots, transfers, settings, rateBook],
+  )
+
+  function toggle(currency: string) {
+    setExpanded((prev) => ({ ...prev, [currency]: !prev[currency] }))
+  }
+
+  return (
+    <Card className="!p-0 overflow-x-auto">
+      <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-800">Счета</h2>
+        <p className="text-sm text-slate-500">
+          {accountCount}{' '}
+          {accountCount === 1 ? 'счёт' : accountCount > 1 && accountCount < 5 ? 'счёта' : 'счетов'}
+        </p>
+      </div>
+      {report.rows.length === 0 ? (
+        <div className="p-4">
+          <EmptyState
+            title="Нет данных"
+            description="Добавьте счета во вкладке «Счета», затем зафиксируйте остатки через чек-ин."
+          />
+        </div>
+      ) : (
+        <table className="w-full min-w-[36rem] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-slate-500">
+              <th className="px-4 py-3 font-medium">Валюта</th>
+              <th className="px-4 py-3 font-medium tabular-nums">Счетов</th>
+              <th className="px-4 py-3 font-medium tabular-nums">Остаток</th>
+              <th className="px-4 py-3 font-medium tabular-nums">В {report.baseCurrency}</th>
+              <th className="px-4 py-3 font-medium tabular-nums">Доля</th>
+              <th className="px-4 py-3 font-medium tabular-nums">Прирост</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.rows.map((row) => {
+              const open = expanded[row.currency]
+              const growthColor =
+                row.growthBase > 0
+                  ? 'text-emerald-700'
+                  : row.growthBase < 0
+                    ? 'text-red-600'
+                    : 'text-slate-700'
+              return (
+                <CurrencyGroup
+                  key={row.currency}
+                  open={!!open}
+                  onToggle={() => toggle(row.currency)}
+                  onOpenAccount={onOpenAccount}
+                  currency={row.currency}
+                  label={row.label}
+                  accountCount={row.accountCount}
+                  balance={row.balance}
+                  balanceBase={row.balanceBase}
+                  share={row.share}
+                  growth={row.growth}
+                  growthBase={row.growthBase}
+                  growthColor={growthColor}
+                  baseCurrency={report.baseCurrency}
+                  accounts={row.accounts}
+                />
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+              <td className="px-4 py-3">Итого</td>
+              <td className="px-4 py-3 tabular-nums">
+                {report.rows.reduce((s, r) => s + r.accountCount, 0)}
+              </td>
+              <td className="px-4 py-3 text-slate-400">—</td>
+              <td className="px-4 py-3 tabular-nums">
+                {formatCurrency(report.grandTotalBase, report.baseCurrency)}
+              </td>
+              <td className="px-4 py-3 tabular-nums">100%</td>
+              <td className="px-4 py-3 tabular-nums">
+                {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </Card>
+  )
+}
+
+function CurrencyGroup({
+  open,
+  onToggle,
+  onOpenAccount,
+  currency,
+  label,
+  accountCount,
+  balance,
+  balanceBase,
+  share,
+  growth,
+  growthBase,
+  growthColor,
+  baseCurrency,
+  accounts,
+}: {
+  open: boolean
+  onToggle: () => void
+  onOpenAccount: (accountId: string) => void
+  currency: string
+  label: string
+  accountCount: number
+  balance: number
+  balanceBase: number
+  share: number
+  growth: number
+  growthBase: number
+  growthColor: string
+  baseCurrency: string
+  accounts: {
+    accountId: string
+    name: string
+    balance: number
+    balanceBase: number
+    growth: number
+    growthBase: number
+  }[]
+}) {
+  return (
+    <>
+      <tr className="border-b border-slate-100 hover:bg-slate-50">
+        <td className="px-4 py-3">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex items-center gap-2 text-left font-medium text-slate-900"
+          >
+            <span className="inline-block w-3 text-slate-400">{open ? '▾' : '▸'}</span>
+            <span>
+              {currency}
+              <span className="ml-2 font-normal text-slate-500">{label}</span>
+            </span>
+          </button>
+        </td>
+        <td className="px-4 py-3 tabular-nums text-slate-700">{accountCount}</td>
+        <td className="px-4 py-3 tabular-nums text-slate-900">
+          {formatCurrency(balance, currency)}
+        </td>
+        <td className="px-4 py-3 tabular-nums text-slate-900">
+          {formatCurrency(balanceBase, baseCurrency)}
+        </td>
+        <td className="px-4 py-3 tabular-nums text-slate-700">{formatShare(share)}</td>
+        <td className={`px-4 py-3 tabular-nums ${growthColor}`}>
+          <div>{signedAmount(growth, currency)}</div>
+          {currency !== baseCurrency && (
+            <div className="text-xs opacity-80">≈ {signedAmount(growthBase, baseCurrency)}</div>
+          )}
+        </td>
+      </tr>
+      {open &&
+        accounts.map((acc) => {
+          const accGrowthColor =
+            acc.growthBase > 0
+              ? 'text-emerald-700'
+              : acc.growthBase < 0
+                ? 'text-red-600'
+                : 'text-slate-600'
+          return (
+            <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50/70">
+              <td className="px-4 py-2 pl-10">
+                <button
+                  type="button"
+                  onClick={() => onOpenAccount(acc.accountId)}
+                  className="text-left text-slate-700 hover:text-blue-700 hover:underline"
+                >
+                  {acc.name}
+                </button>
+              </td>
+              <td className="px-4 py-2 text-slate-400">—</td>
+              <td className="px-4 py-2 tabular-nums text-slate-700">
+                {formatCurrency(acc.balance, currency)}
+              </td>
+              <td className="px-4 py-2 tabular-nums text-slate-700">
+                {formatCurrency(acc.balanceBase, baseCurrency)}
+              </td>
+              <td className="px-4 py-2 text-slate-400">—</td>
+              <td className={`px-4 py-2 tabular-nums ${accGrowthColor}`}>
+                <div>{signedAmount(acc.growth, currency)}</div>
+                {currency !== baseCurrency && (
+                  <div className="text-xs opacity-80">
+                    ≈ {signedAmount(acc.growthBase, baseCurrency)}
+                  </div>
+                )}
+              </td>
+            </tr>
+          )
+        })}
+    </>
+  )
+}

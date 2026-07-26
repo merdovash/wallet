@@ -4,9 +4,12 @@ import type {
   Account,
   BalanceSnapshot,
   SnapshotLine,
+  SnapshotOrigin,
   Transfer,
   WalletSettings,
 } from '../types/wallet'
+import { buildTransferSnapshotLines } from '../lib/transferCheckIn'
+import type { RateBook } from '../engine/growthEngine'
 import {
   createAccountApi,
   createTransferApi,
@@ -45,7 +48,7 @@ interface WalletState {
   ) => Promise<string>
   updateAccount: (
     id: string,
-    patch: Partial<Omit<Account, 'id'>> & {
+    patch: Partial<Omit<Account, 'id' | 'creditLimit' | 'linkedAccountId'>> & {
       creditLimit?: number | null
       linkedAccountId?: string | null
     },
@@ -53,13 +56,23 @@ interface WalletState {
   reorderAccounts: (orderedIds: string[]) => Promise<void>
   archiveAccount: (id: string, archived?: boolean) => Promise<void>
   deleteAccount: (id: string) => Promise<void>
-  addSnapshot: (input: { date: string; note?: string; lines: SnapshotLine[] }) => Promise<string>
+  addSnapshot: (input: {
+    date: string
+    note?: string
+    origin?: SnapshotOrigin
+    lines: SnapshotLine[]
+  }) => Promise<string>
   updateSnapshot: (
     id: string,
     patch: Partial<Omit<BalanceSnapshot, 'id'>>,
   ) => Promise<void>
   deleteSnapshot: (id: string) => Promise<void>
   addTransfer: (input: Omit<Transfer, 'id'>) => Promise<string>
+  /** Create transfer and upsert a locked transfer check-in with adjusted balances. */
+  addTransferCheckIn: (
+    input: Omit<Transfer, 'id'>,
+    rateBook?: RateBook,
+  ) => Promise<{ transferId: string; snapshotId: string }>
   deleteTransfer: (id: string) => Promise<void>
 }
 
@@ -73,6 +86,13 @@ function normalizeAccount(account: Account): Account {
   return {
     ...account,
     kind: account.kind === 'credit' ? 'credit' : 'regular',
+  }
+}
+
+function normalizeSnapshot(snapshot: BalanceSnapshot): BalanceSnapshot {
+  return {
+    ...snapshot,
+    origin: snapshot.origin === 'transfer' ? 'transfer' : 'manual',
   }
 }
 
@@ -162,7 +182,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       set({
         settings: withFallbackRates(bundle.settings.baseCurrency),
         accounts: bundle.accounts.map(normalizeAccount),
-        snapshots: bundle.snapshots,
+        snapshots: bundle.snapshots.map(normalizeSnapshot),
         transfers: bundle.transfers,
         loaded: true,
         loading: false,
@@ -231,7 +251,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   addSnapshot: async (input) => {
-    const snapshot = await upsertSnapshotApi(input)
+    const snapshot = normalizeSnapshot(await upsertSnapshotApi(input))
     set((state) => {
       const others = state.snapshots.filter(
         (s) => s.id !== snapshot.id && s.date !== snapshot.date,
@@ -242,20 +262,35 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   updateSnapshot: async (id, patch) => {
-    const snapshot = await updateSnapshotApi(id, {
-      date: patch.date,
-      note: patch.note,
-      lines: patch.lines,
-    })
+    const snapshot = normalizeSnapshot(
+      await updateSnapshotApi(id, {
+        date: patch.date,
+        note: patch.note,
+        origin: patch.origin,
+        lines: patch.lines,
+      }),
+    )
     set((state) => ({
       snapshots: state.snapshots.map((s) => (s.id === id ? snapshot : s)),
     }))
   },
 
   deleteSnapshot: async (id) => {
+    const snap = get().snapshots.find((s) => s.id === id)
     await deleteSnapshotApi(id)
+    const sameDateTransfers =
+      snap?.origin === 'transfer'
+        ? get().transfers.filter((t) => t.date === snap.date)
+        : []
+    for (const t of sameDateTransfers) {
+      await deleteTransferApi(t.id)
+    }
     set((state) => ({
       snapshots: state.snapshots.filter((s) => s.id !== id),
+      transfers:
+        snap?.origin === 'transfer'
+          ? state.transfers.filter((t) => t.date !== snap.date)
+          : state.transfers,
     }))
   },
 
@@ -263,6 +298,39 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     const transfer = await createTransferApi(input)
     set((state) => ({ transfers: [...state.transfers, transfer] }))
     return transfer.id
+  },
+
+  addTransferCheckIn: async (input, rateBook) => {
+    const state = get()
+    const lines = buildTransferSnapshotLines({
+      date: input.date,
+      fromAccountId: input.fromAccountId,
+      toAccountId: input.toAccountId,
+      amount: input.amount,
+      accounts: state.accounts,
+      snapshots: state.snapshots,
+      settings: state.settings,
+      rateBook,
+    })
+    const transfer = await createTransferApi(input)
+    const snapshot = normalizeSnapshot(
+      await upsertSnapshotApi({
+        date: input.date,
+        note: input.note,
+        origin: 'transfer',
+        lines,
+      }),
+    )
+    set((prev) => {
+      const others = prev.snapshots.filter(
+        (s) => s.id !== snapshot.id && s.date !== snapshot.date,
+      )
+      return {
+        transfers: [...prev.transfers, transfer],
+        snapshots: [...others, snapshot],
+      }
+    })
+    return { transferId: transfer.id, snapshotId: snapshot.id }
   },
 
   deleteTransfer: async (id) => {

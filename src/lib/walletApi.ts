@@ -2,6 +2,7 @@ import type {
   Account,
   BalanceSnapshot,
   SnapshotLine,
+  SnapshotOrigin,
   Transfer,
   WalletSettings,
 } from '../types/wallet'
@@ -70,7 +71,7 @@ export async function createAccountApi(
 
 export async function updateAccountApi(
   id: string,
-  patch: Partial<Omit<Account, 'id'>> & {
+  patch: Partial<Omit<Account, 'id' | 'creditLimit' | 'linkedAccountId'>> & {
     creditLimit?: number | null
     linkedAccountId?: string | null
   },
@@ -97,6 +98,7 @@ export async function reorderAccountsApi(orderedIds: string[]): Promise<Account[
 export async function upsertSnapshotApi(input: {
   date: string
   note?: string
+  origin?: SnapshotOrigin
   lines: SnapshotLine[]
 }): Promise<BalanceSnapshot> {
   const body = await api<{ snapshot: BalanceSnapshot }>('/api/wallet/snapshots', {
@@ -108,7 +110,12 @@ export async function upsertSnapshotApi(input: {
 
 export async function updateSnapshotApi(
   id: string,
-  patch: { date?: string; note?: string; lines?: SnapshotLine[] },
+  patch: {
+    date?: string
+    note?: string
+    origin?: SnapshotOrigin
+    lines?: SnapshotLine[]
+  },
 ): Promise<BalanceSnapshot> {
   const body = await api<{ snapshot: BalanceSnapshot }>(`/api/wallet/snapshots/${id}`, {
     method: 'PATCH',
