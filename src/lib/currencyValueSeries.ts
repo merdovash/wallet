@@ -9,6 +9,40 @@ export interface CurrencyValuePoint {
   values: Record<string, number>
 }
 
+export interface CurrencyValueChangeSummary {
+  fromDate: string
+  toDate: string
+  startTotal: number
+  endTotal: number
+  /** Absolute change of total base-equivalent (FX + quantity). */
+  absolute: number
+  /** Relative change vs first date; null if start is zero. */
+  relative: number | null
+}
+
+export function totalBaseOnPoint(point: CurrencyValuePoint): number {
+  return Object.values(point.values).reduce((sum, value) => sum + value, 0)
+}
+
+export function summarizeCurrencyValueChange(
+  points: CurrencyValuePoint[],
+): CurrencyValueChangeSummary | null {
+  if (points.length === 0) return null
+  const first = points[0]!
+  const last = points[points.length - 1]!
+  const startTotal = totalBaseOnPoint(first)
+  const endTotal = totalBaseOnPoint(last)
+  const absolute = endTotal - startTotal
+  return {
+    fromDate: first.date,
+    toDate: last.date,
+    startTotal,
+    endTotal,
+    absolute,
+    relative: startTotal !== 0 ? absolute / startTotal : null,
+  }
+}
+
 export function buildCurrencyValueSeries(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
@@ -16,7 +50,7 @@ export function buildCurrencyValueSeries(
   rateBook?: RateBook,
   opts?: { foreignOnly?: boolean },
 ): { currencies: string[]; points: CurrencyValuePoint[] } {
-  const foreignOnly = opts?.foreignOnly ?? true
+  const foreignOnly = opts?.foreignOnly ?? false
   const dates = snapshotDates(snapshots)
   const active = accounts.filter((a) => !a.archived)
   const currencies = [

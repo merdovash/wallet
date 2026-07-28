@@ -17,19 +17,15 @@ import { Card, EmptyState } from '../ui/FormControls'
 
 const LINE_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2']
 
-interface CurrencyValueChartProps {
-  foreignOnly?: boolean
-}
-
-export function CurrencyValueChart({ foreignOnly = true }: CurrencyValueChartProps) {
+export function CurrencyValueChart() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
 
   const { currencies, points } = useMemo(
-    () => buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, { foreignOnly }),
-    [accounts, snapshots, settings, rateBook, foreignOnly],
+    () => buildCurrencyValueSeries(accounts, snapshots, settings, rateBook),
+    [accounts, snapshots, settings, rateBook],
   )
 
   const rows = useMemo(
@@ -46,8 +42,8 @@ export function CurrencyValueChart({ foreignOnly = true }: CurrencyValueChartPro
     return (
       <Card>
         <EmptyState
-          title="Нет валютных счетов"
-          description="Добавьте счёт в валюте, отличной от базовой, чтобы увидеть динамику стоимости."
+          title="Нет счетов"
+          description="Добавьте счета, чтобы увидеть динамику стоимости по валютам."
         />
       </Card>
     )
@@ -64,9 +60,9 @@ export function CurrencyValueChart({ foreignOnly = true }: CurrencyValueChartPro
   return (
     <Card className="!p-3 sm:!p-4">
       <div className="mb-3">
-        <h2 className="text-sm font-semibold text-slate-800">Стоимость валютных счетов</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Стоимость по валютам</h2>
         <p className="text-xs text-slate-500">
-          В {settings.baseCurrency} по курсам на даты чек-инов
+          В {settings.baseCurrency} по курсам на даты чек-инов · все валюты
         </p>
       </div>
       <div className="h-64 w-full sm:h-80">

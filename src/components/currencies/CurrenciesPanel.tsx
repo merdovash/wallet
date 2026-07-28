@@ -1,9 +1,14 @@
 import { useEffect, useMemo } from 'react'
 import { snapshotDates } from '../../engine/growthEngine'
-import { todayIsoDate } from '../../lib/format'
+import {
+  buildCurrencyValueSeries,
+  summarizeCurrencyValueChange,
+} from '../../lib/currencyValueSeries'
+import { formatCurrency, formatPercent, formatShortDate, signedAmount, todayIsoDate } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { CurrencyReportTable } from '../dashboard/CurrencyReportTable'
+import { Card } from '../ui/FormControls'
 import { CurrencyValueChart } from './CurrencyValueChart'
 
 interface CurrenciesPanelProps {
@@ -14,29 +19,71 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
+  const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
-  const foreignCount = useMemo(
-    () => activeAccounts.filter((a) => a.currency !== settings.baseCurrency).length,
-    [activeAccounts, settings.baseCurrency],
+  const currencyCount = useMemo(
+    () => new Set(activeAccounts.map((a) => a.currency)).size,
+    [activeAccounts],
   )
+
+  const change = useMemo(() => {
+    const { points } = buildCurrencyValueSeries(accounts, snapshots, settings, rateBook)
+    return summarizeCurrencyValueChange(points)
+  }, [accounts, snapshots, settings, rateBook])
 
   useEffect(() => {
     void ensureRates([...dates, todayIsoDate()])
   }, [dates, ensureRates])
+
+  const absColor =
+    (change?.absolute ?? 0) > 0
+      ? 'text-emerald-700'
+      : (change?.absolute ?? 0) < 0
+        ? 'text-red-600'
+        : 'text-slate-800'
+  const relColor =
+    (change?.relative ?? 0) > 0
+      ? 'text-emerald-700'
+      : (change?.relative ?? 0) < 0
+        ? 'text-red-600'
+        : 'text-slate-800'
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Валюты</h1>
         <p className="text-sm text-slate-500">
-          Динамика стоимости валютных кошельков и сводка по валютам
-          {foreignCount > 0 ? ` · ${foreignCount} вал. счёт.` : ''}
+          Эквивалент в {settings.baseCurrency}: курсы и остатки · все валюты
+          {currencyCount > 0 ? ` · ${currencyCount} вал.` : ''}
         </p>
       </div>
 
-      <CurrencyValueChart foreignOnly />
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <Card className="!p-2.5 sm:!p-3">
+          <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${absColor}`}>
+            {change ? signedAmount(change.absolute, settings.baseCurrency) : '—'}
+          </p>
+          <p className="mt-1 text-[10px] text-slate-400">
+            {change
+              ? `${formatShortDate(change.fromDate)} → ${formatShortDate(change.toDate)}`
+              : 'от первой даты'}
+          </p>
+        </Card>
+        <Card className="!p-2.5 sm:!p-3">
+          <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
+          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${relColor}`}>
+            {formatPercent(change?.relative)}
+          </p>
+          <p className="mt-1 text-[10px] text-slate-400">
+            {change ? `от ${formatCurrency(change.startTotal, settings.baseCurrency)}` : 'от первой даты'}
+          </p>
+        </Card>
+      </div>
+
+      <CurrencyValueChart />
 
       <CurrencyReportTable
         accountCount={activeAccounts.length}
