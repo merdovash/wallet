@@ -1,4 +1,8 @@
 import { toBase } from './currency'
+import {
+  accountKindLabel,
+  normalizeAccountKind,
+} from './accountKinds'
 import { balanceOnDate, snapshotDates, type RateBook } from '../engine/growthEngine'
 import { resolvePivotForDate } from './cbrRates'
 import type { Account, BalanceSnapshot, WalletSettings } from '../types/wallet'
@@ -18,6 +22,45 @@ export interface CurrencyValueChangeSummary {
   absolute: number
   /** Relative change vs first date; null if start is zero. */
   relative: number | null
+}
+
+export interface CurrencyFxAccountLine {
+  accountId: string
+  name: string
+  kind: string
+  kindLabel: string
+  currency: string
+  startBalance: number
+  endBalance: number
+  startBase: number
+  endBase: number
+  /** endBase − startBase */
+  changeBase: number
+  /** Effect of rate move on starting balance: startBal × (rate1 − rate0). */
+  fxEffectBase: number
+  /** Effect of balance change at end rate: (endBal − startBal) × rate1. */
+  quantityEffectBase: number
+}
+
+export interface CurrencyFxFactorLine {
+  key: string
+  label: string
+  amount: number
+  unit: 'money' | 'rate'
+  hint?: string
+}
+
+export interface CurrencyFxBreakdown {
+  fromDate: string
+  toDate: string
+  startTotal: number
+  endTotal: number
+  absolute: number
+  relative: number | null
+  /** Accounts sorted by |changeBase| then changeBase desc. */
+  accounts: CurrencyFxAccountLine[]
+  /** Aggregated drivers of the total change. */
+  factors: CurrencyFxFactorLine[]
 }
 
 export function totalBaseOnPoint(point: CurrencyValuePoint): number {
@@ -40,6 +83,142 @@ export function summarizeCurrencyValueChange(
     endTotal,
     absolute,
     relative: startTotal !== 0 ? absolute / startTotal : null,
+  }
+}
+
+function pivotForDate(
+  date: string,
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): Record<string, number> | null {
+  return (
+    (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
+    (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+  )
+}
+
+function unitInBase(
+  currency: string,
+  settings: WalletSettings,
+  pivot: Record<string, number> | null,
+): number {
+  return toBase(1, currency, settings.baseCurrency, settings.exchangeRates, pivot)
+}
+
+/**
+ * Breakdown of foreign-currency base-equivalent change for the Currencies tab.
+ * Includes all account kinds (operational, cash, fund, …).
+ */
+export function buildCurrencyFxBreakdown(
+  accounts: Account[],
+  snapshots: BalanceSnapshot[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): CurrencyFxBreakdown | null {
+  const { points } = buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, {
+    foreignOnly: true,
+  })
+  const summary = summarizeCurrencyValueChange(points)
+  if (!summary) return null
+
+  const fromDate = summary.fromDate
+  const toDate = summary.toDate
+  const startPivot = pivotForDate(fromDate, settings, rateBook)
+  const endPivot = pivotForDate(toDate, settings, rateBook)
+
+  const foreign = accounts.filter(
+    (a) => !a.archived && a.currency !== settings.baseCurrency,
+  )
+
+  const accountLines: CurrencyFxAccountLine[] = []
+  for (const account of foreign) {
+    const startRec = balanceOnDate(account.id, fromDate, snapshots)
+    const endRec = balanceOnDate(account.id, toDate, snapshots)
+    if (startRec == null && endRec == null) continue
+    const startBalance = startRec ?? 0
+    const endBalance = endRec ?? 0
+    const startBase = toBase(
+      startBalance,
+      account.currency,
+      settings.baseCurrency,
+      settings.exchangeRates,
+      startPivot,
+    )
+    const endBase = toBase(
+      endBalance,
+      account.currency,
+      settings.baseCurrency,
+      settings.exchangeRates,
+      endPivot,
+    )
+    const rate0 = unitInBase(account.currency, settings, startPivot)
+    const rate1 = unitInBase(account.currency, settings, endPivot)
+    const fxEffectBase = startBalance * (rate1 - rate0)
+    const quantityEffectBase = (endBalance - startBalance) * rate1
+    const kind = normalizeAccountKind(account.kind)
+    accountLines.push({
+      accountId: account.id,
+      name: account.name,
+      kind,
+      kindLabel: accountKindLabel(kind),
+      currency: account.currency,
+      startBalance,
+      endBalance,
+      startBase,
+      endBase,
+      changeBase: endBase - startBase,
+      fxEffectBase,
+      quantityEffectBase,
+    })
+  }
+
+  accountLines.sort(
+    (a, b) => b.changeBase - a.changeBase || a.name.localeCompare(b.name),
+  )
+
+  const fxTotal = accountLines.reduce((s, a) => s + a.fxEffectBase, 0)
+  const qtyTotal = accountLines.reduce((s, a) => s + a.quantityEffectBase, 0)
+
+  const rateFactors: CurrencyFxFactorLine[] = []
+  const seen = new Set<string>()
+  for (const line of accountLines) {
+    if (seen.has(line.currency)) continue
+    seen.add(line.currency)
+    const rate0 = unitInBase(line.currency, settings, startPivot)
+    const rate1 = unitInBase(line.currency, settings, endPivot)
+    const delta = rate1 - rate0
+    if (Math.abs(delta) < 1e-12) continue
+    rateFactors.push({
+      key: `rate-${line.currency}`,
+      label: `Курс ${line.currency}`,
+      amount: delta,
+      unit: 'rate',
+      hint: `${rate0.toFixed(2)} → ${rate1.toFixed(2)} ${settings.baseCurrency}`,
+    })
+  }
+
+  const factors: CurrencyFxFactorLine[] = [
+    {
+      key: 'fx',
+      label: 'Курсовой эффект',
+      amount: fxTotal,
+      unit: 'money',
+      hint: 'изменение курса × начальный остаток',
+    },
+    {
+      key: 'qty',
+      label: 'Изменение остатков',
+      amount: qtyTotal,
+      unit: 'money',
+      hint: 'Δ количества × курс на конец',
+    },
+    ...rateFactors,
+  ]
+
+  return {
+    ...summary,
+    accounts: accountLines,
+    factors,
   }
 }
 
@@ -66,9 +245,7 @@ export function buildCurrencyValueSeries(
   }
 
   const points: CurrencyValuePoint[] = dates.map((date) => {
-    const pivot =
-      (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
-      (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+    const pivot = pivotForDate(date, settings, rateBook)
     const values: Record<string, number> = {}
     for (const currency of currencies) {
       let sum = 0

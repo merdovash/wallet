@@ -68,7 +68,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+          <p className="text-xs text-slate-500 sm:text-sm">Курсовая разница</p>
           <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${absColor}`}>
             {change ? signedAmount(change.absolute, settings.baseCurrency) : '—'}
           </p>
@@ -79,7 +79,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
           </p>
         </Card>
         <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
+          <p className="text-xs text-slate-500 sm:text-sm">Курсовая разница %</p>
           <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${relColor}`}>
             {formatPercent(change?.relative)}
           </p>
@@ -95,6 +95,8 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
         accountCount={foreignAccounts.length}
         onOpenAccount={onOpenAccount}
         foreignOnly
+        allKindsGrowth
+        growthColumnLabel="Курсовая разница"
       />
     </div>
   )

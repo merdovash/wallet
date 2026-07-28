@@ -110,4 +110,31 @@ describe('buildCurrencyReport', () => {
     expect(usd.growthBase).toBeGreaterThan(0)
     expect(usd.growth).toBeLessThan(0)
   })
+
+  it('counts operational foreign accounts when allKindsGrowth', () => {
+    const accounts = [
+      account({ id: 'op', name: 'USD cash', currency: 'USD', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [{ accountId: 'op', amount: 10 }],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [{ accountId: 'op', amount: 12 }],
+      },
+    ]
+
+    const defaultReport = buildCurrencyReport(accounts, snapshots, [], settings)
+    expect(defaultReport.rows[0]?.growth).toBe(0)
+
+    const allKinds = buildCurrencyReport(accounts, snapshots, [], settings, undefined, {
+      allKindsGrowth: true,
+    })
+    expect(allKinds.rows[0]?.growth).toBe(2)
+    expect(allKinds.rows[0]?.growthBase).toBe(200)
+  })
 })

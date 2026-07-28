@@ -22,6 +22,10 @@ interface CurrencyReportTableProps {
   baseCurrencyLast?: boolean
   /** When true, hide base-currency accounts entirely. */
   foreignOnly?: boolean
+  /** Include operational/cash/etc. in growth column. */
+  allKindsGrowth?: boolean
+  /** Column title for growth / FX difference. */
+  growthColumnLabel?: string
 }
 
 export function CurrencyReportTable({
@@ -29,6 +33,8 @@ export function CurrencyReportTable({
   onOpenAccount,
   baseCurrencyLast = false,
   foreignOnly = false,
+  allKindsGrowth = false,
+  growthColumnLabel = 'Прирост',
 }: CurrencyReportTableProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
@@ -42,8 +48,18 @@ export function CurrencyReportTable({
       buildCurrencyReport(accounts, snapshots, transfers, settings, rateBook, {
         baseCurrencyLast,
         foreignOnly,
+        allKindsGrowth,
       }),
-    [accounts, snapshots, transfers, settings, rateBook, baseCurrencyLast, foreignOnly],
+    [
+      accounts,
+      snapshots,
+      transfers,
+      settings,
+      rateBook,
+      baseCurrencyLast,
+      foreignOnly,
+      allKindsGrowth,
+    ],
   )
 
   function toggle(currency: string) {
@@ -77,7 +93,7 @@ export function CurrencyReportTable({
               </th>
               <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Доля</th>
               <th className="w-[26%] px-3 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
-                Прирост
+                {growthColumnLabel}
               </th>
             </tr>
           </thead>

@@ -50,7 +50,12 @@ export function buildCurrencyReport(
   transfers: Transfer[],
   settings: WalletSettings,
   rateBook?: RateBook,
-  opts?: { baseCurrencyLast?: boolean; foreignOnly?: boolean },
+  opts?: {
+    baseCurrencyLast?: boolean
+    foreignOnly?: boolean
+    /** When true, growth includes operational/cash/credit — not only fund/deposit/investment. */
+    allKindsGrowth?: boolean
+  },
 ): CurrencyReport {
   const dates = snapshotDates(snapshots)
   const t0 = dates[0] ?? null
@@ -87,19 +92,19 @@ export function buildCurrencyReport(
 
   for (const account of active) {
     const balance = balanceOnDate(account.id, t1, snapshots) ?? 0
-    const growth =
-      t0 != null && isGrowthAccount(account)
-        ? (accountGrowth(
-            account.id,
-            t0,
-            t1,
-            snapshots,
-            transfers,
-            accounts,
-            settings,
-            rateBook,
-          ) ?? 0)
-        : 0
+    const countGrowth = t0 != null && (opts?.allKindsGrowth || isGrowthAccount(account))
+    const growth = countGrowth
+      ? (accountGrowth(
+          account.id,
+          t0!,
+          t1,
+          snapshots,
+          transfers,
+          accounts,
+          settings,
+          rateBook,
+        ) ?? 0)
+      : 0
     const balanceBase = toBase(
       balance,
       account.currency,
@@ -107,19 +112,18 @@ export function buildCurrencyReport(
       settings.exchangeRates,
       pivot,
     )
-    const growthBase =
-      t0 != null && isGrowthAccount(account)
-        ? (accountGrowthBase(
-            account.id,
-            t0,
-            t1,
-            snapshots,
-            transfers,
-            accounts,
-            settings,
-            rateBook,
-          ) ?? 0)
-        : 0
+    const growthBase = countGrowth
+      ? (accountGrowthBase(
+          account.id,
+          t0!,
+          t1,
+          snapshots,
+          transfers,
+          accounts,
+          settings,
+          rateBook,
+        ) ?? 0)
+      : 0
 
     const bucket = byCurrency.get(account.currency) ?? {
       balance: 0,
