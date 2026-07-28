@@ -27,9 +27,13 @@ export interface PeriodReturnSummary {
   days: number
   startTotal: number
   endTotal: number
+  /** Net external cashflow (income − expense) over (start, end]. */
+  netFlow: number
   growth: number
   growthPct: number | null
   annualizedPct: number | null
+  /** Number of fund/deposit/investment accounts in the calculation. */
+  accountCount: number
 }
 
 const MONTH_LABELS = [
@@ -160,9 +164,11 @@ export function buildPeriodReturn(
     days,
     startTotal,
     endTotal,
+    netFlow,
     growth,
     growthPct,
     annualizedPct:
       growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days),
+    accountCount: eligible.length,
   }
 }

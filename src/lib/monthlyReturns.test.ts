@@ -65,6 +65,8 @@ describe('monthlyReturns', () => {
     const summary = buildPeriodReturn(accounts, snapshots, settings)
     expect(summary?.growthPct).toBeCloseTo(0.1, 8)
     expect(summary?.days).toBe(30)
+    expect(summary?.netFlow).toBe(0)
+    expect(summary?.accountCount).toBe(1)
     expect(summary?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
   })
 })
