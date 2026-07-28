@@ -8,6 +8,7 @@ import type {
   Transfer,
   WalletSettings,
 } from '../types/wallet'
+import { normalizeAccountKind } from '../lib/accountKinds'
 import { buildTransferSnapshotLines } from '../lib/transferCheckIn'
 import type { RateBook } from '../engine/growthEngine'
 import {
@@ -87,7 +88,7 @@ function nextColor(accounts: Account[]): string {
 function normalizeAccount(account: Account): Account {
   return {
     ...account,
-    kind: account.kind === 'credit' ? 'credit' : 'regular',
+    kind: normalizeAccountKind(account.kind),
   }
 }
 
@@ -211,7 +212,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       currency: input.currency,
       color: input.color || nextColor(get().accounts),
       sortOrder: input.sortOrder,
-      kind: input.kind ?? 'regular',
+      kind: input.kind ?? 'bank',
       creditLimit: input.creditLimit,
       linkedAccountId: input.linkedAccountId,
       graceMonths: input.graceMonths,

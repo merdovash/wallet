@@ -1,8 +1,14 @@
-export type AppSection = 'dashboard' | 'checkins' | 'accounts' | 'float' | 'settings'
+export type AppSection =
+  | 'dashboard'
+  | 'checkins'
+  | 'accounts'
+  | 'types'
+  | 'float'
+  | 'settings'
 
 export type SnapshotOrigin = 'manual' | 'transfer'
 
-export type AccountKind = 'regular' | 'credit'
+export type AccountKind = 'bank' | 'credit' | 'cash' | 'investment'
 
 export interface Account {
   id: string

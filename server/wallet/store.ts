@@ -1,6 +1,14 @@
 import { getPool } from '../db/pool'
 
-export type DbAccountKind = 'regular' | 'credit'
+export type DbAccountKind = 'bank' | 'credit' | 'cash' | 'investment'
+
+function normalizeKind(kind: string | null | undefined): DbAccountKind {
+  if (kind === 'credit') return 'credit'
+  if (kind === 'cash') return 'cash'
+  if (kind === 'investment') return 'investment'
+  if (kind === 'bank' || kind === 'regular') return 'bank'
+  return 'bank'
+}
 
 export interface DbAccount {
   id: string
@@ -76,7 +84,7 @@ function normalizeGraceMonths(value: unknown): number {
 }
 
 function mapAccount(row: AccountRow): DbAccount {
-  const kind: DbAccountKind = row.kind === 'credit' ? 'credit' : 'regular'
+  const kind = normalizeKind(row.kind)
   const account: DbAccount = {
     id: String(row.id),
     name: String(row.name),
@@ -168,7 +176,7 @@ export async function createAccount(
     graceMonths?: number
   },
 ): Promise<DbAccount> {
-  const kind: DbAccountKind = input.kind === 'credit' ? 'credit' : 'regular'
+  const kind = normalizeKind(input.kind)
   if (kind === 'credit') {
     if (input.creditLimit == null || !(input.creditLimit > 0)) {
       throw new Error('Для кредитки нужен creditLimit > 0')
@@ -229,7 +237,7 @@ export async function updateAccount(
 
   const current = mapAccount(existing.rows[0]!)
   const nextKind: DbAccountKind =
-    patch.kind === 'credit' || patch.kind === 'regular' ? patch.kind : current.kind
+    patch.kind != null ? normalizeKind(patch.kind) : current.kind
 
   let nextLimit: number | null =
     nextKind === 'credit' ? (current.creditLimit ?? null) : null
@@ -658,7 +666,7 @@ export async function importWalletData(
     )
 
     for (const [index, account] of payload.accounts.entries()) {
-      const kind: DbAccountKind = account.kind === 'credit' ? 'credit' : 'regular'
+      const kind = normalizeKind(account.kind)
       const inserted = await query<{ id: string }>(
         `INSERT INTO wallet_accounts
            (user_id, name, currency, color, archived, sort_order, kind, credit_limit, grace_months)

@@ -11,6 +11,7 @@ import {
 import { creditDebt } from '../../engine/creditFloatEngine'
 import { balanceOnDate, buildAccountSeries } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
+import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '../../lib/accountKinds'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRatesStore } from '../../store/ratesStore'
@@ -43,7 +44,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('RUB')
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
-  const [kind, setKind] = useState<AccountKind>('regular')
+  const [kind, setKind] = useState<AccountKind>('bank')
   const [creditLimit, setCreditLimit] = useState('')
   const [linkedAccountId, setLinkedAccountId] = useState('')
   const [graceMonths, setGraceMonths] = useState('3')
@@ -91,7 +92,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setName('')
     setCurrency('RUB')
     setColor(ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)
-    setKind('regular')
+    setKind('bank')
     setCreditLimit('')
     setLinkedAccountId('')
     setGraceMonths('3')
@@ -105,7 +106,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setName(account.name)
     setCurrency(account.currency)
     setColor(account.color)
-    setKind(account.kind ?? 'regular')
+    setKind(account.kind ?? 'bank')
     setCreditLimit(
       account.creditLimit != null ? String(account.creditLimit) : '',
     )
@@ -148,13 +149,13 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         name: trimmed,
         currency,
         color,
-        kind: 'regular',
+        kind,
         creditLimit: null,
         linkedAccountId: null,
         graceMonths: null,
       })
     } else {
-      await addAccount({ name: trimmed, currency, color, kind: 'regular' })
+      await addAccount({ name: trimmed, currency, color, kind })
     }
     setFormOpen(false)
   }
@@ -269,8 +270,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               value={kind}
               onChange={(e) => setKind(e.target.value as AccountKind)}
             >
-              <option value="regular">Обычный</option>
-              <option value="credit">Кредитка</option>
+              {ACCOUNT_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {ACCOUNT_KIND_LABELS[k]}
+                </option>
+              ))}
             </Select>
           </Field>
           <Field label="Валюта">
@@ -604,9 +608,9 @@ function AccountListItem({
           <span className="min-w-0">
             <span className="block truncate font-medium text-slate-900">
               {account.name}
-              {account.kind === 'credit' ? (
-                <span className="ml-2 text-xs font-normal text-slate-400">кредитка</span>
-              ) : null}
+              <span className="ml-2 text-xs font-normal text-slate-400">
+                {ACCOUNT_KIND_LABELS[account.kind].toLowerCase()}
+              </span>
               {account.archived ? (
                 <span className="ml-2 text-xs font-normal text-slate-400">архив</span>
               ) : null}
