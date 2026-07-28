@@ -297,28 +297,21 @@ export function totalOnDate(
 
 /**
  * Capital flows into the growth portfolio over (t0, t1] in base currency:
- * - check-in income − expense
- * - transfers from non-growth → growth (+), growth → non-growth (−)
+ * transfers from non-growth → growth (+), growth → non-growth (−).
+ * Check-in income/expense are ignored — they land on operational accounts
+ * and do not belong in the growth portfolio until transferred in.
  * Internal transfers between growth accounts cancel out.
  */
 export function growthCapitalFlows(
   t0: string,
   t1: string,
-  snapshots: BalanceSnapshot[],
+  _snapshots: BalanceSnapshot[],
   transfers: Transfer[],
   accounts: Account[],
   settings: WalletSettings,
   rateBook?: RateBook,
 ): DatedCapitalFlow[] {
   const byDate = new Map<string, number>()
-
-  for (const snap of snapshots) {
-    if (compareDate(snap.date, t0) <= 0) continue
-    if (compareDate(snap.date, t1) > 0) continue
-    const net = (snap.income ?? 0) - (snap.expense ?? 0)
-    if (net === 0) continue
-    byDate.set(snap.date, (byDate.get(snap.date) ?? 0) + net)
-  }
 
   const map = accountById(accounts)
   for (const t of transfers) {
@@ -395,7 +388,7 @@ export function modifiedDietzReturn(
 /**
  * Series for growth accounts on each snapshot date.
  * growth = total change minus cumulative external capital flows
- * (income − expense, and transfers across the growth boundary).
+ * (transfers across the growth boundary; income/expense are ignored).
  */
 export function buildTotalSeries(
   accounts: Account[],

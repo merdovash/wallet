@@ -29,20 +29,49 @@ describe('monthlyReturns', () => {
     expect(annualizePeriodReturn(0.1, 365)).toBeCloseTo(0.1, 8)
   })
 
-  it('builds monthly growth percent excluding cashflows', () => {
-    const accounts = [account({ id: 'a', name: 'A' })]
+  it('builds monthly growth percent excluding boundary transfers', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'a', name: 'A' }),
+    ]
     const snapshots: BalanceSnapshot[] = [
-      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 100_000 }] },
-      { id: 's2', date: '2026-01-31', lines: [{ accountId: 'a', amount: 101_000 }] },
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 5_000 },
+          { accountId: 'a', amount: 100_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'op', amount: 5_000 },
+          { accountId: 'a', amount: 101_000 },
+        ],
+      },
       {
         id: 's3',
         date: '2026-02-28',
         income: 5_000,
-        lines: [{ accountId: 'a', amount: 107_020 }],
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'a', amount: 107_020 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-02-28',
+        fromAccountId: 'op',
+        toAccountId: 'a',
+        amount: 5_000,
       },
     ]
 
-    const rows = buildMonthlyReturns(accounts, snapshots, settings)
+    const rows = buildMonthlyReturns(accounts, snapshots, settings, undefined, transfers)
     expect(rows).toHaveLength(2)
 
     // Jan: 1000 / 100000 = 1%
@@ -50,28 +79,58 @@ describe('monthlyReturns', () => {
     expect(rows[0]?.growthPct).toBeCloseTo(0.01, 8)
     expect(rows[0]?.annualizedPct).toBeCloseTo(annualizeMonthlyReturn(0.01), 8)
 
-    // Feb: end 107020 - start 101000 - income 5000 = 1020
+    // Feb: end 107020 - start 101000 - transfer 5000 = 1020; income ignored
     // Flow on last day → weight 0 → denom = 101000
     expect(rows[1]?.yearMonth).toBe('2026-02')
     expect(rows[1]?.growth).toBeCloseTo(1020, 4)
+    expect(rows[1]?.netFlow).toBe(5_000)
     expect(rows[1]?.growthPct).toBeCloseTo(1020 / 101_000, 8)
   })
 
-  it('time-weights mid-period deposit in Modified Dietz percent', () => {
-    const accounts = [account({ id: 'a', name: 'A' })]
+  it('time-weights mid-period transfer in Modified Dietz percent', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'a', name: 'A' }),
+    ]
     const snapshots: BalanceSnapshot[] = [
-      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 100_000 }] },
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 50_000 },
+          { accountId: 'a', amount: 100_000 },
+        ],
+      },
       {
         id: 's2',
         date: '2026-01-16',
         income: 50_000,
-        lines: [{ accountId: 'a', amount: 150_000 }],
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'a', amount: 150_000 },
+        ],
       },
-      { id: 's3', date: '2026-01-31', lines: [{ accountId: 'a', amount: 151_000 }] },
+      {
+        id: 's3',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'a', amount: 151_000 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-16',
+        fromAccountId: 'op',
+        toAccountId: 'a',
+        amount: 50_000,
+      },
     ]
 
-    const summary = buildPeriodReturn(accounts, snapshots, settings)
-    // growth = 151000 - 100000 - 50000 = 1000
+    const summary = buildPeriodReturn(accounts, snapshots, settings, undefined, transfers)
+    // growth = 151000 - 100000 - 50000 = 1000; income field ignored
     // days=30, flow day 15, w=15/30=0.5 → denom = 100000 + 25000 = 125000
     expect(summary?.growth).toBeCloseTo(1000, 4)
     expect(summary?.netFlow).toBe(50_000)

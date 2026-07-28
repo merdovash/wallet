@@ -175,25 +175,34 @@ describe('growthEngine', () => {
     expect(totalOnDate('2026-01-01', accounts, snapshots, settings)).toBe(2000)
   })
 
-  it('excludes daily income and expense from total growth', () => {
-    const accounts = [account({ id: 'a', name: 'A' })]
+  it('ignores check-in income and expense for portfolio growth', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'f', name: 'Fund', kind: 'fund' }),
+    ]
     const snapshots: BalanceSnapshot[] = [
       {
         id: 's1',
         date: '2026-01-01',
-        lines: [{ accountId: 'a', amount: 1000 }],
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'f', amount: 1000 },
+        ],
       },
       {
         id: 's2',
         date: '2026-02-01',
         income: 500,
         expense: 100,
-        lines: [{ accountId: 'a', amount: 1500 }],
+        lines: [
+          { accountId: 'op', amount: 400 },
+          { accountId: 'f', amount: 1100 },
+        ],
       },
     ]
-    // Balance +500, but net external cashflow = +400 → growth = 100
+    // Income/expense hit operational; fund grew +100 → growth 100
     const totalSeries = buildTotalSeries(accounts, snapshots, settings)
-    expect(totalSeries[1]?.total).toBe(1500)
+    expect(totalSeries[1]?.total).toBe(1100)
     expect(totalSeries[1]?.growth).toBe(100)
     expect(periodGrowth(accounts, snapshots, settings)).toBe(100)
   })

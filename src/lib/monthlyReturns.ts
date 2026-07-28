@@ -60,7 +60,7 @@ export interface PeriodReturnSummary {
   days: number
   startTotal: number
   endTotal: number
-  /** Net capital into growth portfolio (income − expense + boundary transfers). */
+  /** Net capital into growth portfolio (boundary transfers only). */
   netFlow: number
   /** Start total + time-weighted flows (Modified Dietz denominator). */
   weightedCapital: number
@@ -142,6 +142,7 @@ function flowLines(
  * and the previous month's close (or first snapshot in the first month) as open.
  * Income/expense and boundary transfers are excluded from growth and
  * time-weighted in the percentage (Modified Dietz).
+ * Income/expense fields on check-ins are ignored (they belong to operational).
  */
 export function buildMonthlyReturns(
   accounts: Account[],

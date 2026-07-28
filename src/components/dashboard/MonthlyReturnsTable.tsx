@@ -22,7 +22,7 @@ export function MonthlyReturnsTable() {
       <div className="border-b border-slate-100 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-800">Помесячный прирост</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Без учёта доходов/расходов и пополнений в приросте; % — Modified Dietz
+          Без учёта доходов/расходов; пополнения — только переводы; % — Modified Dietz
         </p>
       </div>
       {rows.length === 0 ? (
