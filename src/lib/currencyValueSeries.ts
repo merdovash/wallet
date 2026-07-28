@@ -50,7 +50,7 @@ export function buildCurrencyValueSeries(
   rateBook?: RateBook,
   opts?: { foreignOnly?: boolean },
 ): { currencies: string[]; points: CurrencyValuePoint[] } {
-  const foreignOnly = opts?.foreignOnly ?? false
+  const foreignOnly = opts?.foreignOnly ?? true
   const dates = snapshotDates(snapshots)
   const active = accounts.filter((a) => !a.archived)
   const currencies = [

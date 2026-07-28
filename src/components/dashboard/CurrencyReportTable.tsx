@@ -18,14 +18,17 @@ function accountCountLabel(count: number): string {
 interface CurrencyReportTableProps {
   accountCount: number
   onOpenAccount: (accountId: string) => void
-  /** When true, base currency row is always last (currencies tab). */
+  /** When true, base currency row is always last (legacy currencies tab). */
   baseCurrencyLast?: boolean
+  /** When true, hide base-currency accounts entirely. */
+  foreignOnly?: boolean
 }
 
 export function CurrencyReportTable({
   accountCount,
   onOpenAccount,
   baseCurrencyLast = false,
+  foreignOnly = false,
 }: CurrencyReportTableProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
@@ -38,8 +41,9 @@ export function CurrencyReportTable({
     () =>
       buildCurrencyReport(accounts, snapshots, transfers, settings, rateBook, {
         baseCurrencyLast,
+        foreignOnly,
       }),
-    [accounts, snapshots, transfers, settings, rateBook, baseCurrencyLast],
+    [accounts, snapshots, transfers, settings, rateBook, baseCurrencyLast, foreignOnly],
   )
 
   function toggle(currency: string) {

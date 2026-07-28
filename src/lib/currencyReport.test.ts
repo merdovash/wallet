@@ -52,10 +52,11 @@ describe('buildCurrencyReport', () => {
     expect(report.rows).toHaveLength(2)
     // Dashboard default: groups by descending amount
     expect(report.rows.map((r) => r.currency)).toEqual(['USD', 'RUB'])
-    const withBaseLast = buildCurrencyReport(accounts, snapshots, transfers, settings, undefined, {
-      baseCurrencyLast: true,
+    const withForeignOnly = buildCurrencyReport(accounts, snapshots, transfers, settings, undefined, {
+      foreignOnly: true,
     })
-    expect(withBaseLast.rows.map((r) => r.currency)).toEqual(['USD', 'RUB'])
+    expect(withForeignOnly.rows.map((r) => r.currency)).toEqual(['USD'])
+    expect(withForeignOnly.grandTotalBase).toBe(2000)
 
     const usd = report.rows.find((r) => r.currency === 'USD')!
     expect(usd.balance).toBe(20)

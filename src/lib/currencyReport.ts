@@ -49,13 +49,14 @@ export function buildCurrencyReport(
   transfers: Transfer[],
   settings: WalletSettings,
   rateBook?: RateBook,
-  opts?: { baseCurrencyLast?: boolean },
+  opts?: { baseCurrencyLast?: boolean; foreignOnly?: boolean },
 ): CurrencyReport {
   const dates = snapshotDates(snapshots)
   const t0 = dates[0] ?? null
   const t1 = dates[dates.length - 1] ?? null
   const active = accounts
     .filter((a) => !a.archived)
+    .filter((a) => (opts?.foreignOnly ? a.currency !== settings.baseCurrency : true))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
 
   if (!t1 || active.length === 0) {

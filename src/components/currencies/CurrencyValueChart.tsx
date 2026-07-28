@@ -24,7 +24,8 @@ export function CurrencyValueChart() {
   const rateBook = useRatesStore((s) => s.byDate)
 
   const { currencies, points } = useMemo(
-    () => buildCurrencyValueSeries(accounts, snapshots, settings, rateBook),
+    () =>
+      buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, { foreignOnly: true }),
     [accounts, snapshots, settings, rateBook],
   )
 
@@ -42,8 +43,8 @@ export function CurrencyValueChart() {
     return (
       <Card>
         <EmptyState
-          title="Нет счетов"
-          description="Добавьте счета, чтобы увидеть динамику стоимости по валютам."
+          title="Нет валютных счетов"
+          description="Добавьте счёт в валюте, отличной от базовой, чтобы увидеть динамику стоимости."
         />
       </Card>
     )
@@ -60,9 +61,9 @@ export function CurrencyValueChart() {
   return (
     <Card className="!p-3 sm:!p-4">
       <div className="mb-3">
-        <h2 className="text-sm font-semibold text-slate-800">Стоимость по валютам</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Стоимость валютных счетов</h2>
         <p className="text-xs text-slate-500">
-          В {settings.baseCurrency} по курсам на даты чек-инов · все валюты
+          В {settings.baseCurrency} по курсам на даты чек-инов · без {settings.baseCurrency}
         </p>
       </div>
       <div className="h-64 w-full sm:h-80">

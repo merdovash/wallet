@@ -22,7 +22,7 @@ function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Acco
 }
 
 describe('buildCurrencyValueSeries', () => {
-  it('tracks all currencies in base by default', () => {
+  it('tracks foreign currencies only by default', () => {
     const accounts = [
       account({ id: 'u', name: 'USD', currency: 'USD' }),
       account({ id: 'r', name: 'RUB', currency: 'RUB' }),
@@ -47,12 +47,12 @@ describe('buildCurrencyValueSeries', () => {
     ]
 
     const { currencies, points } = buildCurrencyValueSeries(accounts, snapshots, settings)
-    expect(currencies).toEqual(['RUB', 'USD'])
-    expect(points[0]?.values).toEqual({ RUB: 1000, USD: 1000 })
-    expect(points[1]?.values).toEqual({ RUB: 1000, USD: 1200 })
+    expect(currencies).toEqual(['USD'])
+    expect(points[0]?.values).toEqual({ USD: 1000 })
+    expect(points[1]?.values).toEqual({ USD: 1200 })
   })
 
-  it('can still exclude base currency when foreignOnly', () => {
+  it('can include base currency when foreignOnly is false', () => {
     const accounts = [
       account({ id: 'u', name: 'USD', currency: 'USD' }),
       account({ id: 'r', name: 'RUB', currency: 'RUB' }),
@@ -69,9 +69,9 @@ describe('buildCurrencyValueSeries', () => {
     ]
 
     const { currencies } = buildCurrencyValueSeries(accounts, snapshots, settings, undefined, {
-      foreignOnly: true,
+      foreignOnly: false,
     })
-    expect(currencies).toEqual(['USD'])
+    expect(currencies).toEqual(['RUB', 'USD'])
   })
 })
 

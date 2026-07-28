@@ -22,14 +22,20 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
+  const foreignAccounts = useMemo(
+    () => activeAccounts.filter((a) => a.currency !== settings.baseCurrency),
+    [activeAccounts, settings.baseCurrency],
+  )
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
-  const currencyCount = useMemo(
-    () => new Set(activeAccounts.map((a) => a.currency)).size,
-    [activeAccounts],
+  const foreignCurrencyCount = useMemo(
+    () => new Set(foreignAccounts.map((a) => a.currency)).size,
+    [foreignAccounts],
   )
 
   const change = useMemo(() => {
-    const { points } = buildCurrencyValueSeries(accounts, snapshots, settings, rateBook)
+    const { points } = buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, {
+      foreignOnly: true,
+    })
     return summarizeCurrencyValueChange(points)
   }, [accounts, snapshots, settings, rateBook])
 
@@ -55,8 +61,8 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Валюты</h1>
         <p className="text-sm text-slate-500">
-          Эквивалент в {settings.baseCurrency}: курсы и остатки · все валюты
-          {currencyCount > 0 ? ` · ${currencyCount} вал.` : ''}
+          Эквивалент иностранных валют в {settings.baseCurrency} (без {settings.baseCurrency})
+          {foreignCurrencyCount > 0 ? ` · ${foreignCurrencyCount} вал.` : ''}
         </p>
       </div>
 
@@ -86,9 +92,9 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
       <CurrencyValueChart />
 
       <CurrencyReportTable
-        accountCount={activeAccounts.length}
+        accountCount={foreignAccounts.length}
         onOpenAccount={onOpenAccount}
-        baseCurrencyLast
+        foreignOnly
       />
     </div>
   )
