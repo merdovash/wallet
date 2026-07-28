@@ -25,11 +25,43 @@ function expandPivotAliases(pivot: Record<string, number>): Record<string, numbe
   return next
 }
 
+async function fetchAndCache(isoDate: string): Promise<RatesApiResult> {
+  const fetched = await fetchCbrRatesForDate(isoDate)
+  const pivot = expandPivotAliases(fetched.pivotPerUnit)
+
+  if (hasDatabaseUrl()) {
+    try {
+      const pool = getPool()
+      await pool.withConnection(async (query) => {
+        await ensureCbrRatesSchema(query)
+        await saveRateDay(query, fetched.rateDate, pivot)
+      })
+    } catch (err) {
+      console.error('[rates] Failed to cache CBR day:', err)
+    }
+  }
+
+  return {
+    requestDate: isoDate,
+    rateDate: fetched.rateDate,
+    pivotPerUnit: pivot,
+    source: 'cbr',
+  }
+}
+
 /**
- * Resolve rates for a calendar date: DB cache (nearest ≤ date) when exact day
- * exists or is close enough; otherwise fetch from CBR and cache.
+ * Resolve rates for a calendar date.
+ * - Default: DB cache (nearest ≤ date within 14 days), else CBR.
+ * - forceRefresh: always hit CBR and overwrite cache (used by «Обновить»).
  */
-export async function resolveRatesForDate(isoDate: string): Promise<RatesApiResult> {
+export async function resolveRatesForDate(
+  isoDate: string,
+  opts?: { forceRefresh?: boolean },
+): Promise<RatesApiResult> {
+  if (opts?.forceRefresh) {
+    return fetchAndCache(isoDate)
+  }
+
   if (hasDatabaseUrl()) {
     try {
       const pool = getPool()
@@ -47,30 +79,14 @@ export async function resolveRatesForDate(isoDate: string): Promise<RatesApiResu
             }
           }
         }
-
-        const fetched = await fetchCbrRatesForDate(isoDate)
-        const pivot = expandPivotAliases(fetched.pivotPerUnit)
-        await saveRateDay(query, fetched.rateDate, pivot)
-        return {
-          requestDate: isoDate,
-          rateDate: fetched.rateDate,
-          pivotPerUnit: pivot,
-          source: 'cbr',
-        }
+        return fetchAndCache(isoDate)
       })
     } catch (err) {
-      // Fall through to direct CBR if DB is down.
       console.error('[rates] DB unavailable, fetching CBR directly:', err)
     }
   }
 
-  const fetched = await fetchCbrRatesForDate(isoDate)
-  return {
-    requestDate: isoDate,
-    rateDate: fetched.rateDate,
-    pivotPerUnit: expandPivotAliases(fetched.pivotPerUnit),
-    source: 'cbr',
-  }
+  return fetchAndCache(isoDate)
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -100,6 +116,8 @@ export async function handleRatesApi(req: any, res: any, pathname: string): Prom
 
   const url = new URL(req.url ?? '/', 'http://localhost')
   const date = url.searchParams.get('date') ?? ''
+  const forceRefresh =
+    url.searchParams.get('refresh') === '1' || url.searchParams.get('force') === '1'
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.statusCode = 400
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -107,10 +125,10 @@ export async function handleRatesApi(req: any, res: any, pathname: string): Prom
     return true
   }
 
-  const result = await resolveRatesForDate(date)
+  const result = await resolveRatesForDate(date, { forceRefresh })
   res.statusCode = 200
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.setHeader('Cache-Control', 'public, max-age=3600')
+  res.setHeader('Cache-Control', forceRefresh ? 'no-store' : 'public, max-age=300')
   res.end(JSON.stringify(result))
   return true
 }

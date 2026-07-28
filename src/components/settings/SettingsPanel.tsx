@@ -15,6 +15,7 @@ export function SettingsPanel() {
   const status = useRatesStore((s) => s.status)
   const error = useRatesStore((s) => s.error)
   const lastFetchedAt = useRatesStore((s) => s.lastFetchedAt)
+  const latestRateDate = useRatesStore((s) => s.latestRateDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const refreshDate = useRatesStore((s) => s.refreshDate)
   const [registryOpen, setRegistryOpen] = useState(false)
@@ -22,6 +23,7 @@ export function SettingsPanel() {
   const today = todayIsoDate()
   const pivot = useMemo(() => resolvePivotForDate(today, byDate), [byDate, today])
   const rateDates = useMemo(() => Object.keys(byDate).sort().reverse(), [byDate])
+  const effectiveRateDate = latestRateDate ?? rateDates[0] ?? null
 
   const currenciesInUse = useMemo(() => {
     const set = new Set<string>([settings.baseCurrency])
@@ -78,10 +80,13 @@ export function SettingsPanel() {
                 Обновлено: {formatDateTimeDisplay(lastFetchedAt)}
               </p>
             )}
-            {rateDates[0] && (
+            {effectiveRateDate && (
               <p className="mt-1 text-xs text-slate-500">
-                Актуальный день ЦБ: {formatDateDisplay(rateDates[0])}
-                {rateDates.length > 1 ? ` · всего дней: ${rateDates.length}` : ''}
+                День котировки ЦБ: {formatDateDisplay(effectiveRateDate)}
+                {effectiveRateDate !== today
+                  ? ` (для ${formatDateDisplay(today)})`
+                  : ''}
+                {rateDates.length > 1 ? ` · в кэше дней: ${rateDates.length}` : ''}
               </p>
             )}
           </div>

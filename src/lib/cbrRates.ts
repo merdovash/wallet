@@ -142,3 +142,46 @@ export function resolvePivotForDate(
   const best = dates[dates.length - 1]
   return best ? byDate[best]! : null
 }
+
+/** Latest rateDate key that is ≤ targetDate, or null. */
+export function nearestRateDate(
+  targetDate: string,
+  byDate: Record<string, Record<string, number>>,
+): string | null {
+  const dates = Object.keys(byDate)
+    .filter((d) => d <= targetDate)
+    .sort()
+  return dates[dates.length - 1] ?? null
+}
+
+export function daysBetweenIso(fromIso: string, toIso: string): number {
+  const a = Date.UTC(
+    Number(fromIso.slice(0, 4)),
+    Number(fromIso.slice(5, 7)) - 1,
+    Number(fromIso.slice(8, 10)),
+  )
+  const b = Date.UTC(
+    Number(toIso.slice(0, 4)),
+    Number(toIso.slice(5, 7)) - 1,
+    Number(toIso.slice(8, 10)),
+  )
+  return Math.round((b - a) / 86_400_000)
+}
+
+/**
+ * Whether we still need to fetch rates for `targetDate`.
+ * Historical dates tolerate up to 14 days lookback (weekends/holidays).
+ * "Today" needs a rate not older than 3 days — otherwise refresh from CBR.
+ */
+export function needsRateFetch(
+  targetDate: string,
+  byDate: Record<string, Record<string, number>>,
+  today: string = todayUtcIso(),
+): boolean {
+  const nearest = nearestRateDate(targetDate, byDate)
+  if (!nearest) return true
+  const gap = daysBetweenIso(nearest, targetDate)
+  if (gap < 0) return true
+  if (targetDate >= today) return gap > 3
+  return gap > 14
+}

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import {
   CURRENCY_ALIASES,
   fetchCbrRatesForDate,
-  resolvePivotForDate,
+  needsRateFetch,
   type ParsedCbrRates,
 } from '../lib/cbrRates'
 import { todayIsoDate } from '../lib/format'
@@ -14,6 +14,8 @@ interface RatesState {
   status: 'idle' | 'loading' | 'ready' | 'error'
   error: string | null
   lastFetchedAt: string | null
+  /** Actual CBR rate day for the last successful refresh/ensure of "today". */
+  latestRateDate: string | null
   ensureRates: (dates: string[]) => Promise<void>
   refreshDate: (date: string) => Promise<void>
   getPivot: (date: string) => Record<string, number> | null
@@ -36,16 +38,44 @@ export function expandPivotAliases(
   return next
 }
 
-async function loadRatesForDate(isoDate: string): Promise<ParsedCbrRates> {
+/**
+ * Store under the real CBR rateDate, and also under requestDate when they differ
+ * so "today" appears in the registry after a refresh (CBR often labels the
+ * previous business day).
+ */
+export function mergeFetchedRates(
+  byDate: Record<string, Record<string, number>>,
+  requestDate: string,
+  rateDate: string,
+  pivot: Record<string, number>,
+): Record<string, Record<string, number>> {
+  const next = { ...byDate, [rateDate]: pivot }
+  if (requestDate !== rateDate) {
+    next[requestDate] = pivot
+  }
+  return next
+}
+
+async function loadRatesForDate(
+  isoDate: string,
+  opts?: { forceRefresh?: boolean },
+): Promise<ParsedCbrRates & { requestDate: string }> {
+  const forceRefresh = opts?.forceRefresh ?? false
   let apiError: string | null = null
   try {
-    const res = await fetch(`/api/rates?date=${encodeURIComponent(isoDate)}`)
+    const params = new URLSearchParams({ date: isoDate })
+    if (forceRefresh) params.set('refresh', '1')
+    const res = await fetch(`/api/rates?${params.toString()}`, {
+      cache: 'no-store',
+    })
     if (res.ok) {
       const data = (await res.json()) as {
+        requestDate?: string
         rateDate: string
         pivotPerUnit: Record<string, number>
       }
       return {
+        requestDate: data.requestDate ?? isoDate,
         rateDate: data.rateDate,
         pivotPerUnit: expandPivotAliases(data.pivotPerUnit),
       }
@@ -63,6 +93,7 @@ async function loadRatesForDate(isoDate: string): Promise<ParsedCbrRates> {
   try {
     const parsed = await fetchCbrRatesForDate(isoDate)
     return {
+      requestDate: isoDate,
       rateDate: parsed.rateDate,
       pivotPerUnit: expandPivotAliases(parsed.pivotPerUnit),
     }
@@ -75,24 +106,30 @@ async function loadRatesForDate(isoDate: string): Promise<ParsedCbrRates> {
 async function loadMissingDates(
   missing: string[],
   seed: Record<string, Record<string, number>>,
-): Promise<Record<string, Record<string, number>>> {
-  const next = { ...seed }
-  // Parallel with a small concurrency limit to avoid hammering CBR / API.
+): Promise<{
+  byDate: Record<string, Record<string, number>>
+  latestRateDate: string | null
+}> {
+  let next = { ...seed }
+  let latestRateDate: string | null = null
   const concurrency = 4
   for (let i = 0; i < missing.length; i += concurrency) {
     const chunk = missing.slice(i, i + concurrency)
     const results = await Promise.all(
       chunk.map(async (date) => {
-        if (resolvePivotForDate(date, next)) return null
+        if (!needsRateFetch(date, next)) return null
         return loadRatesForDate(date)
       }),
     )
     for (const parsed of results) {
       if (!parsed) continue
-      next[parsed.rateDate] = parsed.pivotPerUnit
+      next = mergeFetchedRates(next, parsed.requestDate, parsed.rateDate, parsed.pivotPerUnit)
+      if (!latestRateDate || parsed.rateDate > latestRateDate) {
+        latestRateDate = parsed.rateDate
+      }
     }
   }
-  return next
+  return { byDate: next, latestRateDate }
 }
 
 export const useRatesStore = create<RatesState>()(
@@ -102,8 +139,16 @@ export const useRatesStore = create<RatesState>()(
       status: 'idle',
       error: null,
       lastFetchedAt: null,
+      latestRateDate: null,
 
-      getPivot: (date) => resolvePivotForDate(date, get().byDate),
+      getPivot: (date) => {
+        const byDate = get().byDate
+        const dates = Object.keys(byDate)
+          .filter((d) => d <= date)
+          .sort()
+        const best = dates[dates.length - 1]
+        return best ? byDate[best]! : null
+      },
 
       ensureRates: async (dates) => {
         const unique = [...new Set(dates.filter(Boolean))].sort()
@@ -113,9 +158,8 @@ export const useRatesStore = create<RatesState>()(
 
         if (ensureInFlight) {
           await ensureInFlight
-          // After the shared load, check if newly queued dates still need fetching.
-          const stillMissing = [...ensureQueuedDates].filter(
-            (d) => !resolvePivotForDate(d, get().byDate),
+          const stillMissing = [...ensureQueuedDates].filter((d) =>
+            needsRateFetch(d, get().byDate),
           )
           if (stillMissing.length === 0) {
             ensureQueuedDates.clear()
@@ -126,7 +170,7 @@ export const useRatesStore = create<RatesState>()(
         const run = (async () => {
           const requested = [...ensureQueuedDates]
           ensureQueuedDates.clear()
-          const missing = requested.filter((d) => !resolvePivotForDate(d, get().byDate))
+          const missing = requested.filter((d) => needsRateFetch(d, get().byDate))
           if (missing.length === 0) {
             set({ status: 'ready', error: null })
             return
@@ -134,12 +178,13 @@ export const useRatesStore = create<RatesState>()(
 
           set({ status: 'loading', error: null })
           try {
-            const next = await loadMissingDates(missing, get().byDate)
+            const { byDate, latestRateDate } = await loadMissingDates(missing, get().byDate)
             set({
-              byDate: next,
+              byDate,
               status: 'ready',
               error: null,
               lastFetchedAt: new Date().toISOString(),
+              latestRateDate: latestRateDate ?? get().latestRateDate,
             })
           } catch (err) {
             set({
@@ -158,12 +203,18 @@ export const useRatesStore = create<RatesState>()(
       refreshDate: async (date) => {
         set({ status: 'loading', error: null })
         try {
-          const parsed = await loadRatesForDate(date)
+          const parsed = await loadRatesForDate(date, { forceRefresh: true })
           set({
-            byDate: { ...get().byDate, [parsed.rateDate]: parsed.pivotPerUnit },
+            byDate: mergeFetchedRates(
+              get().byDate,
+              parsed.requestDate,
+              parsed.rateDate,
+              parsed.pivotPerUnit,
+            ),
             status: 'ready',
             error: null,
             lastFetchedAt: new Date().toISOString(),
+            latestRateDate: parsed.rateDate,
           })
         } catch (err) {
           set({
@@ -175,7 +226,11 @@ export const useRatesStore = create<RatesState>()(
     }),
     {
       name: 'wallet-cbr-rates',
-      partialize: (state) => ({ byDate: state.byDate, lastFetchedAt: state.lastFetchedAt }),
+      partialize: (state) => ({
+        byDate: state.byDate,
+        lastFetchedAt: state.lastFetchedAt,
+        latestRateDate: state.latestRateDate,
+      }),
       merge: (persisted, current) => {
         const p = persisted as Partial<RatesState> | undefined
         const byDate: Record<string, Record<string, number>> = {}

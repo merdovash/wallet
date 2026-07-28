@@ -3,6 +3,7 @@ import {
   cbrArchiveUrl,
   cbrDateToIso,
   convertViaCbr,
+  needsRateFetch,
   parseCbrResponse,
   resolveCurrencyCode,
   resolvePivotForDate,
@@ -48,5 +49,21 @@ describe('cbrRates', () => {
     expect(resolvePivotForDate('2026-01-15', byDate)?.USD).toBe(80)
     expect(resolvePivotForDate('2026-01-12', byDate)?.USD).toBe(70)
     expect(resolvePivotForDate('2026-01-01', byDate)).toBeNull()
+  })
+
+  it('needsRateFetch refreshes stale "today" but accepts weekend lookback', () => {
+    const byDate = {
+      '2026-07-20': { RUB: 1, USD: 70 },
+    }
+    expect(needsRateFetch('2026-07-28', byDate, '2026-07-28')).toBe(true)
+    expect(
+      needsRateFetch('2026-07-28', { '2026-07-27': { RUB: 1, USD: 80 } }, '2026-07-28'),
+    ).toBe(false)
+    expect(
+      needsRateFetch('2026-01-15', { '2026-01-10': { RUB: 1, USD: 70 } }, '2026-07-28'),
+    ).toBe(false)
+    expect(
+      needsRateFetch('2026-01-15', { '2025-12-01': { RUB: 1, USD: 70 } }, '2026-07-28'),
+    ).toBe(true)
   })
 })
