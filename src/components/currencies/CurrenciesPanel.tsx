@@ -1,4 +1,7 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import { snapshotDates } from '../../engine/growthEngine'
+import { todayIsoDate } from '../../lib/format'
+import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { CurrencyReportTable } from '../dashboard/CurrencyReportTable'
 import { CurrencyValueChart } from './CurrencyValueChart'
@@ -9,12 +12,19 @@ interface CurrenciesPanelProps {
 
 export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
+  const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
+  const ensureRates = useRatesStore((s) => s.ensureRates)
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
+  const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const foreignCount = useMemo(
     () => activeAccounts.filter((a) => a.currency !== settings.baseCurrency).length,
     [activeAccounts, settings.baseCurrency],
   )
+
+  useEffect(() => {
+    void ensureRates([...dates, todayIsoDate()])
+  }, [dates, ensureRates])
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -26,7 +36,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
         </p>
       </div>
 
-      <CurrencyValueChart />
+      <CurrencyValueChart foreignOnly />
 
       <CurrencyReportTable
         accountCount={activeAccounts.length}

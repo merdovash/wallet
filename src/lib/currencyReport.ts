@@ -148,7 +148,12 @@ export function buildCurrencyReport(
       share: grandTotalBase !== 0 ? data.balanceBase / grandTotalBase : 0,
       accounts: data.accounts,
     }))
-    .sort((a, b) => b.balanceBase - a.balanceBase || a.currency.localeCompare(b.currency))
+    .sort((a, b) => {
+      const aBase = a.currency === settings.baseCurrency ? 1 : 0
+      const bBase = b.currency === settings.baseCurrency ? 1 : 0
+      if (aBase !== bBase) return aBase - bBase
+      return b.balanceBase - a.balanceBase || a.currency.localeCompare(b.currency)
+    })
 
   return {
     asOfDate: t1,

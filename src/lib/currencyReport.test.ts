@@ -49,6 +49,8 @@ describe('buildCurrencyReport', () => {
     expect(report.asOfDate).toBe('2026-02-01')
     expect(report.grandTotalBase).toBe(1500 + 10 * 100 + 10 * 100) // 3500
     expect(report.rows).toHaveLength(2)
+    // Base currency is listed last
+    expect(report.rows.map((r) => r.currency)).toEqual(['USD', 'RUB'])
 
     const usd = report.rows.find((r) => r.currency === 'USD')!
     expect(usd.balance).toBe(20)
