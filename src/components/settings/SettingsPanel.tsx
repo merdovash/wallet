@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { resolvePivotForDate } from '../../lib/cbrRates'
 import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
 import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, Field, Select } from '../ui/FormControls'
+import { RatesRegistryPanel } from './RatesRegistryPanel'
 
 export function SettingsPanel() {
   const settings = useWalletStore((s) => s.settings)
@@ -16,6 +17,7 @@ export function SettingsPanel() {
   const lastFetchedAt = useRatesStore((s) => s.lastFetchedAt)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const refreshDate = useRatesStore((s) => s.refreshDate)
+  const [registryOpen, setRegistryOpen] = useState(false)
 
   const today = todayIsoDate()
   const pivot = useMemo(() => resolvePivotForDate(today, byDate), [byDate, today])
@@ -79,17 +81,28 @@ export function SettingsPanel() {
             {rateDates[0] && (
               <p className="mt-1 text-xs text-slate-500">
                 Актуальный день ЦБ: {formatDateDisplay(rateDates[0])}
+                {rateDates.length > 1 ? ` · всего дней: ${rateDates.length}` : ''}
               </p>
             )}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={status === 'loading'}
-            onClick={() => void refreshDate(today)}
-          >
-            Обновить
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={rateDates.length === 0}
+              onClick={() => setRegistryOpen(true)}
+            >
+              Реестр
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={status === 'loading'}
+              onClick={() => void refreshDate(today)}
+            >
+              Обновить
+            </Button>
+          </div>
         </div>
 
         <p className="text-xs text-slate-500">
@@ -143,19 +156,15 @@ export function SettingsPanel() {
             </ul>
           </div>
         )}
-
-        {rateDates.length > 1 && (
-          <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Закэшированные дни ЦБ
-            </h3>
-            <p className="text-sm text-slate-600">
-              {rateDates.slice(0, 12).map(formatDateDisplay).join(', ')}
-              {rateDates.length > 12 ? '…' : ''}
-            </p>
-          </div>
-        )}
       </Card>
+
+      <RatesRegistryPanel
+        open={registryOpen}
+        onClose={() => setRegistryOpen(false)}
+        byDate={byDate}
+        baseCurrency={settings.baseCurrency}
+        currenciesInUse={currenciesInUse}
+      />
     </div>
   )
 }
