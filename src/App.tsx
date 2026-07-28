@@ -7,6 +7,7 @@ import { FloatPanel } from './components/float/FloatPanel'
 import { SnapshotsPanel } from './components/snapshots/SnapshotsPanel'
 import { AccountTypesPanel } from './components/types/AccountTypesPanel'
 import { CurrenciesPanel } from './components/currencies/CurrenciesPanel'
+import { MonthlyPanel } from './components/monthly/MonthlyPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
@@ -125,7 +126,7 @@ function SectionContent({
 }) {
   switch (section) {
     case 'dashboard':
-      return <Dashboard />
+      return <Dashboard onOpenAccount={onOpenAccount} />
     case 'checkins':
       return <SnapshotsPanel />
     case 'accounts':
@@ -136,6 +137,8 @@ function SectionContent({
       return <AccountTypesPanel onOpenAccount={onOpenAccount} />
     case 'currencies':
       return <CurrenciesPanel onOpenAccount={onOpenAccount} />
+    case 'monthly':
+      return <MonthlyPanel />
     case 'float':
       return <FloatPanel />
     case 'settings':

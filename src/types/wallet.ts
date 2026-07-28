@@ -4,6 +4,7 @@ export type AppSection =
   | 'accounts'
   | 'types'
   | 'currencies'
+  | 'monthly'
   | 'float'
   | 'settings'
 
