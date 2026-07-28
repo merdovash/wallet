@@ -11,6 +11,7 @@ const NAV_ITEMS: { id: AppSection; label: string; Icon: NavIcon }[] = [
   { id: 'checkins', label: 'Чек-ины', Icon: CheckInIcon },
   { id: 'accounts', label: 'Счета', Icon: AccountsIcon },
   { id: 'types', label: 'По типам', Icon: TypesIcon },
+  { id: 'currencies', label: 'Валюты', Icon: CurrenciesIcon },
   { id: 'float', label: 'Float', Icon: FloatIcon },
   { id: 'settings', label: 'Настройки', Icon: SettingsIcon },
 ]
@@ -271,6 +272,18 @@ function TypesIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M4 6h6v6H4V6ZM14 6h6v4h-6V6ZM14 14h6v4h-6v-4ZM4 16h6v2H4v-2Z"
+      />
+    </svg>
+  )
+}
+
+function CurrenciesIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 3v18M16.5 7.5c-.8-1-2-1.5-4.5-1.5s-3.7.5-4.5 1.5S7 9.5 7 10.5s.5 2 2 2.5c1.8.6 5 .9 6.5 1.5 1.4.6 2 1.4 2 2.5s-.8 2.2-2.5 2.8c-1.4.5-3.2.5-5 0"
       />
     </svg>
   )

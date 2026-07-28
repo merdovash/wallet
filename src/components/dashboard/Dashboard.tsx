@@ -12,16 +12,11 @@ import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
 import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
-import { CurrencyReportTable } from './CurrencyReportTable'
 import { GrowthChart } from './GrowthChart'
 import { MonthlyReturnsTable } from './MonthlyReturnsTable'
 import { SummaryCards } from './SummaryCards'
 
-interface DashboardProps {
-  onOpenAccount: (accountId: string) => void
-}
-
-export function Dashboard({ onOpenAccount }: DashboardProps) {
+export function Dashboard() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
@@ -29,7 +24,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const [checkInOpen, setCheckInOpen] = useState(false)
 
-  const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const latestDate = dates[dates.length - 1]
 
@@ -81,11 +75,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
       <GrowthChart data={series} currency={settings.baseCurrency} mode="total" />
 
       <MonthlyReturnsTable />
-
-      <CurrencyReportTable
-        accountCount={activeAccounts.length}
-        onOpenAccount={onOpenAccount}
-      />
 
       <CheckInPanel open={checkInOpen} onClose={() => setCheckInOpen(false)} />
     </div>

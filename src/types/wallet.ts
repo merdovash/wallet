@@ -3,6 +3,7 @@ export type AppSection =
   | 'checkins'
   | 'accounts'
   | 'types'
+  | 'currencies'
   | 'float'
   | 'settings'
 
