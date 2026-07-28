@@ -62,6 +62,8 @@ interface WalletState {
   addSnapshot: (input: {
     date: string
     note?: string
+    income?: number
+    expense?: number
     origin?: SnapshotOrigin
     lines: SnapshotLine[]
   }) => Promise<string>
@@ -96,6 +98,8 @@ function normalizeSnapshot(snapshot: BalanceSnapshot): BalanceSnapshot {
   return {
     ...snapshot,
     origin: snapshot.origin === 'transfer' ? 'transfer' : 'manual',
+    income: snapshot.income != null && Number.isFinite(snapshot.income) ? snapshot.income : 0,
+    expense: snapshot.expense != null && Number.isFinite(snapshot.expense) ? snapshot.expense : 0,
   }
 }
 
@@ -270,6 +274,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       await updateSnapshotApi(id, {
         date: patch.date,
         note: patch.note,
+        income: patch.income,
+        expense: patch.expense,
         origin: patch.origin,
         lines: patch.lines,
       }),

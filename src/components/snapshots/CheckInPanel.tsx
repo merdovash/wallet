@@ -71,6 +71,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
 
   const [date, setDate] = useState(todayIsoDate)
   const [note, setNote] = useState('')
+  const [income, setIncome] = useState('')
+  const [expense, setExpense] = useState('')
   /** Only manually typed values — empty means «без изменений». */
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
@@ -82,9 +84,13 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     if (editing) {
       setDate(editing.date)
       setNote(editing.note ?? '')
+      setIncome(editing.income ? String(editing.income) : '')
+      setExpense(editing.expense ? String(editing.expense) : '')
     } else {
       setDate(todayIsoDate())
       setNote('')
+      setIncome('')
+      setExpense('')
     }
     setAmounts({})
     setPendingTransfers([])
@@ -168,10 +174,16 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   async function handleSave() {
     if (!date || formAccounts.length === 0) return
 
+    const incomeValue = parseMoneyInput(income) ?? 0
+    const expenseValue = parseMoneyInput(expense) ?? 0
+    if (incomeValue < 0 || expenseValue < 0) return
+
     if (locked) {
-      if (note.trim() !== (editing?.note ?? '')) {
-        await updateSnapshot(editing!.id, { note: note.trim() || undefined })
-      }
+      await updateSnapshot(editing!.id, {
+        note: note.trim() || undefined,
+        income: incomeValue,
+        expense: expenseValue,
+      })
       onClose()
       return
     }
@@ -183,6 +195,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       await updateSnapshot(editing.id, {
         date,
         note: note.trim() || undefined,
+        income: incomeValue,
+        expense: expenseValue,
         lines: merged,
         origin: 'manual',
       })
@@ -208,6 +222,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     await addSnapshot({
       date,
       note: note.trim() || undefined,
+      income: incomeValue,
+      expense: expenseValue,
       origin: 'manual',
       lines,
     })
@@ -294,6 +310,27 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             placeholder="Необязательно"
           />
         </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Доход за день (базовая валюта)">
+            <MoneyInput
+              value={income}
+              onChange={setIncome}
+              allowNegative={false}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="Расход за день (базовая валюта)">
+            <MoneyInput
+              value={expense}
+              onChange={setExpense}
+              allowNegative={false}
+              placeholder="0"
+            />
+          </Field>
+        </div>
+        <p className="text-xs text-slate-500">
+          Внешние доходы и расходы не считаются приростом — нужны для корректных процентов.
+        </p>
 
         {!locked && (
           <p className="text-xs text-slate-500">

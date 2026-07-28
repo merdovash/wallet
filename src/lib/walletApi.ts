@@ -99,6 +99,8 @@ export async function reorderAccountsApi(orderedIds: string[]): Promise<Account[
 export async function upsertSnapshotApi(input: {
   date: string
   note?: string
+  income?: number
+  expense?: number
   origin?: SnapshotOrigin
   lines: SnapshotLine[]
 }): Promise<BalanceSnapshot> {
@@ -114,6 +116,8 @@ export async function updateSnapshotApi(
   patch: {
     date?: string
     note?: string
+    income?: number
+    expense?: number
     origin?: SnapshotOrigin
     lines?: SnapshotLine[]
   },

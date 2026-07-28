@@ -40,6 +40,16 @@ export interface BalanceSnapshot {
   note?: string
   /** manual = editable check-in; transfer = created via transfer, amounts locked */
   origin?: SnapshotOrigin
+  /**
+   * External income for the day in base currency (deposits / salary).
+   * Excluded from growth / return calculations.
+   */
+  income?: number
+  /**
+   * External expense for the day in base currency (withdrawals / spending).
+   * Excluded from growth / return calculations.
+   */
+  expense?: number
   lines: SnapshotLine[]
 }
 

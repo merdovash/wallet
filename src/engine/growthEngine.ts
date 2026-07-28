@@ -188,7 +188,8 @@ export function totalOnDate(
 
 /**
  * Series for the whole wallet on each snapshot date.
- * growth = total - first total (transfers between tracked accounts cancel out).
+ * growth = total change minus cumulative external cashflows (income − expense).
+ * Transfers between tracked accounts cancel out in totals.
  */
 export function buildTotalSeries(
   accounts: Account[],
@@ -199,18 +200,46 @@ export function buildTotalSeries(
   const dates = snapshotDates(snapshots)
   if (dates.length === 0) return []
 
+  const cashflowByDate = new Map<string, number>()
+  for (const snap of snapshots) {
+    const net = (snap.income ?? 0) - (snap.expense ?? 0)
+    cashflowByDate.set(snap.date, (cashflowByDate.get(snap.date) ?? 0) + net)
+  }
+
   const points: TotalPoint[] = []
   let baseline: number | null = null
+  let cumCashflow = 0
   for (const date of dates) {
     const total = totalOnDate(date, accounts, snapshots, settings, { rateBook })
-    if (baseline == null) baseline = total
+    if (baseline == null) {
+      baseline = total
+      points.push({ date, total, growth: 0 })
+      continue
+    }
+    // Cashflow on this date is attributed to the interval ending here.
+    cumCashflow += cashflowByDate.get(date) ?? 0
     points.push({
       date,
       total,
-      growth: total - baseline,
+      growth: total - baseline - cumCashflow,
     })
   }
   return points
+}
+
+/** Net external cashflow (income − expense) in base currency over (t0, t1]. */
+export function netExternalCashflow(
+  t0: string,
+  t1: string,
+  snapshots: BalanceSnapshot[],
+): number {
+  let net = 0
+  for (const snap of snapshots) {
+    if (compareDate(snap.date, t0) <= 0) continue
+    if (compareDate(snap.date, t1) > 0) continue
+    net += (snap.income ?? 0) - (snap.expense ?? 0)
+  }
+  return net
 }
 
 /**

@@ -133,6 +133,12 @@ export function SnapshotsPanel() {
                                   : 'переводов'
                             }`
                           : ''}
+                        {(snap.income ?? 0) > 0
+                          ? ` · доход ${formatCurrency(snap.income!, settings.baseCurrency)}`
+                          : ''}
+                        {(snap.expense ?? 0) > 0
+                          ? ` · расход ${formatCurrency(snap.expense!, settings.baseCurrency)}`
+                          : ''}
                         {snap.note ? ` · ${snap.note}` : ''}
                       </span>
                     </span>

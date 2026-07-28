@@ -35,6 +35,8 @@ export interface DbSnapshot {
   date: string
   note?: string
   origin: DbSnapshotOrigin
+  income: number
+  expense: number
   lines: DbSnapshotLine[]
 }
 
@@ -336,8 +338,10 @@ export async function listSnapshots(userId: string): Promise<DbSnapshot[]> {
     snapshot_date: string
     note: string | null
     origin: string | null
+    income: number | string | null
+    expense: number | string | null
   }>(
-    `SELECT id, snapshot_date::text AS snapshot_date, note, origin
+    `SELECT id, snapshot_date::text AS snapshot_date, note, origin, income, expense
      FROM wallet_snapshots
      WHERE user_id = $1
      ORDER BY snapshot_date ASC`,
@@ -371,6 +375,8 @@ export async function listSnapshots(userId: string): Promise<DbSnapshot[]> {
     date: String(row.snapshot_date).slice(0, 10),
     note: row.note ? String(row.note) : undefined,
     origin: row.origin === 'transfer' ? 'transfer' : 'manual',
+    income: row.income != null ? num(row.income) : 0,
+    expense: row.expense != null ? num(row.expense) : 0,
     lines: bySnap.get(String(row.id)) ?? [],
   }))
 }
@@ -401,12 +407,16 @@ export async function upsertSnapshot(
   input: {
     date: string
     note?: string
+    income?: number
+    expense?: number
     lines: DbSnapshotLine[]
     origin?: DbSnapshotOrigin
   },
 ): Promise<DbSnapshot> {
   const pool = getPool()
   const origin: DbSnapshotOrigin = input.origin === 'transfer' ? 'transfer' : 'manual'
+  const income = Math.max(0, input.income ?? 0)
+  const expense = Math.max(0, input.expense ?? 0)
   const existing = await pool.query<{ id: string }>(
     `SELECT id FROM wallet_snapshots WHERE user_id = $1 AND snapshot_date = $2::date`,
     [userId, input.date],
@@ -418,25 +428,25 @@ export async function upsertSnapshot(
     if (input.origin !== undefined) {
       await pool.query(
         `UPDATE wallet_snapshots
-         SET note = $3, origin = $4, updated_at = now()
+         SET note = $3, origin = $4, income = $5, expense = $6, updated_at = now()
          WHERE id = $1 AND user_id = $2`,
-        [snapshotId, userId, input.note ?? null, origin],
+        [snapshotId, userId, input.note ?? null, origin, income, expense],
       )
     } else {
       await pool.query(
         `UPDATE wallet_snapshots
-         SET note = $3, updated_at = now()
+         SET note = $3, income = $4, expense = $5, updated_at = now()
          WHERE id = $1 AND user_id = $2`,
-        [snapshotId, userId, input.note ?? null],
+        [snapshotId, userId, input.note ?? null, income, expense],
       )
     }
     await replaceSnapshotLines(snapshotId, input.lines, 'merge')
   } else {
     const inserted = await pool.query<{ id: string }>(
-      `INSERT INTO wallet_snapshots (user_id, snapshot_date, note, origin)
-       VALUES ($1, $2::date, $3, $4)
+      `INSERT INTO wallet_snapshots (user_id, snapshot_date, note, origin, income, expense)
+       VALUES ($1, $2::date, $3, $4, $5, $6)
        RETURNING id`,
-      [userId, input.date, input.note ?? null, origin],
+      [userId, input.date, input.note ?? null, origin, income, expense],
     )
     snapshotId = String(inserted.rows[0]!.id)
     await replaceSnapshotLines(snapshotId, input.lines, 'replace')
@@ -452,6 +462,8 @@ export async function updateSnapshot(
   patch: {
     date?: string
     note?: string | null
+    income?: number | null
+    expense?: number | null
     lines?: DbSnapshotLine[]
     origin?: DbSnapshotOrigin
   },
@@ -463,12 +475,20 @@ export async function updateSnapshot(
   )
   if (existing.rows.length === 0) return null
 
-  if (patch.date !== undefined || patch.note !== undefined || patch.origin !== undefined) {
+  if (
+    patch.date !== undefined ||
+    patch.note !== undefined ||
+    patch.origin !== undefined ||
+    patch.income !== undefined ||
+    patch.expense !== undefined
+  ) {
     await pool.query(
       `UPDATE wallet_snapshots SET
          snapshot_date = COALESCE($3::date, snapshot_date),
          note = CASE WHEN $4::boolean THEN $5 ELSE note END,
          origin = COALESCE($6, origin),
+         income = CASE WHEN $7::boolean THEN $8 ELSE income END,
+         expense = CASE WHEN $9::boolean THEN $10 ELSE expense END,
          updated_at = now()
        WHERE id = $1 AND user_id = $2`,
       [
@@ -478,6 +498,10 @@ export async function updateSnapshot(
         patch.note !== undefined,
         patch.note === undefined ? null : patch.note,
         patch.origin ?? null,
+        patch.income !== undefined,
+        patch.income == null ? 0 : Math.max(0, patch.income),
+        patch.expense !== undefined,
+        patch.expense == null ? 0 : Math.max(0, patch.expense),
       ],
     )
   }
