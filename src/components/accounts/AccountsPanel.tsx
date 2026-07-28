@@ -396,7 +396,16 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 </span>
               </p>
             )}
-            <GrowthChart data={detailSeries} currency={detailAccount.currency} mode="account" />
+            <GrowthChart
+              data={detailSeries}
+              currency={detailAccount.currency}
+              mode="account"
+              accounts={accounts}
+              snapshots={snapshots}
+              settings={settings}
+              rateBook={rateBook}
+              accountId={detailAccount.id}
+            />
           </div>
         )}
       </StackPanel>

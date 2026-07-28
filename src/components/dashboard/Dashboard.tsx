@@ -72,7 +72,15 @@ export function Dashboard() {
 
       <CreditFloatSummary />
 
-      <GrowthChart data={series} currency={settings.baseCurrency} mode="total" />
+      <GrowthChart
+        data={series}
+        currency={settings.baseCurrency}
+        mode="total"
+        accounts={accounts}
+        snapshots={snapshots}
+        settings={settings}
+        rateBook={rateBook}
+      />
 
       <MonthlyReturnsTable />
 
