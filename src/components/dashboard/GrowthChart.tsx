@@ -75,7 +75,7 @@ export function GrowthChart({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={rows}
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+              margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
               onClick={(state) => {
                 const date = state?.activePayload?.[0]?.payload?.date as string | undefined
                 selectDate(date)
@@ -85,9 +85,18 @@ export function GrowthChart({
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} interval="preserveStartEnd" />
               <YAxis
+                yAxisId="primary"
                 tick={{ fontSize: 11, fill: '#64748b' }}
                 tickFormatter={formatCompactAxisValue}
                 width={48}
+              />
+              <YAxis
+                yAxisId="growth"
+                orientation="right"
+                tick={{ fontSize: 11, fill: '#059669' }}
+                tickFormatter={formatCompactAxisValue}
+                width={48}
+                domain={['auto', 'auto']}
               />
               <Tooltip
                 formatter={(value: number, name: string) => [
@@ -103,6 +112,7 @@ export function GrowthChart({
                 formatter={(value) => (value === 'primary' ? primaryLabel : growthLabel)}
               />
               <Line
+                yAxisId="primary"
                 type="monotone"
                 dataKey="primary"
                 name="primary"
@@ -112,6 +122,7 @@ export function GrowthChart({
                 activeDot={{ r: 6 }}
               />
               <Line
+                yAxisId="growth"
                 type="monotone"
                 dataKey="growth"
                 name="growth"
