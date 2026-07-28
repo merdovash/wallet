@@ -8,6 +8,7 @@ import { SnapshotsPanel } from './components/snapshots/SnapshotsPanel'
 import { AccountTypesPanel } from './components/types/AccountTypesPanel'
 import { CurrenciesPanel } from './components/currencies/CurrenciesPanel'
 import { MonthlyPanel } from './components/monthly/MonthlyPanel'
+import { DailyGrowthPanel } from './components/daily/DailyGrowthPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
@@ -139,6 +140,8 @@ function SectionContent({
       return <CurrenciesPanel onOpenAccount={onOpenAccount} />
     case 'monthly':
       return <MonthlyPanel />
+    case 'daily':
+      return <DailyGrowthPanel />
     case 'float':
       return <FloatPanel />
     case 'settings':

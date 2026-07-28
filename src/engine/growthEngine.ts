@@ -444,6 +444,37 @@ export function buildTotalSeries(
   return points
 }
 
+export function buildDailyGrowthSeries(
+  accounts: Account[],
+  snapshots: BalanceSnapshot[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+  transfers: Transfer[] = [],
+): DailyGrowthPoint[] {
+  const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers)
+  if (series.length < 2) return []
+  const points: DailyGrowthPoint[] = []
+  for (let i = 1; i < series.length; i += 1) {
+    const prev = series[i - 1]!
+    const cur = series[i]!
+    points.push({
+      date: cur.date,
+      growth: cur.growth - prev.growth,
+      total: cur.total,
+      cumulativeGrowth: cur.growth,
+    })
+  }
+  return points
+}
+
+export interface DailyGrowthPoint {
+  date: string
+  /** Incremental growth for the interval ending on this check-in date. */
+  growth: number
+  total: number
+  cumulativeGrowth: number
+}
+
 /** @deprecated Prefer netGrowthCapitalFlow — kept for callers that only have income/expense. */
 export function netExternalCashflow(
   t0: string,

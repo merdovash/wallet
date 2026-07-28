@@ -5,6 +5,7 @@ export type AppSection =
   | 'types'
   | 'currencies'
   | 'monthly'
+  | 'daily'
   | 'float'
   | 'settings'
 

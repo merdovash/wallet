@@ -7,6 +7,7 @@ export const APP_SECTION_PATHS: Record<AppSection, string> = {
   types: '/types',
   currencies: '/currencies',
   monthly: '/monthly',
+  daily: '/daily',
   float: '/float',
   settings: '/settings',
 }

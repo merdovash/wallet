@@ -3,6 +3,7 @@ import {
   accountGrowth,
   balanceOnDate,
   buildAccountSeries,
+  buildDailyGrowthSeries,
   buildTotalSeries,
   netTransfersIn,
   periodGrowth,
@@ -272,5 +273,18 @@ describe('growthEngine', () => {
     // +600 balance change − 500 transfer = 100 growth
     expect(series[1]?.growth).toBe(100)
     expect(periodGrowth(accounts, snapshots, settings, undefined, transfers)).toBe(100)
+  })
+
+  it('builds daily incremental growth between check-ins', () => {
+    const accounts = [account({ id: 'a', name: 'A' })]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 1000 }] },
+      { id: 's2', date: '2026-01-10', lines: [{ accountId: 'a', amount: 1100 }] },
+      { id: 's3', date: '2026-01-20', lines: [{ accountId: 'a', amount: 1050 }] },
+    ]
+    const daily = buildDailyGrowthSeries(accounts, snapshots, settings)
+    expect(daily).toHaveLength(2)
+    expect(daily[0]).toMatchObject({ date: '2026-01-10', growth: 100 })
+    expect(daily[1]).toMatchObject({ date: '2026-01-20', growth: -50 })
   })
 })

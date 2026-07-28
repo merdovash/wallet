@@ -13,6 +13,7 @@ const NAV_ITEMS: { id: AppSection; label: string; Icon: NavIcon }[] = [
   { id: 'types', label: 'По типам', Icon: TypesIcon },
   { id: 'currencies', label: 'Валюты', Icon: CurrenciesIcon },
   { id: 'monthly', label: 'Помесячно', Icon: MonthlyIcon },
+  { id: 'daily', label: 'По дням', Icon: DailyIcon },
   { id: 'float', label: 'Float', Icon: FloatIcon },
   { id: 'settings', label: 'Настройки', Icon: SettingsIcon },
 ]
@@ -298,6 +299,14 @@ function MonthlyIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinejoin="round"
         d="M4 19V5M4 19h16M7 15l3-4 3 2 4-6"
       />
+    </svg>
+  )
+}
+
+function DailyIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V5M4 19h16M7 15v-3M11 15V9M15 15v-6M19 15v-2" />
     </svg>
   )
 }
