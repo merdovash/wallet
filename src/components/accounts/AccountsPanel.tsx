@@ -9,7 +9,7 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { creditDebt } from '../../engine/creditFloatEngine'
-import { balanceOnDate, buildAccountSeries } from '../../engine/growthEngine'
+import { balanceOnDate, buildAccountSeries, snapshotDates } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '../../lib/accountKinds'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
@@ -77,6 +77,16 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
       .filter((a) => (showArchived ? true : !a.archived))
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
   }, [accounts, showArchived])
+
+  const balancesById = useMemo(() => {
+    const dates = snapshotDates(snapshots)
+    const asOf = dates[dates.length - 1] ?? todayIsoDate()
+    const map = new Map<string, number | null>()
+    for (const account of visible) {
+      map.set(account.id, balanceOnDate(account.id, asOf, snapshots))
+    }
+    return map
+  }, [visible, snapshots])
 
   const detailAccount = accounts.find((a) => a.id === detailId) ?? null
   const detailSeries = useMemo(
@@ -225,6 +235,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               <AccountListItem
                 key={account.id}
                 account={account}
+                balance={balancesById.get(account.id) ?? null}
                 isDragging={dragId === account.id}
                 isOver={overId === account.id && dragId !== account.id}
                 swipeOpen={swipeOpenId === account.id}
@@ -458,6 +469,7 @@ const SWIPE_ACTIONS_WIDTH = 96
 
 interface AccountListItemProps {
   account: Account
+  balance: number | null
   isDragging: boolean
   isOver: boolean
   swipeOpen: boolean
@@ -473,6 +485,7 @@ interface AccountListItemProps {
 
 function AccountListItem({
   account,
+  balance,
   isDragging,
   isOver,
   swipeOpen,
@@ -614,7 +627,7 @@ function AccountListItem({
             className="h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: account.color }}
           />
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate font-medium text-slate-900">
               {account.name}
               <span className="ml-2 text-xs font-normal text-slate-400">
@@ -625,6 +638,22 @@ function AccountListItem({
               ) : null}
             </span>
             <span className="text-xs text-slate-500">{account.currency}</span>
+          </span>
+          <span className="shrink-0 text-right tabular-nums">
+            {balance == null ? (
+              <span className="text-sm text-slate-400">нет данных</span>
+            ) : (
+              <>
+                <span className="block text-sm font-medium text-slate-900">
+                  {formatCurrency(balance, account.currency)}
+                </span>
+                {account.kind === 'credit' && account.creditLimit != null ? (
+                  <span className="text-[11px] text-slate-400">
+                    долг {formatCurrency(creditDebt(account.creditLimit, balance), account.currency)}
+                  </span>
+                ) : null}
+              </>
+            )}
           </span>
         </button>
       </div>
