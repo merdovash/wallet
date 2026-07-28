@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
+  CURRENCY_ALIASES,
   fetchCbrRatesForDate,
   resolvePivotForDate,
   type ParsedCbrRates,
@@ -18,7 +19,25 @@ interface RatesState {
   getPivot: (date: string) => Record<string, number> | null
 }
 
+/** In-flight ensureRates so concurrent callers share one load. */
+let ensureInFlight: Promise<void> | null = null
+let ensureQueuedDates = new Set<string>()
+
+/** Copy proxy quotes (e.g. USDT ← USD) into the pivot map. */
+export function expandPivotAliases(
+  pivot: Record<string, number>,
+): Record<string, number> {
+  const next = { ...pivot }
+  for (const [alias, target] of Object.entries(CURRENCY_ALIASES)) {
+    if (next[alias] == null && next[target] != null) {
+      next[alias] = next[target]!
+    }
+  }
+  return next
+}
+
 async function loadRatesForDate(isoDate: string): Promise<ParsedCbrRates> {
+  let apiError: string | null = null
   try {
     const res = await fetch(`/api/rates?date=${encodeURIComponent(isoDate)}`)
     if (res.ok) {
@@ -26,12 +45,54 @@ async function loadRatesForDate(isoDate: string): Promise<ParsedCbrRates> {
         rateDate: string
         pivotPerUnit: Record<string, number>
       }
-      return { rateDate: data.rateDate, pivotPerUnit: data.pivotPerUnit }
+      return {
+        rateDate: data.rateDate,
+        pivotPerUnit: expandPivotAliases(data.pivotPerUnit),
+      }
+    }
+    try {
+      const body = (await res.json()) as { error?: string }
+      apiError = body.error ?? `HTTP ${res.status}`
+    } catch {
+      apiError = `HTTP ${res.status}`
     }
   } catch {
-    /* fall through to direct CBR */
+    /* own API unreachable — try direct CBR (works for daily feed in browser) */
   }
-  return fetchCbrRatesForDate(isoDate)
+
+  try {
+    const parsed = await fetchCbrRatesForDate(isoDate)
+    return {
+      rateDate: parsed.rateDate,
+      pivotPerUnit: expandPivotAliases(parsed.pivotPerUnit),
+    }
+  } catch (err) {
+    const fallback = err instanceof Error ? err.message : 'Не удалось загрузить курсы ЦБ'
+    throw new Error(apiError ? `${apiError}; ${fallback}` : fallback)
+  }
+}
+
+async function loadMissingDates(
+  missing: string[],
+  seed: Record<string, Record<string, number>>,
+): Promise<Record<string, Record<string, number>>> {
+  const next = { ...seed }
+  // Parallel with a small concurrency limit to avoid hammering CBR / API.
+  const concurrency = 4
+  for (let i = 0; i < missing.length; i += concurrency) {
+    const chunk = missing.slice(i, i + concurrency)
+    const results = await Promise.all(
+      chunk.map(async (date) => {
+        if (resolvePivotForDate(date, next)) return null
+        return loadRatesForDate(date)
+      }),
+    )
+    for (const parsed of results) {
+      if (!parsed) continue
+      next[parsed.rateDate] = parsed.pivotPerUnit
+    }
+  }
+  return next
 }
 
 export const useRatesStore = create<RatesState>()(
@@ -48,33 +109,50 @@ export const useRatesStore = create<RatesState>()(
         const unique = [...new Set(dates.filter(Boolean))].sort()
         if (unique.length === 0) unique.push(todayIsoDate())
 
-        const missing = unique.filter((d) => !resolvePivotForDate(d, get().byDate))
-        if (missing.length === 0) {
-          set({ status: 'ready', error: null })
-          return
+        for (const d of unique) ensureQueuedDates.add(d)
+
+        if (ensureInFlight) {
+          await ensureInFlight
+          // After the shared load, check if newly queued dates still need fetching.
+          const stillMissing = [...ensureQueuedDates].filter(
+            (d) => !resolvePivotForDate(d, get().byDate),
+          )
+          if (stillMissing.length === 0) {
+            ensureQueuedDates.clear()
+            return
+          }
         }
 
-        set({ status: 'loading', error: null })
-        try {
-          const next = { ...get().byDate }
-          for (const date of missing) {
-            // Re-check: a previous fetch in this loop may already cover this date.
-            if (resolvePivotForDate(date, next)) continue
-            const parsed = await loadRatesForDate(date)
-            next[parsed.rateDate] = parsed.pivotPerUnit
+        const run = (async () => {
+          const requested = [...ensureQueuedDates]
+          ensureQueuedDates.clear()
+          const missing = requested.filter((d) => !resolvePivotForDate(d, get().byDate))
+          if (missing.length === 0) {
+            set({ status: 'ready', error: null })
+            return
           }
-          set({
-            byDate: next,
-            status: 'ready',
-            error: null,
-            lastFetchedAt: new Date().toISOString(),
-          })
-        } catch (err) {
-          set({
-            status: 'error',
-            error: err instanceof Error ? err.message : 'Не удалось загрузить курсы ЦБ',
-          })
-        }
+
+          set({ status: 'loading', error: null })
+          try {
+            const next = await loadMissingDates(missing, get().byDate)
+            set({
+              byDate: next,
+              status: 'ready',
+              error: null,
+              lastFetchedAt: new Date().toISOString(),
+            })
+          } catch (err) {
+            set({
+              status: 'error',
+              error: err instanceof Error ? err.message : 'Не удалось загрузить курсы ЦБ',
+            })
+          }
+        })()
+
+        ensureInFlight = run.finally(() => {
+          ensureInFlight = null
+        })
+        await ensureInFlight
       },
 
       refreshDate: async (date) => {
@@ -98,6 +176,18 @@ export const useRatesStore = create<RatesState>()(
     {
       name: 'wallet-cbr-rates',
       partialize: (state) => ({ byDate: state.byDate, lastFetchedAt: state.lastFetchedAt }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<RatesState> | undefined
+        const byDate: Record<string, Record<string, number>> = {}
+        for (const [date, pivot] of Object.entries(p?.byDate ?? {})) {
+          byDate[date] = expandPivotAliases(pivot)
+        }
+        return {
+          ...current,
+          ...p,
+          byDate,
+        }
+      },
     },
   ),
 )

@@ -1,5 +1,5 @@
 import { getPool, loadEnvFile } from '../db/pool'
-import { fetchCbrRatesForDate } from '../../src/lib/cbrRates'
+import { CURRENCY_ALIASES, fetchCbrRatesForDate } from '../../src/lib/cbrRates'
 import { ensureCbrRatesSchema, getNearestRateDay, saveRateDay } from './store'
 
 export interface RatesApiResult {
@@ -12,6 +12,17 @@ export interface RatesApiResult {
 function hasDatabaseUrl(): boolean {
   loadEnvFile()
   return Boolean(process.env.DATABASE_URL)
+}
+
+/** Copy proxy quotes (e.g. USDT ← USD) into the pivot before caching. */
+function expandPivotAliases(pivot: Record<string, number>): Record<string, number> {
+  const next = { ...pivot }
+  for (const [alias, target] of Object.entries(CURRENCY_ALIASES)) {
+    if (next[alias] == null && next[target] != null) {
+      next[alias] = next[target]!
+    }
+  }
+  return next
 }
 
 /**
@@ -31,18 +42,19 @@ export async function resolveRatesForDate(isoDate: string): Promise<RatesApiResu
             return {
               requestDate: isoDate,
               rateDate: cached.rateDate,
-              pivotPerUnit: cached.pivot,
+              pivotPerUnit: expandPivotAliases(cached.pivot),
               source: 'cache',
             }
           }
         }
 
         const fetched = await fetchCbrRatesForDate(isoDate)
-        await saveRateDay(query, fetched.rateDate, fetched.pivotPerUnit)
+        const pivot = expandPivotAliases(fetched.pivotPerUnit)
+        await saveRateDay(query, fetched.rateDate, pivot)
         return {
           requestDate: isoDate,
           rateDate: fetched.rateDate,
-          pivotPerUnit: fetched.pivotPerUnit,
+          pivotPerUnit: pivot,
           source: 'cbr',
         }
       })
@@ -56,7 +68,7 @@ export async function resolveRatesForDate(isoDate: string): Promise<RatesApiResu
   return {
     requestDate: isoDate,
     rateDate: fetched.rateDate,
-    pivotPerUnit: fetched.pivotPerUnit,
+    pivotPerUnit: expandPivotAliases(fetched.pivotPerUnit),
     source: 'cbr',
   }
 }

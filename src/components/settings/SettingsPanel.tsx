@@ -114,7 +114,7 @@ export function SettingsPanel() {
                     </li>
                   )
                 }
-                const rub = pivot[code === 'USDT' ? 'USD' : code]
+                const rub = pivot[code]
                 if (rub == null) {
                   return (
                     <li key={code} className="flex justify-between px-3 py-2 text-sm text-slate-400">
