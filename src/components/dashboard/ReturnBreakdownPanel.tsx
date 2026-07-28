@@ -10,7 +10,7 @@ import { StackPanel } from '../ui/StackPanel'
 interface ReturnBreakdownPanelProps {
   open: boolean
   onClose: () => void
-  focus: 'growthPct' | 'annualizedPct' | null
+  focus: 'growth' | 'growthPct' | 'annualizedPct' | 'topUp' | null
   periodReturn: PeriodReturnSummary | null
   currency: string
 }
@@ -23,7 +23,19 @@ export function ReturnBreakdownPanel({
   currency,
 }: ReturnBreakdownPanelProps) {
   const title =
-    focus === 'annualizedPct' ? 'Расчёт: в годовых' : 'Расчёт: прирост %'
+    focus === 'annualizedPct'
+      ? 'Расчёт: в годовых'
+      : focus === 'growth'
+        ? 'Расшифровка: прирост'
+        : focus === 'topUp'
+          ? 'Расшифровка: пополнения'
+          : 'Расчёт: прирост %'
+
+  const includedSorted = periodReturn
+    ? [...periodReturn.includedAccounts].sort(
+        (a, b) => b.endBase - b.startBase - (a.endBase - a.startBase) || a.name.localeCompare(b.name),
+      )
+    : []
 
   return (
     <StackPanel open={open} title={title} onClose={onClose}>
@@ -35,7 +47,7 @@ export function ReturnBreakdownPanel({
       ) : (
         <div className="space-y-4 text-sm text-slate-700">
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-            <p className="font-semibold">Что входит в процент прироста</p>
+            <p className="font-semibold">Что входит в прирост</p>
             <p className="mt-1">
               Только накопления (фонд), вклады и инвестиции — {periodReturn.accountCount} счёт(а).
               Доходы и расходы с оперативных счетов в прирост не входят. Пополнения
@@ -63,6 +75,7 @@ export function ReturnBreakdownPanel({
               label="Чистый капитал (пополнения)"
               value={signedAmount(periodReturn.netFlow, currency)}
               hint="переводы в/из портфеля роста (доход/расход не входят)"
+              emphasize={focus === 'topUp'}
             />
             <Row
               label="Взвешенный капитал"
@@ -73,6 +86,7 @@ export function ReturnBreakdownPanel({
               label="Прирост"
               value={signedAmount(periodReturn.growth, currency)}
               hint="конец − начало − поток"
+              emphasize={focus === 'growth'}
             />
             <Row
               label="Прирост %"
@@ -124,10 +138,15 @@ export function ReturnBreakdownPanel({
           ) : null}
 
           <AccountSection
-            title="Включены в расчёт"
+            title={
+              focus === 'growth' || focus === 'topUp'
+                ? 'Счета по убыванию изменения'
+                : 'Включены в расчёт'
+            }
             tone="include"
-            accounts={periodReturn.includedAccounts}
+            accounts={includedSorted}
             currency={currency}
+            showDelta
           />
           <AccountSection
             title="Не учитываются"
@@ -136,6 +155,16 @@ export function ReturnBreakdownPanel({
             currency={currency}
           />
 
+          {(focus === 'growth' || focus === 'topUp') && (
+            <FormulaBlock
+              title="Формула прироста"
+              lines={[
+                'капитал = сумма фондов/накоплений + вкладов + инвестиций',
+                'поток = переводы в/из портфеля роста',
+                'прирост = капитал_конец − капитал_начало − поток',
+              ]}
+            />
+          )}
           {focus === 'growthPct' && (
             <FormulaBlock
               title="Формула прироста %"
@@ -170,11 +199,13 @@ function AccountSection({
   tone,
   accounts,
   currency,
+  showDelta = false,
 }: {
   title: string
   tone: 'include' | 'exclude'
   accounts: PeriodReturnAccountLine[]
   currency: string
+  showDelta?: boolean
 }) {
   if (accounts.length === 0) {
     return (
@@ -189,27 +220,48 @@ function AccountSection({
     <div>
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-        {accounts.map((acc) => (
-          <li key={acc.accountId} className="flex items-start justify-between gap-3 px-3 py-2">
-            <span className="min-w-0">
-              <span className="block truncate font-medium text-slate-900">{acc.name}</span>
-              <span
-                className={`text-[11px] ${
-                  tone === 'include' ? 'text-emerald-700' : 'text-slate-400'
-                }`}
-              >
-                {acc.kindLabel}
-                {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
+        {accounts.map((acc) => {
+          const delta = acc.endBase - acc.startBase
+          return (
+            <li key={acc.accountId} className="flex items-start justify-between gap-3 px-3 py-2">
+              <span className="min-w-0">
+                <span className="block truncate font-medium text-slate-900">{acc.name}</span>
+                <span
+                  className={`text-[11px] ${
+                    tone === 'include' ? 'text-emerald-700' : 'text-slate-400'
+                  }`}
+                >
+                  {acc.kindLabel}
+                  {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
+                </span>
               </span>
-            </span>
-            <span className="shrink-0 text-right text-xs tabular-nums text-slate-600">
-              <span className="block">{formatCurrency(acc.endBase, currency)}</span>
-              <span className="text-[11px] text-slate-400">
-                было {formatCurrency(acc.startBase, currency)}
+              <span className="shrink-0 text-right text-xs tabular-nums text-slate-600">
+                {showDelta ? (
+                  <>
+                    <span
+                      className={`block ${
+                        delta > 0 ? 'text-emerald-700' : delta < 0 ? 'text-red-600' : ''
+                      }`}
+                    >
+                      {signedAmount(delta, currency)}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {formatCurrency(acc.startBase, currency)} →{' '}
+                      {formatCurrency(acc.endBase, currency)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="block">{formatCurrency(acc.endBase, currency)}</span>
+                    <span className="text-[11px] text-slate-400">
+                      было {formatCurrency(acc.startBase, currency)}
+                    </span>
+                  </>
+                )}
               </span>
-            </span>
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

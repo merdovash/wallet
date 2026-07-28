@@ -11,10 +11,10 @@ interface SummaryCardsProps {
   periodReturn?: PeriodReturnSummary | null
 }
 
+type BreakdownFocus = 'growth' | 'growthPct' | 'annualizedPct' | 'topUp' | null
+
 export function SummaryCards({ total, growth, currency, periodReturn }: SummaryCardsProps) {
-  const [breakdownFocus, setBreakdownFocus] = useState<'growthPct' | 'annualizedPct' | null>(
-    null,
-  )
+  const [breakdownFocus, setBreakdownFocus] = useState<BreakdownFocus>(null)
 
   const growthColor = growth > 0 ? 'text-emerald-700' : growth < 0 ? 'text-red-600' : 'text-slate-800'
   const topUp = periodReturn?.netFlow ?? 0
@@ -35,20 +35,34 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
             {formatCurrency(total, currency)}
           </p>
         </Card>
-        <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
-          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
-            {signedAmount(growth, currency)}
-          </p>
-          <p className="mt-1 text-[10px] text-slate-400">накоп./вклады/инвест.</p>
-        </Card>
-        <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 sm:text-sm">Пополнения</p>
-          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${topUpColor}`}>
-            {periodReturn ? signedAmount(topUp, currency) : '—'}
-          </p>
-          <p className="mt-1 text-[10px] text-slate-400">фонд / вклад / инвест.</p>
-        </Card>
+        <button
+          type="button"
+          onClick={() => setBreakdownFocus('growth')}
+          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          title="Показать расшифровку прироста"
+        >
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
+              {signedAmount(growth, currency)}
+            </p>
+            <p className="mt-1 text-[10px] text-blue-600">как считается</p>
+          </Card>
+        </button>
+        <button
+          type="button"
+          onClick={() => setBreakdownFocus('topUp')}
+          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          title="Показать расшифровку пополнений"
+        >
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">Пополнения</p>
+            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${topUpColor}`}>
+              {periodReturn ? signedAmount(topUp, currency) : '—'}
+            </p>
+            <p className="mt-1 text-[10px] text-blue-600">как считается</p>
+          </Card>
+        </button>
         <button
           type="button"
           onClick={() => setBreakdownFocus('growthPct')}
