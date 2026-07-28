@@ -47,19 +47,19 @@ export function CreditFloatSummary() {
         : 'text-slate-800'
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Card>
-        <p className="text-sm text-slate-500">Выгода float</p>
-        <p className={`mt-1 text-xl font-semibold ${earnedColor}`}>
+    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <Card className="!p-2.5 sm:!p-3">
+        <p className="text-xs text-slate-500 sm:text-sm">Выгода float</p>
+        <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${earnedColor}`}>
           {signedAmount(summary.totalEarnedBase, currency)}
         </p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-[11px] leading-snug text-slate-500 sm:text-xs">
           Накопительно по связанным кошелькам (без переводов)
         </p>
       </Card>
-      <Card>
-        <p className="text-sm text-slate-500">Долг по кредиткам</p>
-        <p className="mt-1 text-xl font-semibold text-slate-900">
+      <Card className="!p-2.5 sm:!p-3">
+        <p className="text-xs text-slate-500 sm:text-sm">Долг по кредиткам</p>
+        <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
           {formatCurrency(
             summary.cards.reduce((s, c) => s + c.totalDebt, 0),
             currency,

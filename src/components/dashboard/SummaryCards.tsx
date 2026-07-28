@@ -19,24 +19,28 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         : 'text-slate-800'
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <p className="text-sm text-slate-500">Остаток</p>
-        <p className="mt-1 text-xl font-semibold text-slate-900">{formatCurrency(total, currency)}</p>
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <Card className="!p-2.5 sm:!p-3">
+        <p className="text-xs text-slate-500 sm:text-sm">Остаток</p>
+        <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
+          {formatCurrency(total, currency)}
+        </p>
       </Card>
-      <Card>
-        <p className="text-sm text-slate-500">Прирост</p>
-        <p className={`mt-1 text-xl font-semibold ${growthColor}`}>{signedAmount(growth, currency)}</p>
+      <Card className="!p-2.5 sm:!p-3">
+        <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+        <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
+          {signedAmount(growth, currency)}
+        </p>
       </Card>
-      <Card>
-        <p className="text-sm text-slate-500">Прирост %</p>
-        <p className={`mt-1 text-xl font-semibold ${pctColor}`}>
+      <Card className="!p-2.5 sm:!p-3">
+        <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
+        <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
           {formatPercent(periodReturn?.growthPct)}
         </p>
       </Card>
-      <Card>
-        <p className="text-sm text-slate-500">В годовых</p>
-        <p className={`mt-1 text-xl font-semibold ${pctColor}`}>
+      <Card className="!p-2.5 sm:!p-3">
+        <p className="text-xs text-slate-500 sm:text-sm">В годовых</p>
+        <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
           {formatPercent(periodReturn?.annualizedPct)}
         </p>
       </Card>
