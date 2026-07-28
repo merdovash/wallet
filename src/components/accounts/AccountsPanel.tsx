@@ -44,7 +44,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('RUB')
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
-  const [kind, setKind] = useState<AccountKind>('bank')
+  const [kind, setKind] = useState<AccountKind>('operational')
   const [creditLimit, setCreditLimit] = useState('')
   const [linkedAccountId, setLinkedAccountId] = useState('')
   const [graceMonths, setGraceMonths] = useState('3')
@@ -92,7 +92,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setName('')
     setCurrency('RUB')
     setColor(ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length]!)
-    setKind('bank')
+    setKind('operational')
     setCreditLimit('')
     setLinkedAccountId('')
     setGraceMonths('3')
@@ -106,7 +106,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setName(account.name)
     setCurrency(account.currency)
     setColor(account.color)
-    setKind(account.kind ?? 'bank')
+    setKind(account.kind ?? 'operational')
     setCreditLimit(
       account.creditLimit != null ? String(account.creditLimit) : '',
     )

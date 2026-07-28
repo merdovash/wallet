@@ -4,6 +4,7 @@ import {
   totalOnDate,
   type RateBook,
 } from '../engine/growthEngine'
+import { growthAccounts } from './accountKinds'
 import type { Account, BalanceSnapshot, WalletSettings } from '../types/wallet'
 
 export interface MonthlyReturnRow {
@@ -91,8 +92,9 @@ export function buildMonthlyReturns(
   settings: WalletSettings,
   rateBook?: RateBook,
 ): MonthlyReturnRow[] {
+  const eligible = growthAccounts(accounts)
   const dates = snapshotDates(snapshots)
-  if (dates.length < 2) return []
+  if (dates.length < 2 || eligible.length === 0) return []
 
   const lastDateByMonth = new Map<string, string>()
   for (const date of dates) {
@@ -113,8 +115,8 @@ export function buildMonthlyReturns(
     }
     if (startDate === endDate) continue
 
-    const startTotal = totalOnDate(startDate, accounts, snapshots, settings, { rateBook })
-    const endTotal = totalOnDate(endDate, accounts, snapshots, settings, { rateBook })
+    const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
+    const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
     const netFlow = netExternalCashflow(startDate, endDate, snapshots)
     const growth = endTotal - startTotal - netFlow
     const growthPct = pctOrNull(growth, startTotal)
@@ -141,12 +143,13 @@ export function buildPeriodReturn(
   settings: WalletSettings,
   rateBook?: RateBook,
 ): PeriodReturnSummary | null {
+  const eligible = growthAccounts(accounts)
   const dates = snapshotDates(snapshots)
-  if (dates.length < 2) return null
+  if (dates.length < 2 || eligible.length === 0) return null
   const startDate = dates[0]!
   const endDate = dates[dates.length - 1]!
-  const startTotal = totalOnDate(startDate, accounts, snapshots, settings, { rateBook })
-  const endTotal = totalOnDate(endDate, accounts, snapshots, settings, { rateBook })
+  const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
+  const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
   const netFlow = netExternalCashflow(startDate, endDate, snapshots)
   const growth = endTotal - startTotal - netFlow
   const growthPct = pctOrNull(growth, startTotal)

@@ -216,7 +216,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       currency: input.currency,
       color: input.color || nextColor(get().accounts),
       sortOrder: input.sortOrder,
-      kind: input.kind ?? 'bank',
+      kind: input.kind ?? 'operational',
       creditLimit: input.creditLimit,
       linkedAccountId: input.linkedAccountId,
       graceMonths: input.graceMonths,

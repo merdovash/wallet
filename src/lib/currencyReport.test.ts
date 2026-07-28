@@ -12,6 +12,7 @@ function account(partial: Partial<Account> & Pick<Account, 'id' | 'name' | 'curr
     color: '#2563eb',
     archived: false,
     sortOrder: 0,
+    kind: 'fund',
     ...partial,
   }
 }

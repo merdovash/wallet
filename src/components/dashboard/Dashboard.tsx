@@ -61,7 +61,9 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Дашборд</h1>
-          <p className="text-sm text-slate-500">Остатки и прирост без учёта переводов между счетами</p>
+          <p className="text-sm text-slate-500">
+            Остатки и прирост фондов, вкладов и инвестиций (без оперативных, налички и кредиток)
+          </p>
         </div>
         <Button type="button" onClick={() => setCheckInOpen(true)}>
           Чек-ин

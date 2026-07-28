@@ -10,7 +10,13 @@ export type AppSection =
 
 export type SnapshotOrigin = 'manual' | 'transfer'
 
-export type AccountKind = 'bank' | 'credit' | 'cash' | 'investment'
+export type AccountKind =
+  | 'operational'
+  | 'fund'
+  | 'investment'
+  | 'deposit'
+  | 'cash'
+  | 'credit'
 
 export interface Account {
   id: string

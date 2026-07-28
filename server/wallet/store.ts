@@ -1,13 +1,22 @@
 import { getPool } from '../db/pool'
 
-export type DbAccountKind = 'bank' | 'credit' | 'cash' | 'investment'
+export type DbAccountKind =
+  | 'operational'
+  | 'fund'
+  | 'deposit'
+  | 'investment'
+  | 'cash'
+  | 'credit'
 
 function normalizeKind(kind: string | null | undefined): DbAccountKind {
   if (kind === 'credit') return 'credit'
   if (kind === 'cash') return 'cash'
   if (kind === 'investment') return 'investment'
-  if (kind === 'bank' || kind === 'regular') return 'bank'
-  return 'bank'
+  if (kind === 'deposit') return 'deposit'
+  if (kind === 'fund') return 'fund'
+  if (kind === 'operational') return 'operational'
+  if (kind === 'bank' || kind === 'regular') return 'operational'
+  return 'operational'
 }
 
 export interface DbAccount {

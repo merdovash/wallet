@@ -13,7 +13,7 @@ function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Acco
     color: '#2563eb',
     archived: false,
     sortOrder: 0,
-    kind: 'bank',
+    kind: 'fund',
     ...partial,
   }
 }
@@ -21,7 +21,7 @@ function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Acco
 describe('buildAccountTypeReport', () => {
   it('groups balances by account kind', () => {
     const accounts: Account[] = [
-      account({ id: 'b', name: 'Карта', kind: 'bank', sortOrder: 0 }),
+      account({ id: 'b', name: 'Карта', kind: 'operational', sortOrder: 0 }),
       account({ id: 'c', name: 'Кошелёк', kind: 'cash', sortOrder: 1 }),
       account({
         id: 'cr',
@@ -46,8 +46,13 @@ describe('buildAccountTypeReport', () => {
     ]
 
     const report = buildAccountTypeReport(accounts, snapshots, [], settings)
-    expect(report.rows.map((r) => r.kind)).toEqual(['bank', 'cash', 'credit', 'investment'])
-    expect(report.rows.find((r) => r.kind === 'bank')?.balanceBase).toBe(10_000)
+    expect(report.rows.map((r) => r.kind)).toEqual([
+      'operational',
+      'investment',
+      'cash',
+      'credit',
+    ])
+    expect(report.rows.find((r) => r.kind === 'operational')?.balanceBase).toBe(10_000)
     expect(report.rows.find((r) => r.kind === 'cash')?.balanceBase).toBe(2_000)
     // Credit contributes −debt to net worth (limit 100k − available 80k = 20k debt)
     expect(report.rows.find((r) => r.kind === 'credit')?.balanceBase).toBe(-20_000)

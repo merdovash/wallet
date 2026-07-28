@@ -6,6 +6,7 @@ import {
   type RateBook,
 } from '../engine/growthEngine'
 import { resolvePivotForDate } from './cbrRates'
+import { isGrowthAccount } from './accountKinds'
 import type {
   Account,
   BalanceSnapshot,
@@ -85,7 +86,7 @@ export function buildCurrencyReport(
   for (const account of active) {
     const balance = balanceOnDate(account.id, t1, snapshots) ?? 0
     const growth =
-      t0 != null
+      t0 != null && isGrowthAccount(account)
         ? (accountGrowth(
             account.id,
             t0,

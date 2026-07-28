@@ -1,4 +1,5 @@
 import { toBase } from '../lib/currency'
+import { growthAccounts } from '../lib/accountKinds'
 import { resolvePivotForDate } from '../lib/cbrRates'
 import type {
   Account,
@@ -188,6 +189,8 @@ export function totalOnDate(
 
 /**
  * Series for the whole wallet on each snapshot date.
+ * Only fund / deposit / investment accounts contribute (operational, cash, credit
+ * are excluded from growth metrics).
  * growth = total change minus cumulative external cashflows (income − expense).
  * Transfers between tracked accounts cancel out in totals.
  */
@@ -200,6 +203,8 @@ export function buildTotalSeries(
   const dates = snapshotDates(snapshots)
   if (dates.length === 0) return []
 
+  const eligible = growthAccounts(accounts)
+
   const cashflowByDate = new Map<string, number>()
   for (const snap of snapshots) {
     const net = (snap.income ?? 0) - (snap.expense ?? 0)
@@ -210,7 +215,7 @@ export function buildTotalSeries(
   let baseline: number | null = null
   let cumCashflow = 0
   for (const date of dates) {
-    const total = totalOnDate(date, accounts, snapshots, settings, { rateBook })
+    const total = totalOnDate(date, eligible, snapshots, settings, { rateBook })
     if (baseline == null) {
       baseline = total
       points.push({ date, total, growth: 0 })

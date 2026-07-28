@@ -10,6 +10,7 @@ import { resolvePivotForDate } from './cbrRates'
 import {
   ACCOUNT_KIND_ORDER,
   accountKindLabel,
+  isGrowthAccount,
   normalizeAccountKind,
 } from './accountKinds'
 import type {
@@ -94,7 +95,7 @@ export function buildAccountTypeReport(
     const displayBalance =
       kind === 'credit' ? Math.max(0, (account.creditLimit ?? 0) - recorded) : recorded
     const growth =
-      t0 != null
+      t0 != null && isGrowthAccount(account)
         ? (accountGrowth(
             account.id,
             t0,

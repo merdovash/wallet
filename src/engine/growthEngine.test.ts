@@ -21,7 +21,7 @@ function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Acco
     color: '#2563eb',
     archived: false,
     sortOrder: 0,
-    kind: 'bank',
+    kind: 'fund',
     ...partial,
   }
 }
@@ -196,5 +196,33 @@ describe('growthEngine', () => {
     expect(totalSeries[1]?.total).toBe(1500)
     expect(totalSeries[1]?.growth).toBe(100)
     expect(periodGrowth(accounts, snapshots, settings)).toBe(100)
+  })
+
+  it('excludes operational, cash and credit from portfolio growth series', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'f', name: 'Fund', kind: 'fund' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 1000 },
+          { accountId: 'f', amount: 1000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'op', amount: 2000 },
+          { accountId: 'f', amount: 1100 },
+        ],
+      },
+    ]
+    const series = buildTotalSeries(accounts, snapshots, settings)
+    expect(series[1]?.total).toBe(1100)
+    expect(series[1]?.growth).toBe(100)
   })
 })

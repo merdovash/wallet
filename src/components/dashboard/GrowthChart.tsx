@@ -56,8 +56,9 @@ export function GrowthChart({
     )
   }
 
-  const primaryLabel = mode === 'total' ? 'Всего' : 'Остаток'
-  const growthLabel = mode === 'total' ? 'Прирост' : 'Прирост (без переводов)'
+  const primaryLabel = mode === 'total' ? 'Капитал' : 'Остаток'
+  const growthLabel =
+    mode === 'total' ? 'Прирост (фонды/вклады/инвест.)' : 'Прирост (без переводов)'
   const canOpenDay = Boolean(settings)
 
   function selectDate(date: string | undefined) {
