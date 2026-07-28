@@ -81,4 +81,33 @@ describe('buildCurrencyReport', () => {
       ).rows,
     ).toEqual([])
   })
+
+  it('keeps positive base growth when native currency growth is negative due to FX', () => {
+    const accounts = [account({ id: 'u', name: 'USD', currency: 'USD' })]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [{ accountId: 'u', amount: 10 }],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [{ accountId: 'u', amount: 9 }],
+      },
+    ]
+    const rateBook = {
+      '2026-01-01': { RUB: 1, USD: 100 },
+      '2026-02-01': { RUB: 1, USD: 120 },
+    }
+
+    const report = buildCurrencyReport(accounts, snapshots, [], settings, rateBook)
+    const usd = report.rows.find((r) => r.currency === 'USD')!
+    // Native: 9 − 10 = −1 USD
+    expect(usd.growth).toBe(-1)
+    // Base: 9*120 − 10*100 = 1080 − 1000 = +80 (FX outweighs quantity drop)
+    expect(usd.growthBase).toBeCloseTo(80, 4)
+    expect(usd.growthBase).toBeGreaterThan(0)
+    expect(usd.growth).toBeLessThan(0)
+  })
 })

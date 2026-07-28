@@ -1,6 +1,7 @@
 import { toBase } from './currency'
 import {
   accountGrowth,
+  accountGrowthBase,
   balanceOnDate,
   netWorthAmount,
   snapshotDates,
@@ -114,13 +115,19 @@ export function buildAccountTypeReport(
       settings.exchangeRates,
       pivot,
     )
-    const growthBase = toBase(
-      growth,
-      account.currency,
-      settings.baseCurrency,
-      settings.exchangeRates,
-      pivot,
-    )
+    const growthBase =
+      t0 != null && isGrowthAccount(account)
+        ? (accountGrowthBase(
+            account.id,
+            t0,
+            t1,
+            snapshots,
+            transfers,
+            accounts,
+            settings,
+            rateBook,
+          ) ?? 0)
+        : 0
 
     const bucket = byKind.get(kind) ?? {
       balanceBase: 0,

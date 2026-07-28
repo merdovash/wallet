@@ -84,12 +84,6 @@ export function CurrencyReportTable({
           <tbody>
             {report.rows.map((row) => {
               const open = expanded[row.currency]
-              const growthColor =
-                row.growthBase > 0
-                  ? 'text-emerald-700'
-                  : row.growthBase < 0
-                    ? 'text-red-600'
-                    : 'text-slate-700'
               return (
                 <CurrencyGroup
                   key={row.currency}
@@ -104,7 +98,6 @@ export function CurrencyReportTable({
                   share={row.share}
                   growth={row.growth}
                   growthBase={row.growthBase}
-                  growthColor={growthColor}
                   baseCurrency={report.baseCurrency}
                   accounts={row.accounts}
                 />
@@ -141,6 +134,12 @@ export function CurrencyReportTable({
   )
 }
 
+function growthTone(value: number): string {
+  if (value > 0) return 'text-emerald-700'
+  if (value < 0) return 'text-red-600'
+  return 'text-slate-700'
+}
+
 function CurrencyGroup({
   open,
   onToggle,
@@ -153,7 +152,6 @@ function CurrencyGroup({
   share,
   growth,
   growthBase,
-  growthColor,
   baseCurrency,
   accounts,
 }: {
@@ -168,7 +166,6 @@ function CurrencyGroup({
   share: number
   growth: number
   growthBase: number
-  growthColor: string
   baseCurrency: string
   accounts: {
     accountId: string
@@ -217,60 +214,52 @@ function CurrencyGroup({
         <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
           {formatShare(share)}
         </td>
-        <td className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${growthColor}`}>
-          <div className="break-words">{signedAmount(growth, currency)}</div>
+        <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
+          <div className={`break-words ${growthTone(growth)}`}>{signedAmount(growth, currency)}</div>
           {currency !== baseCurrency && (
-            <div className="mt-0.5 text-xs opacity-80">
+            <div className={`mt-0.5 text-xs ${growthTone(growthBase)}`}>
               ≈ {signedAmount(growthBase, baseCurrency)}
             </div>
           )}
         </td>
       </tr>
       {open &&
-        accounts.map((acc) => {
-          const accGrowthColor =
-            acc.growthBase > 0
-              ? 'text-emerald-700'
-              : acc.growthBase < 0
-                ? 'text-red-600'
-                : 'text-slate-600'
-          return (
-            <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50/70">
-              <td className="px-3 py-2 pl-9 sm:px-4 sm:pl-10">
-                <button
-                  type="button"
-                  onClick={() => onOpenAccount(acc.accountId)}
-                  className="text-left text-slate-700 hover:text-blue-700 hover:underline"
-                >
-                  {acc.name}
-                </button>
-              </td>
-              <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
-              <td className="px-3 py-2 tabular-nums text-slate-700 sm:px-4">
-                <div className="break-words">{formatCurrency(acc.balance, currency)}</div>
-                {currency !== baseCurrency && (
-                  <div className="mt-0.5 text-xs text-slate-500 lg:hidden">
-                    ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
-                  </div>
-                )}
-              </td>
-              <td className="hidden px-4 py-2 tabular-nums text-slate-700 lg:table-cell">
-                {formatCurrency(acc.balanceBase, baseCurrency)}
-              </td>
-              <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
-              <td
-                className={`px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left ${accGrowthColor}`}
+        accounts.map((acc) => (
+          <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50/70">
+            <td className="px-3 py-2 pl-9 sm:px-4 sm:pl-10">
+              <button
+                type="button"
+                onClick={() => onOpenAccount(acc.accountId)}
+                className="text-left text-slate-700 hover:text-blue-700 hover:underline"
               >
-                <div className="break-words">{signedAmount(acc.growth, currency)}</div>
-                {currency !== baseCurrency && (
-                  <div className="mt-0.5 text-xs opacity-80">
-                    ≈ {signedAmount(acc.growthBase, baseCurrency)}
-                  </div>
-                )}
-              </td>
-            </tr>
-          )
-        })}
+                {acc.name}
+              </button>
+            </td>
+            <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
+            <td className="px-3 py-2 tabular-nums text-slate-700 sm:px-4">
+              <div className="break-words">{formatCurrency(acc.balance, currency)}</div>
+              {currency !== baseCurrency && (
+                <div className="mt-0.5 text-xs text-slate-500 lg:hidden">
+                  ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
+                </div>
+              )}
+            </td>
+            <td className="hidden px-4 py-2 tabular-nums text-slate-700 lg:table-cell">
+              {formatCurrency(acc.balanceBase, baseCurrency)}
+            </td>
+            <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
+            <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
+              <div className={`break-words ${growthTone(acc.growth)}`}>
+                {signedAmount(acc.growth, currency)}
+              </div>
+              {currency !== baseCurrency && (
+                <div className={`mt-0.5 text-xs ${growthTone(acc.growthBase)}`}>
+                  ≈ {signedAmount(acc.growthBase, baseCurrency)}
+                </div>
+              )}
+            </td>
+          </tr>
+        ))}
     </>
   )
 }

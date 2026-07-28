@@ -163,6 +163,101 @@ export function accountGrowth(
   return bal1 - bal0 - netTransfersIn(accountId, t0, t1, transfers, accounts, settings, rateBook)
 }
 
+/**
+ * Net transfers into account over (t0, t1] converted to base currency
+ * at each transfer's own date (FX-aware).
+ */
+export function netTransfersInBase(
+  accountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  const map = accountById(accounts)
+  const account = map.get(accountId)
+  if (!account) return 0
+  let net = 0
+  for (const t of transfers) {
+    if (compareDate(t.date, t0) <= 0) continue
+    if (compareDate(t.date, t1) > 0) continue
+    if (t.fromAccountId === accountId) {
+      net -= convertAmount(
+        t.amount,
+        account.currency,
+        settings.baseCurrency,
+        settings,
+        t.date,
+        rateBook,
+      )
+      continue
+    }
+    if (t.toAccountId === accountId) {
+      const from = map.get(t.fromAccountId)
+      // Transfer.amount is always in the source account currency.
+      const fromCurrency = from?.currency ?? account.currency
+      net += convertAmount(
+        t.amount,
+        fromCurrency,
+        settings.baseCurrency,
+        settings,
+        t.date,
+        rateBook,
+      )
+    }
+  }
+  return net
+}
+
+/**
+ * Base-currency growth including FX: end NW − start NW − transfers (at their dates).
+ * Native-currency growth can be negative while this is positive when the rate rises.
+ */
+export function accountGrowthBase(
+  accountId: string,
+  t0: string,
+  t1: string,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number | null {
+  const map = accountById(accounts)
+  const account = map.get(accountId)
+  if (!account) return null
+  const bal0 = balanceOnDate(accountId, t0, snapshots)
+  const bal1 = balanceOnDate(accountId, t1, snapshots)
+  if (bal0 == null || bal1 == null) return null
+
+  const startBase = toBase(
+    netWorthAmount(account, bal0),
+    account.currency,
+    settings.baseCurrency,
+    settings.exchangeRates,
+    pivotFor(t0, settings, rateBook),
+  )
+  const endBase = toBase(
+    netWorthAmount(account, bal1),
+    account.currency,
+    settings.baseCurrency,
+    settings.exchangeRates,
+    pivotFor(t1, settings, rateBook),
+  )
+  const transferBase = netTransfersInBase(
+    accountId,
+    t0,
+    t1,
+    transfers,
+    accounts,
+    settings,
+    rateBook,
+  )
+  return endBase - startBase - transferBase
+}
+
 function accountById(accounts: Account[]): Map<string, Account> {
   return new Map(accounts.map((a) => [a.id, a]))
 }

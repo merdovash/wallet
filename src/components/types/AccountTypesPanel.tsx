@@ -193,7 +193,13 @@ function TypeGroup({
       </tr>
       {open &&
         accounts.map((acc) => {
-          const accGrowthColor =
+          const nativeTone =
+            acc.growth > 0
+              ? 'text-emerald-700'
+              : acc.growth < 0
+                ? 'text-red-600'
+                : 'text-slate-600'
+          const baseTone =
             acc.growthBase > 0
               ? 'text-emerald-700'
               : acc.growthBase < 0
@@ -221,12 +227,10 @@ function TypeGroup({
                 )}
               </td>
               <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
-              <td
-                className={`px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left ${accGrowthColor}`}
-              >
-                <div>{signedAmount(acc.growth, acc.currency)}</div>
+              <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
+                <div className={nativeTone}>{signedAmount(acc.growth, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
-                  <div className="mt-0.5 text-xs opacity-80">
+                  <div className={`mt-0.5 text-xs ${baseTone}`}>
                     ≈ {signedAmount(acc.growthBase, baseCurrency)}
                   </div>
                 )}
