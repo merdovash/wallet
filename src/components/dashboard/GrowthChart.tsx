@@ -96,7 +96,16 @@ export function GrowthChart({
                 tick={{ fontSize: 11, fill: '#059669' }}
                 tickFormatter={formatCompactAxisValue}
                 width={48}
-                domain={['auto', 'auto']}
+                domain={([dataMin, dataMax]) => {
+                  const min = Number.isFinite(dataMin) ? dataMin : 0
+                  const max = Number.isFinite(dataMax) ? dataMax : 0
+                  if (min === max) {
+                    const pad = Math.max(Math.abs(min) * 0.15, 1)
+                    return [min - pad, max + pad]
+                  }
+                  const pad = (max - min) * 0.12
+                  return [min - pad, max + pad]
+                }}
               />
               <Tooltip
                 formatter={(value: number, name: string) => [
