@@ -17,6 +17,8 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
   )
 
   const growthColor = growth > 0 ? 'text-emerald-700' : growth < 0 ? 'text-red-600' : 'text-slate-800'
+  const topUp = periodReturn?.netFlow ?? 0
+  const topUpColor = topUp > 0 ? 'text-emerald-700' : topUp < 0 ? 'text-red-600' : 'text-slate-800'
   const pctColor =
     (periodReturn?.growthPct ?? 0) > 0
       ? 'text-emerald-700'
@@ -26,7 +28,7 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
         <Card className="!p-2.5 sm:!p-3">
           <p className="text-xs text-slate-500 sm:text-sm">Остаток</p>
           <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
@@ -39,6 +41,13 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
             {signedAmount(growth, currency)}
           </p>
           <p className="mt-1 text-[10px] text-slate-400">накоп./вклады/инвест.</p>
+        </Card>
+        <Card className="!p-2.5 sm:!p-3">
+          <p className="text-xs text-slate-500 sm:text-sm">Пополнения</p>
+          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${topUpColor}`}>
+            {periodReturn ? signedAmount(topUp, currency) : '—'}
+          </p>
+          <p className="mt-1 text-[10px] text-slate-400">фонд / вклад / инвест.</p>
         </Card>
         <button
           type="button"
