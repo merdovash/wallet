@@ -142,3 +142,13 @@ export function signedAmount(amount: number, currency: string): string {
   if (amount < 0) return `−${formatCurrency(Math.abs(amount), currency)}`
   return formatted
 }
+
+/** Signed percent with one decimal, e.g. +1,2% / −0,5%. */
+export function formatPercent(value: number | null | undefined, digits = 1): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  const pct = value * 100
+  const abs = Math.abs(pct).toFixed(digits).replace('.', ',')
+  if (pct > 0) return `+${abs}%`
+  if (pct < 0) return `−${abs}%`
+  return `${abs}%`
+}

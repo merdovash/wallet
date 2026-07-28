@@ -6,6 +6,7 @@ import {
   totalOnDate,
 } from '../../engine/growthEngine'
 import { todayIsoDate } from '../../lib/format'
+import { buildPeriodReturn } from '../../lib/monthlyReturns'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
@@ -13,6 +14,7 @@ import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
 import { GrowthChart } from './GrowthChart'
+import { MonthlyReturnsTable } from './MonthlyReturnsTable'
 import { SummaryCards } from './SummaryCards'
 
 interface DashboardProps {
@@ -50,6 +52,10 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     () => buildTotalSeries(accounts, snapshots, settings, rateBook),
     [accounts, snapshots, settings, rateBook],
   )
+  const periodReturn = useMemo(
+    () => buildPeriodReturn(accounts, snapshots, settings, rateBook),
+    [accounts, snapshots, settings, rateBook],
+  )
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -63,11 +69,18 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         </Button>
       </div>
 
-      <SummaryCards total={total} growth={growth} currency={settings.baseCurrency} />
+      <SummaryCards
+        total={total}
+        growth={growth}
+        currency={settings.baseCurrency}
+        periodReturn={periodReturn}
+      />
 
       <CreditFloatSummary />
 
       <GrowthChart data={series} currency={settings.baseCurrency} mode="total" />
+
+      <MonthlyReturnsTable />
 
       <CurrencyReportTable
         accountCount={activeAccounts.length}
