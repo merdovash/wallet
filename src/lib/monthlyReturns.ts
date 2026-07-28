@@ -1,10 +1,19 @@
 import {
+  balanceOnDate,
   netExternalCashflow,
+  netWorthAmount,
   snapshotDates,
   totalOnDate,
   type RateBook,
 } from '../engine/growthEngine'
-import { growthAccounts } from './accountKinds'
+import {
+  accountKindLabel,
+  growthAccounts,
+  isGrowthAccount,
+  normalizeAccountKind,
+} from './accountKinds'
+import { toBase } from './currency'
+import { resolvePivotForDate } from './cbrRates'
 import type { Account, BalanceSnapshot, WalletSettings } from '../types/wallet'
 
 export interface MonthlyReturnRow {
@@ -21,6 +30,18 @@ export interface MonthlyReturnRow {
   annualizedPct: number | null
 }
 
+export interface PeriodReturnAccountLine {
+  accountId: string
+  name: string
+  kind: string
+  kindLabel: string
+  currency: string
+  startBalance: number
+  endBalance: number
+  startBase: number
+  endBase: number
+}
+
 export interface PeriodReturnSummary {
   startDate: string
   endDate: string
@@ -34,6 +55,8 @@ export interface PeriodReturnSummary {
   annualizedPct: number | null
   /** Number of fund/deposit/investment accounts in the calculation. */
   accountCount: number
+  includedAccounts: PeriodReturnAccountLine[]
+  excludedAccounts: PeriodReturnAccountLine[]
 }
 
 const MONTH_LABELS = [
@@ -158,6 +181,52 @@ export function buildPeriodReturn(
   const growth = endTotal - startTotal - netFlow
   const growthPct = pctOrNull(growth, startTotal)
   const days = daysBetween(startDate, endDate)
+
+  const startPivot =
+    (rateBook ? resolvePivotForDate(startDate, rateBook) : null) ??
+    (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+  const endPivot =
+    (rateBook ? resolvePivotForDate(endDate, rateBook) : null) ??
+    (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+
+  const active = accounts
+    .filter((a) => !a.archived)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+
+  function lineFor(account: Account): PeriodReturnAccountLine {
+    const kind = normalizeAccountKind(account.kind)
+    const startRec = balanceOnDate(account.id, startDate, snapshots)
+    const endRec = balanceOnDate(account.id, endDate, snapshots)
+    const startBal = startRec == null ? 0 : netWorthAmount(account, startRec)
+    const endBal = endRec == null ? 0 : netWorthAmount(account, endRec)
+    return {
+      accountId: account.id,
+      name: account.name,
+      kind,
+      kindLabel: accountKindLabel(kind),
+      currency: account.currency,
+      startBalance: startBal,
+      endBalance: endBal,
+      startBase: toBase(
+        startBal,
+        account.currency,
+        settings.baseCurrency,
+        settings.exchangeRates,
+        startPivot,
+      ),
+      endBase: toBase(
+        endBal,
+        account.currency,
+        settings.baseCurrency,
+        settings.exchangeRates,
+        endPivot,
+      ),
+    }
+  }
+
+  const includedAccounts = eligible.map(lineFor)
+  const excludedAccounts = active.filter((a) => !isGrowthAccount(a)).map(lineFor)
+
   return {
     startDate,
     endDate,
@@ -170,5 +239,7 @@ export function buildPeriodReturn(
     annualizedPct:
       growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days),
     accountCount: eligible.length,
+    includedAccounts,
+    excludedAccounts,
   }
 }

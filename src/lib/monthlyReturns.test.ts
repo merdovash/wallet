@@ -67,6 +67,8 @@ describe('monthlyReturns', () => {
     expect(summary?.days).toBe(30)
     expect(summary?.netFlow).toBe(0)
     expect(summary?.accountCount).toBe(1)
+    expect(summary?.includedAccounts).toHaveLength(1)
+    expect(summary?.excludedAccounts).toHaveLength(0)
     expect(summary?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
   })
 })

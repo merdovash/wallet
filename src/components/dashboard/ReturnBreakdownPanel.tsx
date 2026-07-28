@@ -4,7 +4,7 @@ import {
   formatPercent,
   signedAmount,
 } from '../../lib/format'
-import type { PeriodReturnSummary } from '../../lib/monthlyReturns'
+import type { PeriodReturnAccountLine, PeriodReturnSummary } from '../../lib/monthlyReturns'
 import { StackPanel } from '../ui/StackPanel'
 
 interface ReturnBreakdownPanelProps {
@@ -29,15 +29,18 @@ export function ReturnBreakdownPanel({
     <StackPanel open={open} title={title} onClose={onClose}>
       {!periodReturn ? (
         <p className="text-sm text-slate-500">
-          Недостаточно данных: нужны минимум два чек-ина и счета типа фонд, вклад или инвестиции.
+          Недостаточно данных: нужны минимум два чек-ина и счета типа накопления (фонд), вклад
+          или инвестиции.
         </p>
       ) : (
         <div className="space-y-4 text-sm text-slate-700">
-          <p className="text-xs text-slate-500">
-            В расчёт входят только счета «фонд», «вклад» и «инвестиции» ({periodReturn.accountCount}
-            ). Оперативные, наличка и кредитки не учитываются. Доходы и расходы чек-инов вычитаются
-            из прироста.
-          </p>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            <p className="font-semibold">Что входит в процент прироста</p>
+            <p className="mt-1">
+              Только накопления (фонд), вклады и инвестиции — {periodReturn.accountCount} счёт(а).
+              Наличка, оперативные счета и кредитки в расчёт не входят.
+            </p>
+          </div>
 
           <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200">
             <Row
@@ -48,6 +51,7 @@ export function ReturnBreakdownPanel({
             <Row
               label="Капитал на начало"
               value={formatCurrency(periodReturn.startTotal, currency)}
+              hint="сумма только включённых счетов"
             />
             <Row
               label="Капитал на конец"
@@ -80,10 +84,24 @@ export function ReturnBreakdownPanel({
             />
           </dl>
 
+          <AccountSection
+            title="Включены в расчёт"
+            tone="include"
+            accounts={periodReturn.includedAccounts}
+            currency={currency}
+          />
+          <AccountSection
+            title="Не учитываются"
+            tone="exclude"
+            accounts={periodReturn.excludedAccounts}
+            currency={currency}
+          />
+
           {focus === 'growthPct' && (
             <FormulaBlock
               title="Формула прироста %"
               lines={[
+                'капитал = сумма фондов/накоплений + вкладов + инвестиций',
                 'прирост = капитал_конец − капитал_начало − (доход − расход)',
                 'прирост% = прирост ÷ капитал_начало',
               ]}
@@ -102,6 +120,56 @@ export function ReturnBreakdownPanel({
         </div>
       )}
     </StackPanel>
+  )
+}
+
+function AccountSection({
+  title,
+  tone,
+  accounts,
+  currency,
+}: {
+  title: string
+  tone: 'include' | 'exclude'
+  accounts: PeriodReturnAccountLine[]
+  currency: string
+}) {
+  if (accounts.length === 0) {
+    return (
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+        <p className="mt-1 text-xs text-slate-400">Нет счетов</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        {accounts.map((acc) => (
+          <li key={acc.accountId} className="flex items-start justify-between gap-3 px-3 py-2">
+            <span className="min-w-0">
+              <span className="block truncate font-medium text-slate-900">{acc.name}</span>
+              <span
+                className={`text-[11px] ${
+                  tone === 'include' ? 'text-emerald-700' : 'text-slate-400'
+                }`}
+              >
+                {acc.kindLabel}
+                {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
+              </span>
+            </span>
+            <span className="shrink-0 text-right text-xs tabular-nums text-slate-600">
+              <span className="block">{formatCurrency(acc.endBase, currency)}</span>
+              <span className="text-[11px] text-slate-400">
+                было {formatCurrency(acc.startBase, currency)}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

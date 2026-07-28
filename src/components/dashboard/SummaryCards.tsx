@@ -38,6 +38,7 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
             {signedAmount(growth, currency)}
           </p>
+          <p className="mt-1 text-[10px] text-slate-400">накоп./вклады/инвест.</p>
         </Card>
         <button
           type="button"
