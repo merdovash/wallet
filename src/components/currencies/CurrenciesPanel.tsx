@@ -41,6 +41,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
       <CurrencyReportTable
         accountCount={activeAccounts.length}
         onOpenAccount={onOpenAccount}
+        baseCurrencyLast
       />
     </div>
   )

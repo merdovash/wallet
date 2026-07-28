@@ -48,6 +48,7 @@ export function buildCurrencyReport(
   transfers: Transfer[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  opts?: { baseCurrencyLast?: boolean },
 ): CurrencyReport {
   const dates = snapshotDates(snapshots)
   const t0 = dates[0] ?? null
@@ -149,9 +150,11 @@ export function buildCurrencyReport(
       accounts: data.accounts,
     }))
     .sort((a, b) => {
-      const aBase = a.currency === settings.baseCurrency ? 1 : 0
-      const bBase = b.currency === settings.baseCurrency ? 1 : 0
-      if (aBase !== bBase) return aBase - bBase
+      if (opts?.baseCurrencyLast) {
+        const aBase = a.currency === settings.baseCurrency ? 1 : 0
+        const bBase = b.currency === settings.baseCurrency ? 1 : 0
+        if (aBase !== bBase) return aBase - bBase
+      }
       return b.balanceBase - a.balanceBase || a.currency.localeCompare(b.currency)
     })
 

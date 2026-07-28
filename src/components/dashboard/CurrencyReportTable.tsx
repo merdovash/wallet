@@ -18,9 +18,15 @@ function accountCountLabel(count: number): string {
 interface CurrencyReportTableProps {
   accountCount: number
   onOpenAccount: (accountId: string) => void
+  /** When true, base currency row is always last (currencies tab). */
+  baseCurrencyLast?: boolean
 }
 
-export function CurrencyReportTable({ accountCount, onOpenAccount }: CurrencyReportTableProps) {
+export function CurrencyReportTable({
+  accountCount,
+  onOpenAccount,
+  baseCurrencyLast = false,
+}: CurrencyReportTableProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
@@ -29,8 +35,11 @@ export function CurrencyReportTable({ accountCount, onOpenAccount }: CurrencyRep
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const report = useMemo(
-    () => buildCurrencyReport(accounts, snapshots, transfers, settings, rateBook),
-    [accounts, snapshots, transfers, settings, rateBook],
+    () =>
+      buildCurrencyReport(accounts, snapshots, transfers, settings, rateBook, {
+        baseCurrencyLast,
+      }),
+    [accounts, snapshots, transfers, settings, rateBook, baseCurrencyLast],
   )
 
   function toggle(currency: string) {
