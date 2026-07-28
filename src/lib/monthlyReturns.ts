@@ -1,9 +1,12 @@
 import {
   balanceOnDate,
-  netExternalCashflow,
+  growthCapitalFlows,
+  modifiedDietzReturn,
+  netGrowthCapitalFlow,
   netWorthAmount,
   snapshotDates,
   totalOnDate,
+  type DatedCapitalFlow,
   type RateBook,
 } from '../engine/growthEngine'
 import {
@@ -14,7 +17,7 @@ import {
 } from './accountKinds'
 import { toBase } from './currency'
 import { resolvePivotForDate } from './cbrRates'
-import type { Account, BalanceSnapshot, WalletSettings } from '../types/wallet'
+import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 export interface MonthlyReturnRow {
   yearMonth: string
@@ -24,7 +27,9 @@ export interface MonthlyReturnRow {
   startTotal: number
   endTotal: number
   growth: number
-  /** Simple return for the month: growth / startTotal. */
+  netFlow: number
+  weightedCapital: number
+  /** Modified Dietz return for the month. */
   growthPct: number | null
   /** (1 + growthPct)^12 − 1 */
   annualizedPct: number | null
@@ -42,19 +47,29 @@ export interface PeriodReturnAccountLine {
   endBase: number
 }
 
+export interface PeriodReturnFlowLine {
+  date: string
+  amount: number
+  weight: number
+  weightedAmount: number
+}
+
 export interface PeriodReturnSummary {
   startDate: string
   endDate: string
   days: number
   startTotal: number
   endTotal: number
-  /** Net external cashflow (income − expense) over (start, end]. */
+  /** Net capital into growth portfolio (income − expense + boundary transfers). */
   netFlow: number
+  /** Start total + time-weighted flows (Modified Dietz denominator). */
+  weightedCapital: number
   growth: number
   growthPct: number | null
   annualizedPct: number | null
   /** Number of fund/deposit/investment accounts in the calculation. */
   accountCount: number
+  flows: PeriodReturnFlowLine[]
   includedAccounts: PeriodReturnAccountLine[]
   excludedAccounts: PeriodReturnAccountLine[]
 }
@@ -103,21 +118,37 @@ function daysBetween(startDate: string, endDate: string): number {
   return Math.max(0, Math.round((end - start) / 86_400_000))
 }
 
-function pctOrNull(growth: number, startTotal: number): number | null {
-  if (!Number.isFinite(startTotal) || startTotal === 0) return null
-  return growth / startTotal
+function flowLines(
+  startDate: string,
+  endDate: string,
+  flows: DatedCapitalFlow[],
+): PeriodReturnFlowLine[] {
+  const periodDays = daysBetween(startDate, endDate)
+  return flows.map((flow) => {
+    const elapsed = daysBetween(startDate, flow.date)
+    const weight =
+      periodDays > 0 ? Math.max(0, Math.min(1, (periodDays - elapsed) / periodDays)) : 0
+    return {
+      date: flow.date,
+      amount: flow.amount,
+      weight,
+      weightedAmount: flow.amount * weight,
+    }
+  })
 }
 
 /**
  * Month-by-month returns using last snapshot of each month as the close,
  * and the previous month's close (or first snapshot in the first month) as open.
- * External income/expense are excluded from growth.
+ * Income/expense and boundary transfers are excluded from growth and
+ * time-weighted in the percentage (Modified Dietz).
  */
 export function buildMonthlyReturns(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  transfers: Transfer[] = [],
 ): MonthlyReturnRow[] {
   const eligible = growthAccounts(accounts)
   const dates = snapshotDates(snapshots)
@@ -144,9 +175,24 @@ export function buildMonthlyReturns(
 
     const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
     const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
-    const netFlow = netExternalCashflow(startDate, endDate, snapshots)
+    const flows = growthCapitalFlows(
+      startDate,
+      endDate,
+      snapshots,
+      transfers,
+      accounts,
+      settings,
+      rateBook,
+    )
+    const netFlow = flows.reduce((sum, f) => sum + f.amount, 0)
     const growth = endTotal - startTotal - netFlow
-    const growthPct = pctOrNull(growth, startTotal)
+    const { growthPct, weightedCapital } = modifiedDietzReturn(
+      startTotal,
+      growth,
+      startDate,
+      endDate,
+      flows,
+    )
 
     rows.push({
       yearMonth,
@@ -156,6 +202,8 @@ export function buildMonthlyReturns(
       startTotal,
       endTotal,
       growth,
+      netFlow,
+      weightedCapital,
       growthPct,
       annualizedPct: growthPct == null ? null : annualizeMonthlyReturn(growthPct),
     })
@@ -163,12 +211,13 @@ export function buildMonthlyReturns(
   return rows
 }
 
-/** Overall return from first to last snapshot, cashflow-adjusted, with annualization. */
+/** Overall return from first to last snapshot, cashflow-adjusted (Modified Dietz). */
 export function buildPeriodReturn(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  transfers: Transfer[] = [],
 ): PeriodReturnSummary | null {
   const eligible = growthAccounts(accounts)
   const dates = snapshotDates(snapshots)
@@ -177,9 +226,32 @@ export function buildPeriodReturn(
   const endDate = dates[dates.length - 1]!
   const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
   const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
-  const netFlow = netExternalCashflow(startDate, endDate, snapshots)
+  const flows = growthCapitalFlows(
+    startDate,
+    endDate,
+    snapshots,
+    transfers,
+    accounts,
+    settings,
+    rateBook,
+  )
+  const netFlow = netGrowthCapitalFlow(
+    startDate,
+    endDate,
+    snapshots,
+    transfers,
+    accounts,
+    settings,
+    rateBook,
+  )
   const growth = endTotal - startTotal - netFlow
-  const growthPct = pctOrNull(growth, startTotal)
+  const { growthPct, weightedCapital } = modifiedDietzReturn(
+    startTotal,
+    growth,
+    startDate,
+    endDate,
+    flows,
+  )
   const days = daysBetween(startDate, endDate)
 
   const startPivot =
@@ -234,11 +306,13 @@ export function buildPeriodReturn(
     startTotal,
     endTotal,
     netFlow,
+    weightedCapital,
     growth,
     growthPct,
     annualizedPct:
       growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days),
     accountCount: eligible.length,
+    flows: flowLines(startDate, endDate, flows),
     includedAccounts,
     excludedAccounts,
   }

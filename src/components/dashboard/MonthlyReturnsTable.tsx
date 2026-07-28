@@ -8,12 +8,13 @@ import { Card, EmptyState } from '../ui/FormControls'
 export function MonthlyReturnsTable() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
+  const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
 
   const rows = useMemo(
-    () => buildMonthlyReturns(accounts, snapshots, settings, rateBook),
-    [accounts, snapshots, settings, rateBook],
+    () => buildMonthlyReturns(accounts, snapshots, settings, rateBook, transfers),
+    [accounts, snapshots, settings, rateBook, transfers],
   )
 
   return (
@@ -21,7 +22,7 @@ export function MonthlyReturnsTable() {
       <div className="border-b border-slate-100 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-800">Помесячный прирост</h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Без учёта доходов/расходов и переводов; годовые — из месячной ставки
+          Без учёта доходов/расходов и пополнений в приросте; % — Modified Dietz
         </p>
       </div>
       {rows.length === 0 ? (

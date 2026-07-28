@@ -225,4 +225,43 @@ describe('growthEngine', () => {
     expect(series[1]?.total).toBe(1100)
     expect(series[1]?.growth).toBe(100)
   })
+
+  it('excludes transfer into fund from portfolio growth', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'f', name: 'Fund', kind: 'fund' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 500 },
+          { accountId: 'f', amount: 1000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'f', amount: 1600 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-15',
+        fromAccountId: 'op',
+        toAccountId: 'f',
+        amount: 500,
+      },
+    ]
+    const series = buildTotalSeries(accounts, snapshots, settings, undefined, transfers)
+    expect(series[1]?.total).toBe(1600)
+    // +600 balance change − 500 transfer = 100 growth
+    expect(series[1]?.growth).toBe(100)
+    expect(periodGrowth(accounts, snapshots, settings, undefined, transfers)).toBe(100)
+  })
 })

@@ -5,7 +5,7 @@ import {
   buildMonthlyReturns,
   buildPeriodReturn,
 } from './monthlyReturns'
-import type { Account, BalanceSnapshot, WalletSettings } from '../types/wallet'
+import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 const settings: WalletSettings = {
   baseCurrency: 'RUB',
@@ -50,10 +50,82 @@ describe('monthlyReturns', () => {
     expect(rows[0]?.growthPct).toBeCloseTo(0.01, 8)
     expect(rows[0]?.annualizedPct).toBeCloseTo(annualizeMonthlyReturn(0.01), 8)
 
-    // Feb: end 107020 - start 101000 - income 5000 = 1020 → ~1.01%
+    // Feb: end 107020 - start 101000 - income 5000 = 1020
+    // Flow on last day → weight 0 → denom = 101000
     expect(rows[1]?.yearMonth).toBe('2026-02')
     expect(rows[1]?.growth).toBeCloseTo(1020, 4)
     expect(rows[1]?.growthPct).toBeCloseTo(1020 / 101_000, 8)
+  })
+
+  it('time-weights mid-period deposit in Modified Dietz percent', () => {
+    const accounts = [account({ id: 'a', name: 'A' })]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 100_000 }] },
+      {
+        id: 's2',
+        date: '2026-01-16',
+        income: 50_000,
+        lines: [{ accountId: 'a', amount: 150_000 }],
+      },
+      { id: 's3', date: '2026-01-31', lines: [{ accountId: 'a', amount: 151_000 }] },
+    ]
+
+    const summary = buildPeriodReturn(accounts, snapshots, settings)
+    // growth = 151000 - 100000 - 50000 = 1000
+    // days=30, flow day 15, w=15/30=0.5 → denom = 100000 + 25000 = 125000
+    expect(summary?.growth).toBeCloseTo(1000, 4)
+    expect(summary?.netFlow).toBe(50_000)
+    expect(summary?.weightedCapital).toBeCloseTo(125_000, 4)
+    expect(summary?.growthPct).toBeCloseTo(1000 / 125_000, 8)
+  })
+
+  it('treats transfer into deposit as capital from that date only', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'dep', name: 'Deposit', kind: 'deposit' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 50_000 },
+          { accountId: 'dep', amount: 100_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-16',
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'dep', amount: 150_000 },
+        ],
+      },
+      {
+        id: 's3',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'dep', amount: 151_000 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-16',
+        fromAccountId: 'op',
+        toAccountId: 'dep',
+        amount: 50_000,
+      },
+    ]
+
+    const summary = buildPeriodReturn(accounts, snapshots, settings, undefined, transfers)
+    expect(summary?.startTotal).toBe(100_000)
+    expect(summary?.endTotal).toBe(151_000)
+    expect(summary?.netFlow).toBe(50_000)
+    expect(summary?.growth).toBeCloseTo(1000, 4)
+    expect(summary?.growthPct).toBeCloseTo(1000 / 125_000, 8)
   })
 
   it('summarizes overall period return', () => {

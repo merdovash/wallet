@@ -1,5 +1,5 @@
 import { toBase } from '../lib/currency'
-import { growthAccounts } from '../lib/accountKinds'
+import { growthAccounts, isGrowthAccount } from '../lib/accountKinds'
 import { resolvePivotForDate } from '../lib/cbrRates'
 import type {
   Account,
@@ -14,8 +14,21 @@ import type {
 /** CBR rate days: rateDate → RUB pivot per unit. */
 export type RateBook = Record<string, Record<string, number>>
 
+/** External capital movement into the growth portfolio on a date (base currency). */
+export interface DatedCapitalFlow {
+  date: string
+  amount: number
+}
+
 function compareDate(a: string, b: string): number {
   return a.localeCompare(b)
+}
+
+function daysBetween(startDate: string, endDate: string): number {
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0
+  return Math.max(0, Math.round((end - start) / 86_400_000))
 }
 
 function sortSnapshots(snapshots: BalanceSnapshot[]): BalanceSnapshot[] {
@@ -188,51 +201,162 @@ export function totalOnDate(
 }
 
 /**
- * Series for the whole wallet on each snapshot date.
- * Only fund / deposit / investment accounts contribute (operational, cash, credit
- * are excluded from growth metrics).
- * growth = total change minus cumulative external cashflows (income − expense).
- * Transfers between tracked accounts cancel out in totals.
+ * Capital flows into the growth portfolio over (t0, t1] in base currency:
+ * - check-in income − expense
+ * - transfers from non-growth → growth (+), growth → non-growth (−)
+ * Internal transfers between growth accounts cancel out.
+ */
+export function growthCapitalFlows(
+  t0: string,
+  t1: string,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const byDate = new Map<string, number>()
+
+  for (const snap of snapshots) {
+    if (compareDate(snap.date, t0) <= 0) continue
+    if (compareDate(snap.date, t1) > 0) continue
+    const net = (snap.income ?? 0) - (snap.expense ?? 0)
+    if (net === 0) continue
+    byDate.set(snap.date, (byDate.get(snap.date) ?? 0) + net)
+  }
+
+  const map = accountById(accounts)
+  for (const t of transfers) {
+    if (compareDate(t.date, t0) <= 0) continue
+    if (compareDate(t.date, t1) > 0) continue
+    const from = map.get(t.fromAccountId)
+    const to = map.get(t.toAccountId)
+    if (!from || !to) continue
+    const fromGrowth = isGrowthAccount(from)
+    const toGrowth = isGrowthAccount(to)
+    if (fromGrowth === toGrowth) continue
+
+    const amountBase = convertAmount(
+      t.amount,
+      from.currency,
+      settings.baseCurrency,
+      settings,
+      t.date,
+      rateBook,
+    )
+    const signed = toGrowth && !fromGrowth ? amountBase : -amountBase
+    byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
+  }
+
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => compareDate(a, b))
+    .map(([date, amount]) => ({ date, amount }))
+}
+
+/** Net capital flow into the growth portfolio over (t0, t1]. */
+export function netGrowthCapitalFlow(
+  t0: string,
+  t1: string,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  return growthCapitalFlows(t0, t1, snapshots, transfers, accounts, settings, rateBook).reduce(
+    (sum, f) => sum + f.amount,
+    0,
+  )
+}
+
+/**
+ * Modified Dietz: flows enter the capital base only for the fraction of the
+ * period remaining after the flow date (w = (T − t) / T).
+ */
+export function modifiedDietzReturn(
+  startTotal: number,
+  growth: number,
+  startDate: string,
+  endDate: string,
+  flows: DatedCapitalFlow[],
+): { growthPct: number | null; weightedCapital: number } {
+  const periodDays = daysBetween(startDate, endDate)
+  let weightedFlows = 0
+  if (periodDays > 0) {
+    for (const flow of flows) {
+      const elapsed = daysBetween(startDate, flow.date)
+      const weight = Math.max(0, Math.min(1, (periodDays - elapsed) / periodDays))
+      weightedFlows += flow.amount * weight
+    }
+  }
+  const weightedCapital = startTotal + weightedFlows
+  if (!Number.isFinite(weightedCapital) || weightedCapital === 0) {
+    return { growthPct: null, weightedCapital }
+  }
+  return { growthPct: growth / weightedCapital, weightedCapital }
+}
+
+/**
+ * Series for growth accounts on each snapshot date.
+ * growth = total change minus cumulative external capital flows
+ * (income − expense, and transfers across the growth boundary).
  */
 export function buildTotalSeries(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  transfers: Transfer[] = [],
 ): TotalPoint[] {
   const dates = snapshotDates(snapshots)
   if (dates.length === 0) return []
 
   const eligible = growthAccounts(accounts)
+  const startDate = dates[0]!
 
   const cashflowByDate = new Map<string, number>()
-  for (const snap of snapshots) {
-    const net = (snap.income ?? 0) - (snap.expense ?? 0)
-    cashflowByDate.set(snap.date, (cashflowByDate.get(snap.date) ?? 0) + net)
+  for (const flow of growthCapitalFlows(
+    startDate,
+    dates[dates.length - 1]!,
+    snapshots,
+    transfers,
+    accounts,
+    settings,
+    rateBook,
+  )) {
+    cashflowByDate.set(flow.date, (cashflowByDate.get(flow.date) ?? 0) + flow.amount)
   }
 
   const points: TotalPoint[] = []
   let baseline: number | null = null
   let cumCashflow = 0
+  let prevDate: string | null = null
   for (const date of dates) {
     const total = totalOnDate(date, eligible, snapshots, settings, { rateBook })
-    if (baseline == null) {
+    if (baseline == null || prevDate == null) {
       baseline = total
+      prevDate = date
       points.push({ date, total, growth: 0 })
       continue
     }
-    // Cashflow on this date is attributed to the interval ending here.
-    cumCashflow += cashflowByDate.get(date) ?? 0
+    // Attribute flows on dates between check-ins to the interval ending here.
+    for (const [flowDate, amount] of cashflowByDate) {
+      if (compareDate(flowDate, prevDate) > 0 && compareDate(flowDate, date) <= 0) {
+        cumCashflow += amount
+      }
+    }
     points.push({
       date,
       total,
       growth: total - baseline - cumCashflow,
     })
+    prevDate = date
   }
   return points
 }
 
-/** Net external cashflow (income − expense) in base currency over (t0, t1]. */
+/** @deprecated Prefer netGrowthCapitalFlow — kept for callers that only have income/expense. */
 export function netExternalCashflow(
   t0: string,
   t1: string,
@@ -348,8 +472,9 @@ export function periodGrowth(
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  transfers: Transfer[] = [],
 ): number {
-  const series = buildTotalSeries(accounts, snapshots, settings, rateBook)
+  const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers)
   if (series.length < 2) return series[0]?.growth ?? 0
   return series[series.length - 1]!.growth
 }

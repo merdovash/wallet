@@ -38,7 +38,8 @@ export function ReturnBreakdownPanel({
             <p className="font-semibold">Что входит в процент прироста</p>
             <p className="mt-1">
               Только накопления (фонд), вклады и инвестиции — {periodReturn.accountCount} счёт(а).
-              Наличка, оперативные счета и кредитки в расчёт не входят.
+              Доходы, расходы и пополнения переводом не входят в прирост: они лишь меняют капитал
+              с даты поступления (метод Modified Dietz).
             </p>
           </div>
 
@@ -58,8 +59,14 @@ export function ReturnBreakdownPanel({
               value={formatCurrency(periodReturn.endTotal, currency)}
             />
             <Row
-              label="Чистый внешний поток (доход − расход)"
+              label="Чистый капитал (пополнения)"
               value={signedAmount(periodReturn.netFlow, currency)}
+              hint="доход − расход + переводы в портфель роста"
+            />
+            <Row
+              label="Взвешенный капитал"
+              value={formatCurrency(periodReturn.weightedCapital, currency)}
+              hint="начало + потоки × доля оставшихся дней"
             />
             <Row
               label="Прирост"
@@ -69,7 +76,7 @@ export function ReturnBreakdownPanel({
             <Row
               label="Прирост %"
               value={formatPercent(periodReturn.growthPct)}
-              hint="прирост ÷ капитал на начало"
+              hint="прирост ÷ взвешенный капитал"
               emphasize={focus === 'growthPct'}
             />
             <Row
@@ -83,6 +90,37 @@ export function ReturnBreakdownPanel({
               emphasize={focus === 'annualizedPct'}
             />
           </dl>
+
+          {periodReturn.flows.length > 0 ? (
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Потоки капитала
+              </h3>
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                {periodReturn.flows.map((flow) => (
+                  <li
+                    key={`${flow.date}-${flow.amount}`}
+                    className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
+                  >
+                    <span>
+                      <span className="block font-medium text-slate-900">
+                        {formatDateDisplay(flow.date)}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        вес {(flow.weight * 100).toFixed(0).replace('.', ',')}% периода
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right tabular-nums text-slate-700">
+                      <span className="block">{signedAmount(flow.amount, currency)}</span>
+                      <span className="text-[11px] text-slate-400">
+                        → {signedAmount(flow.weightedAmount, currency)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <AccountSection
             title="Включены в расчёт"
@@ -102,8 +140,11 @@ export function ReturnBreakdownPanel({
               title="Формула прироста %"
               lines={[
                 'капитал = сумма фондов/накоплений + вкладов + инвестиций',
-                'прирост = капитал_конец − капитал_начало − (доход − расход)',
-                'прирост% = прирост ÷ капитал_начало',
+                'поток = доход − расход + переводы в/из портфеля роста',
+                'прирост = капитал_конец − капитал_начало − поток',
+                'вес потока = (дни_после_даты) ÷ дней_периода',
+                'взвеш.капитал = начало + Σ(поток × вес)',
+                'прирост% = прирост ÷ взвеш.капитал',
               ]}
             />
           )}
@@ -111,7 +152,7 @@ export function ReturnBreakdownPanel({
             <FormulaBlock
               title="Формула годовых"
               lines={[
-                'Сначала считается прирост% за период (см. выше).',
+                'Сначала считается прирост% за период (Modified Dietz, см. выше).',
                 `годовых = (1 + прирост%)^(365/${periodReturn.days || 'N'}) − 1`,
                 'Так простой процент за период пересчитывается в эквивалент за 365 дней.',
               ]}

@@ -23,6 +23,7 @@ interface DashboardProps {
 export function Dashboard({ onOpenAccount }: DashboardProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
+  const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
@@ -44,16 +45,16 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     [latestDate, accounts, snapshots, settings, rateBook],
   )
   const growth = useMemo(
-    () => periodGrowth(accounts, snapshots, settings, rateBook),
-    [accounts, snapshots, settings, rateBook],
+    () => periodGrowth(accounts, snapshots, settings, rateBook, transfers),
+    [accounts, snapshots, settings, rateBook, transfers],
   )
   const series = useMemo(
-    () => buildTotalSeries(accounts, snapshots, settings, rateBook),
-    [accounts, snapshots, settings, rateBook],
+    () => buildTotalSeries(accounts, snapshots, settings, rateBook, transfers),
+    [accounts, snapshots, settings, rateBook, transfers],
   )
   const periodReturn = useMemo(
-    () => buildPeriodReturn(accounts, snapshots, settings, rateBook),
-    [accounts, snapshots, settings, rateBook],
+    () => buildPeriodReturn(accounts, snapshots, settings, rateBook, transfers),
+    [accounts, snapshots, settings, rateBook, transfers],
   )
 
   return (
