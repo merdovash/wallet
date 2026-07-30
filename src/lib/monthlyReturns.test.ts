@@ -4,6 +4,7 @@ import {
   annualizePeriodReturn,
   buildMonthlyReturns,
   buildPeriodReturn,
+  dailyGrowthInterval,
 } from './monthlyReturns'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
@@ -249,5 +250,61 @@ describe('monthlyReturns', () => {
       amountBase: 16,
       crossesGrowthBoundary: true,
     })
+  })
+
+  it('builds one-day interval breakdown matching daily bar growth', () => {
+    const accounts = [
+      account({ id: 'a', name: 'Fund' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'a', amount: 100 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+      { id: 's2', date: '2026-01-02', lines: [{ accountId: 'a', amount: 105 }] },
+      {
+        id: 's3',
+        date: '2026-01-03',
+        lines: [
+          { accountId: 'a', amount: 90 },
+          { accountId: 'op', amount: 16 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-03',
+        fromAccountId: 'a',
+        toAccountId: 'op',
+        amount: 16,
+      },
+    ]
+
+    const interval = dailyGrowthInterval('2026-01-03', [
+      '2026-01-01',
+      '2026-01-02',
+      '2026-01-03',
+    ])
+    expect(interval).toEqual({ startDate: '2026-01-02', endDate: '2026-01-03' })
+
+    const day = buildPeriodReturn(
+      accounts,
+      snapshots,
+      settings,
+      undefined,
+      transfers,
+      interval!,
+    )
+    // From 105 to 90 with −16 transfer → growth +1
+    expect(day?.growth).toBe(1)
+    expect(day?.includedAccounts[0]?.growthBase).toBe(1)
+    expect(day?.includedAccounts[0]?.transfersBase).toBe(-16)
+    expect(day?.transferMovements).toHaveLength(1)
   })
 })

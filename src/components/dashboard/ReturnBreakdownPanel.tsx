@@ -17,6 +17,8 @@ interface ReturnBreakdownPanelProps {
   focus: 'growth' | 'growthPct' | 'annualizedPct' | 'topUp' | null
   periodReturn: PeriodReturnSummary | null
   currency: string
+  /** Override panel title (e.g. daily breakdown). */
+  title?: string
 }
 
 function tone(value: number): string {
@@ -31,15 +33,17 @@ export function ReturnBreakdownPanel({
   focus,
   periodReturn,
   currency,
+  title: titleOverride,
 }: ReturnBreakdownPanelProps) {
   const title =
-    focus === 'annualizedPct'
+    titleOverride ??
+    (focus === 'annualizedPct'
       ? 'Расчёт: в годовых'
       : focus === 'growth'
         ? 'Расшифровка: прирост'
         : focus === 'topUp'
           ? 'Расшифровка: пополнения'
-          : 'Расчёт: прирост %'
+          : 'Расчёт: прирост %')
 
   const includedSorted = periodReturn
     ? [...periodReturn.includedAccounts].sort(

@@ -13,11 +13,14 @@ import { buildDailyGrowthSeries, snapshotDates } from '../../engine/growthEngine
 import {
   formatCompactAxisValue,
   formatCurrency,
+  formatDateDisplay,
   formatShortDate,
   todayIsoDate,
 } from '../../lib/format'
+import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { ReturnBreakdownPanel } from '../dashboard/ReturnBreakdownPanel'
 import { Card, EmptyState, Field, Select } from '../ui/FormControls'
 
 export function DailyGrowthPanel() {
@@ -34,6 +37,7 @@ export function DailyGrowthPanel() {
 
   const [fromDate, setFromDate] = useState(firstDate)
   const [toDate, setToDate] = useState(lastDate)
+  const [selectedEndDate, setSelectedEndDate] = useState<string | null>(null)
 
   useEffect(() => {
     if (!firstDate || !lastDate) {
@@ -77,6 +81,13 @@ export function DailyGrowthPanel() {
     () => filtered.reduce((s, p) => s + p.growth, 0),
     [filtered],
   )
+
+  const dayBreakdown = useMemo(() => {
+    if (!selectedEndDate) return null
+    const interval = dailyGrowthInterval(selectedEndDate, checkInDates)
+    if (!interval) return null
+    return buildPeriodReturn(accounts, snapshots, settings, rateBook, transfers, interval)
+  }, [selectedEndDate, checkInDates, accounts, snapshots, settings, rateBook, transfers])
 
   const fromOptions = checkInDates.filter((d) => !toDate || d <= toDate)
   const toOptions = checkInDates.filter((d) => !fromDate || d >= fromDate)
@@ -161,12 +172,20 @@ export function DailyGrowthPanel() {
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-slate-800">Прирост по дням чек-инов</h2>
               <p className="text-xs text-slate-500">
-                Столбец — прирост за интервал, заканчивающийся этой датой
+                Столбец — прирост за интервал до этой даты · клик открывает расшифровку
               </p>
             </div>
             <div className="h-72 w-full sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart
+                  data={rows}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(state) => {
+                    const date = state?.activePayload?.[0]?.payload?.date as string | undefined
+                    if (date) setSelectedEndDate(date)
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     dataKey="label"
@@ -199,6 +218,19 @@ export function DailyGrowthPanel() {
           </Card>
         </>
       )}
+
+      <ReturnBreakdownPanel
+        open={selectedEndDate != null}
+        onClose={() => setSelectedEndDate(null)}
+        focus="growth"
+        periodReturn={dayBreakdown}
+        currency={settings.baseCurrency}
+        title={
+          selectedEndDate
+            ? `Расшифровка: прирост за ${formatDateDisplay(selectedEndDate)}`
+            : undefined
+        }
+      />
     </div>
   )
 }

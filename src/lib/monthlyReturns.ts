@@ -236,19 +236,23 @@ export function buildMonthlyReturns(
   return rows
 }
 
-/** Overall return from first to last snapshot, cashflow-adjusted (Modified Dietz). */
+/** Overall return over a date range, cashflow-adjusted (Modified Dietz).
+ * Defaults to first→last check-in when `range` is omitted.
+ */
 export function buildPeriodReturn(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
   transfers: Transfer[] = [],
+  range?: { startDate: string; endDate: string },
 ): PeriodReturnSummary | null {
   const eligible = growthAccounts(accounts)
   const dates = snapshotDates(snapshots)
   if (dates.length < 2 || eligible.length === 0) return null
-  const startDate = dates[0]!
-  const endDate = dates[dates.length - 1]!
+  const startDate = range?.startDate ?? dates[0]!
+  const endDate = range?.endDate ?? dates[dates.length - 1]!
+  if (startDate.localeCompare(endDate) >= 0) return null
   const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
   const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
   const flows = growthCapitalFlows(
@@ -404,4 +408,14 @@ export function buildPeriodReturn(
     includedAccounts,
     excludedAccounts,
   }
+}
+
+/** Interval for a daily bar: previous check-in → this check-in. */
+export function dailyGrowthInterval(
+  endDate: string,
+  checkInDates: string[],
+): { startDate: string; endDate: string } | null {
+  const idx = checkInDates.indexOf(endDate)
+  if (idx < 1) return null
+  return { startDate: checkInDates[idx - 1]!, endDate }
 }
