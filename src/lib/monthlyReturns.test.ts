@@ -240,5 +240,14 @@ describe('monthlyReturns', () => {
     const summary = buildPeriodReturn(accounts, snapshots, settings, undefined, transfers)
     expect(summary?.growth).toBe(6)
     expect(summary?.includedAccounts[0]?.growthBase).toBe(6)
+    expect(summary?.includedAccounts[0]?.transfersBase).toBe(-16)
+    expect(summary?.includedAccounts[0]?.balanceChangeBase).toBe(-10)
+    expect(summary?.transferMovements).toHaveLength(1)
+    expect(summary?.transferMovements[0]).toMatchObject({
+      fromName: 'Fund',
+      toName: 'Op',
+      amountBase: 16,
+      crossesGrowthBoundary: true,
+    })
   })
 })

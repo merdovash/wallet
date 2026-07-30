@@ -4,7 +4,11 @@ import {
   formatPercent,
   signedAmount,
 } from '../../lib/format'
-import type { PeriodReturnAccountLine, PeriodReturnSummary } from '../../lib/monthlyReturns'
+import type {
+  PeriodReturnAccountLine,
+  PeriodReturnSummary,
+  PeriodReturnTransferLine,
+} from '../../lib/monthlyReturns'
 import { StackPanel } from '../ui/StackPanel'
 
 interface ReturnBreakdownPanelProps {
@@ -13,6 +17,12 @@ interface ReturnBreakdownPanelProps {
   focus: 'growth' | 'growthPct' | 'annualizedPct' | 'topUp' | null
   periodReturn: PeriodReturnSummary | null
   currency: string
+}
+
+function tone(value: number): string {
+  if (value > 0) return 'text-emerald-700'
+  if (value < 0) return 'text-red-600'
+  return 'text-slate-800'
 }
 
 export function ReturnBreakdownPanel({
@@ -44,159 +54,346 @@ export function ReturnBreakdownPanel({
           Недостаточно данных: нужны минимум два чек-ина и счета типа накопления (фонд), вклад
           или инвестиции.
         </p>
+      ) : focus === 'growth' ? (
+        <GrowthMovementsView periodReturn={periodReturn} accounts={includedSorted} currency={currency} />
       ) : (
-        <div className="space-y-4 text-sm text-slate-700">
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-            <p className="font-semibold">Что входит в прирост</p>
-            <p className="mt-1">
-              Только накопления (фонд), вклады и инвестиции — {periodReturn.accountCount} счёт(а).
-              Доходы и расходы с оперативных счетов в прирост не входят. Пополнения
-              переводом в портфель роста лишь меняют капитал с даты поступления (метод
-              Modified Dietz).
-            </p>
-          </div>
-
-          <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-            <Row
-              label="Период"
-              value={`${formatDateDisplay(periodReturn.startDate)} → ${formatDateDisplay(periodReturn.endDate)}`}
-            />
-            <Row label="Дней" value={String(periodReturn.days)} />
-            <Row
-              label="Капитал на начало"
-              value={formatCurrency(periodReturn.startTotal, currency)}
-              hint="сумма только включённых счетов"
-            />
-            <Row
-              label="Капитал на конец"
-              value={formatCurrency(periodReturn.endTotal, currency)}
-            />
-            <Row
-              label="Чистый капитал (пополнения)"
-              value={signedAmount(periodReturn.netFlow, currency)}
-              hint="переводы в/из портфеля роста (доход/расход не входят)"
-              emphasize={focus === 'topUp'}
-            />
-            <Row
-              label="Взвешенный капитал"
-              value={formatCurrency(periodReturn.weightedCapital, currency)}
-              hint="начало + потоки × доля оставшихся дней"
-            />
-            <Row
-              label="Прирост"
-              value={signedAmount(periodReturn.growth, currency)}
-              hint="конец − начало − поток"
-              emphasize={focus === 'growth'}
-            />
-            <Row
-              label="Прирост %"
-              value={formatPercent(periodReturn.growthPct)}
-              hint="прирост ÷ взвешенный капитал"
-              emphasize={focus === 'growthPct'}
-            />
-            <Row
-              label="В годовых"
-              value={formatPercent(periodReturn.annualizedPct)}
-              hint={
-                periodReturn.days > 0
-                  ? `(1 + прирост%) ^ (365 ÷ ${periodReturn.days}) − 1`
-                  : undefined
-              }
-              emphasize={focus === 'annualizedPct'}
-            />
-          </dl>
-
-          {periodReturn.flows.length > 0 ? (
-            <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Потоки капитала
-              </h3>
-              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                {periodReturn.flows.map((flow) => (
-                  <li
-                    key={`${flow.date}-${flow.amount}`}
-                    className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
-                  >
-                    <span>
-                      <span className="block font-medium text-slate-900">
-                        {formatDateDisplay(flow.date)}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        вес {(flow.weight * 100).toFixed(0).replace('.', ',')}% периода
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right tabular-nums text-slate-700">
-                      <span className="block">{signedAmount(flow.amount, currency)}</span>
-                      <span className="text-[11px] text-slate-400">
-                        → {signedAmount(flow.weightedAmount, currency)}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <AccountSection
-            title={
-              focus === 'growth' || focus === 'topUp'
-                ? 'Счета по убыванию изменения'
-                : 'Включены в расчёт'
-            }
-            tone="include"
-            accounts={includedSorted}
-            currency={currency}
-            showDelta
-          />
-          <AccountSection
-            title="Не учитываются"
-            tone="exclude"
-            accounts={periodReturn.excludedAccounts}
-            currency={currency}
-          />
-
-          {(focus === 'growth' || focus === 'topUp') && (
-            <FormulaBlock
-              title="Формула прироста"
-              lines={[
-                'капитал = сумма фондов/накоплений + вкладов + инвестиций',
-                'поток = переводы в/из портфеля роста',
-                'прирост = капитал_конец − капитал_начало − поток',
-              ]}
-            />
-          )}
-          {focus === 'growthPct' && (
-            <FormulaBlock
-              title="Формула прироста %"
-              lines={[
-                'капитал = сумма фондов/накоплений + вкладов + инвестиций',
-                'поток = переводы в/из портфеля роста (доход и расход с оперативных не входят)',
-                'прирост = капитал_конец − капитал_начало − поток',
-                'вес потока = (дни_после_даты) ÷ дней_периода',
-                'взвеш.капитал = начало + Σ(поток × вес)',
-                'прирост% = прирост ÷ взвеш.капитал',
-              ]}
-            />
-          )}
-          {focus === 'annualizedPct' && (
-            <FormulaBlock
-              title="Формула годовых"
-              lines={[
-                'Сначала считается прирост% за период (Modified Dietz, см. выше).',
-                `годовых = (1 + прирост%)^(365/${periodReturn.days || 'N'}) − 1`,
-                'Так простой процент за период пересчитывается в эквивалент за 365 дней.',
-              ]}
-            />
-          )}
-        </div>
+        <PercentBreakdownView
+          focus={focus}
+          periodReturn={periodReturn}
+          includedSorted={includedSorted}
+          currency={currency}
+        />
       )}
     </StackPanel>
   )
 }
 
+/** Absolute growth: movements on included accounts — growth vs transfers. */
+function GrowthMovementsView({
+  periodReturn,
+  accounts,
+  currency,
+}: {
+  periodReturn: PeriodReturnSummary
+  accounts: PeriodReturnAccountLine[]
+  currency: string
+}) {
+  const totalGrowth = accounts.reduce((s, a) => s + a.growthBase, 0)
+  const totalTransfers = accounts.reduce((s, a) => s + a.transfersBase, 0)
+
+  return (
+    <div className="space-y-4 text-sm text-slate-700">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <p className="font-semibold">Движения по учитываемым счетам</p>
+        <p className="mt-1">
+          Фонд, вклад и инвестиции за период{' '}
+          {formatDateDisplay(periodReturn.startDate)} → {formatDateDisplay(periodReturn.endDate)}.
+          Изменение остатка = прирост + переводы.
+        </p>
+      </div>
+
+      <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        <Row
+          label="Прирост"
+          value={signedAmount(periodReturn.growth, currency)}
+          valueClassName={tone(periodReturn.growth)}
+          hint="сумма роста по учитываемым счетам"
+          emphasize
+        />
+        <Row
+          label="Переводы (чистые)"
+          value={signedAmount(totalTransfers, currency)}
+          valueClassName={tone(totalTransfers)}
+          hint="пополнения (+) и снятия (−) по этим счетам"
+        />
+        <Row
+          label="Изменение остатков"
+          value={signedAmount(periodReturn.endTotal - periodReturn.startTotal, currency)}
+          hint="прирост + переводы"
+        />
+      </dl>
+
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          По счетам
+        </h3>
+        {accounts.length === 0 ? (
+          <p className="text-xs text-slate-400">Нет учитываемых счетов</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {accounts.map((acc) => (
+              <li key={acc.accountId} className="space-y-1.5 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-900">{acc.name}</span>
+                    <span className="text-[11px] text-emerald-700">
+                      {acc.kindLabel}
+                      {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right text-xs tabular-nums text-slate-500">
+                    {formatCurrency(acc.startBalance, acc.currency)} →{' '}
+                    {formatCurrency(acc.endBalance, acc.currency)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                  <MovementChip
+                    label="Прирост"
+                    value={signedAmount(acc.growthBase, currency)}
+                    className={tone(acc.growthBase)}
+                  />
+                  <MovementChip
+                    label="Переводы"
+                    value={signedAmount(acc.transfersBase, currency)}
+                    className={tone(acc.transfersBase)}
+                  />
+                  <MovementChip
+                    label="Δ остатка"
+                    value={signedAmount(acc.balanceChangeBase, currency)}
+                    className="text-slate-700"
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {accounts.length > 0 ? (
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            Итого прирост по счетам: {signedAmount(totalGrowth, currency)}
+          </p>
+        ) : null}
+      </div>
+
+      <TransferMovementsSection
+        transfers={periodReturn.transferMovements}
+        currency={currency}
+      />
+    </div>
+  )
+}
+
+function TransferMovementsSection({
+  transfers,
+  currency,
+}: {
+  transfers: PeriodReturnTransferLine[]
+  currency: string
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Переводы
+      </h3>
+      {transfers.length === 0 ? (
+        <p className="text-xs text-slate-400">За период переводов по учитываемым счетам не было</p>
+      ) : (
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {transfers.map((t) => (
+            <li
+              key={t.id}
+              className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
+            >
+              <span className="min-w-0">
+                <span className="block font-medium text-slate-900">
+                  {t.fromName} → {t.toName}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {formatDateDisplay(t.date)}
+                  {t.crossesGrowthBoundary ? ' · через границу портфеля' : ' · внутри портфеля'}
+                </span>
+              </span>
+              <span className="shrink-0 tabular-nums font-medium text-slate-800">
+                {formatCurrency(t.amountBase, currency)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function MovementChip({
+  label,
+  value,
+  className,
+}: {
+  label: string
+  value: string
+  className?: string
+}) {
+  return (
+    <div className="rounded-md bg-slate-50 px-2 py-1.5">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className={`mt-0.5 font-medium tabular-nums ${className ?? ''}`}>{value}</p>
+    </div>
+  )
+}
+
+function PercentBreakdownView({
+  focus,
+  periodReturn,
+  includedSorted,
+  currency,
+}: {
+  focus: 'growthPct' | 'annualizedPct' | 'topUp' | null
+  periodReturn: PeriodReturnSummary
+  includedSorted: PeriodReturnAccountLine[]
+  currency: string
+}) {
+  return (
+    <div className="space-y-4 text-sm text-slate-700">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <p className="font-semibold">Что входит в прирост</p>
+        <p className="mt-1">
+          Только накопления (фонд), вклады и инвестиции — {periodReturn.accountCount} счёт(а).
+          Доходы и расходы с оперативных счетов в прирост не входят. Пополнения
+          переводом в портфель роста лишь меняют капитал с даты поступления (метод
+          Modified Dietz).
+        </p>
+      </div>
+
+      <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        <Row
+          label="Период"
+          value={`${formatDateDisplay(periodReturn.startDate)} → ${formatDateDisplay(periodReturn.endDate)}`}
+        />
+        <Row label="Дней" value={String(periodReturn.days)} />
+        <Row
+          label="Капитал на начало"
+          value={formatCurrency(periodReturn.startTotal, currency)}
+          hint="сумма только включённых счетов"
+        />
+        <Row
+          label="Капитал на конец"
+          value={formatCurrency(periodReturn.endTotal, currency)}
+        />
+        <Row
+          label="Чистый капитал (пополнения)"
+          value={signedAmount(periodReturn.netFlow, currency)}
+          hint="переводы в/из портфеля роста (доход/расход не входят)"
+          emphasize={focus === 'topUp'}
+        />
+        <Row
+          label="Взвешенный капитал"
+          value={formatCurrency(periodReturn.weightedCapital, currency)}
+          hint="начало + потоки × доля оставшихся дней"
+        />
+        <Row
+          label="Прирост"
+          value={signedAmount(periodReturn.growth, currency)}
+          hint="конец − начало − поток"
+        />
+        <Row
+          label="Прирост %"
+          value={formatPercent(periodReturn.growthPct)}
+          hint="прирост ÷ взвешенный капитал"
+          emphasize={focus === 'growthPct'}
+        />
+        <Row
+          label="В годовых"
+          value={formatPercent(periodReturn.annualizedPct)}
+          hint={
+            periodReturn.days > 0
+              ? `(1 + прирост%) ^ (365 ÷ ${periodReturn.days}) − 1`
+              : undefined
+          }
+          emphasize={focus === 'annualizedPct'}
+        />
+      </dl>
+
+      {periodReturn.flows.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Потоки капитала
+          </h3>
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {periodReturn.flows.map((flow) => (
+              <li
+                key={`${flow.date}-${flow.amount}`}
+                className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
+              >
+                <span>
+                  <span className="block font-medium text-slate-900">
+                    {formatDateDisplay(flow.date)}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    вес {(flow.weight * 100).toFixed(0).replace('.', ',')}% периода
+                  </span>
+                </span>
+                <span className="shrink-0 text-right tabular-nums text-slate-700">
+                  <span className="block">{signedAmount(flow.amount, currency)}</span>
+                  <span className="text-[11px] text-slate-400">
+                    → {signedAmount(flow.weightedAmount, currency)}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {focus === 'topUp' ? (
+        <TransferMovementsSection
+          transfers={periodReturn.transferMovements.filter((t) => t.crossesGrowthBoundary)}
+          currency={currency}
+        />
+      ) : null}
+
+      <AccountSection
+        title={focus === 'topUp' ? 'Счета по убыванию прироста' : 'Включены в расчёт'}
+        tone="include"
+        accounts={includedSorted}
+        currency={currency}
+        showDelta={focus === 'topUp'}
+      />
+      <AccountSection
+        title="Не учитываются"
+        tone="exclude"
+        accounts={periodReturn.excludedAccounts}
+        currency={currency}
+      />
+
+      {focus === 'topUp' && (
+        <FormulaBlock
+          title="Формула прироста"
+          lines={[
+            'капитал = сумма фондов/накоплений + вкладов + инвестиций',
+            'поток = переводы в/из портфеля роста',
+            'прирост = капитал_конец − капитал_начало − поток',
+          ]}
+        />
+      )}
+      {focus === 'growthPct' && (
+        <FormulaBlock
+          title="Формула прироста %"
+          lines={[
+            'капитал = сумма фондов/накоплений + вкладов + инвестиций',
+            'поток = переводы в/из портфеля роста (доход и расход с оперативных не входят)',
+            'прирост = капитал_конец − капитал_начало − поток',
+            'вес потока = (дни_после_даты) ÷ дней_периода',
+            'взвеш.капитал = начало + Σ(поток × вес)',
+            'прирост% = прирост ÷ взвеш.капитал',
+          ]}
+        />
+      )}
+      {focus === 'annualizedPct' && (
+        <FormulaBlock
+          title="Формула годовых"
+          lines={[
+            'Сначала считается прирост% за период (Modified Dietz, см. выше).',
+            `годовых = (1 + прирост%)^(365/${periodReturn.days || 'N'}) − 1`,
+            'Так простой процент за период пересчитывается в эквивалент за 365 дней.',
+          ]}
+        />
+      )}
+    </div>
+  )
+}
+
 function AccountSection({
   title,
-  tone,
+  tone: sectionTone,
   accounts,
   currency,
   showDelta = false,
@@ -228,7 +425,7 @@ function AccountSection({
                 <span className="block truncate font-medium text-slate-900">{acc.name}</span>
                 <span
                   className={`text-[11px] ${
-                    tone === 'include' ? 'text-emerald-700' : 'text-slate-400'
+                    sectionTone === 'include' ? 'text-emerald-700' : 'text-slate-400'
                   }`}
                 >
                   {acc.kindLabel}
@@ -238,13 +435,7 @@ function AccountSection({
               <span className="shrink-0 text-right text-xs tabular-nums text-slate-600">
                 {showDelta ? (
                   <>
-                    <span
-                      className={`block ${
-                        delta > 0 ? 'text-emerald-700' : delta < 0 ? 'text-red-600' : ''
-                      }`}
-                    >
-                      {signedAmount(delta, currency)}
-                    </span>
+                    <span className={`block ${tone(delta)}`}>{signedAmount(delta, currency)}</span>
                     <span className="text-[11px] text-slate-400">
                       {formatCurrency(acc.startBase, currency)} →{' '}
                       {formatCurrency(acc.endBase, currency)}
@@ -272,11 +463,13 @@ function Row({
   value,
   hint,
   emphasize = false,
+  valueClassName,
 }: {
   label: string
   value: string
   hint?: string
   emphasize?: boolean
+  valueClassName?: string
 }) {
   return (
     <div
@@ -288,7 +481,11 @@ function Row({
         <span className="block">{label}</span>
         {hint ? <span className="mt-0.5 block text-[11px] text-slate-400">{hint}</span> : null}
       </dt>
-      <dd className="shrink-0 text-right font-medium tabular-nums text-slate-900">{value}</dd>
+      <dd
+        className={`shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900'}`}
+      >
+        {value}
+      </dd>
     </div>
   )
 }

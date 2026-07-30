@@ -1,9 +1,11 @@
 import {
   accountGrowthBase,
   balanceOnDate,
+  convertAmount,
   growthCapitalFlows,
   modifiedDietzReturn,
   netGrowthCapitalFlow,
+  netTransfersInBase,
   netWorthAmount,
   snapshotDates,
   totalOnDate,
@@ -46,8 +48,25 @@ export interface PeriodReturnAccountLine {
   endBalance: number
   startBase: number
   endBase: number
-  /** Transfer-adjusted growth in base (end − start − net transfers in). */
+  /** endBase − startBase (includes transfers). */
+  balanceChangeBase: number
+  /** Net transfers into the account in base over the period. */
+  transfersBase: number
+  /** Transfer-adjusted growth in base (balanceChange − transfers). */
   growthBase: number
+}
+
+export interface PeriodReturnTransferLine {
+  id: string
+  date: string
+  fromAccountId: string
+  fromName: string
+  toAccountId: string
+  toName: string
+  /** Amount in base currency (from source amount converted on transfer date). */
+  amountBase: number
+  /** True if the transfer crosses the growth-portfolio boundary. */
+  crossesGrowthBoundary: boolean
 }
 
 export interface PeriodReturnFlowLine {
@@ -73,6 +92,8 @@ export interface PeriodReturnSummary {
   /** Number of fund/deposit/investment accounts in the calculation. */
   accountCount: number
   flows: PeriodReturnFlowLine[]
+  /** Transfers that touch at least one growth account in the period. */
+  transferMovements: PeriodReturnTransferLine[]
   includedAccounts: PeriodReturnAccountLine[]
   excludedAccounts: PeriodReturnAccountLine[]
 }
@@ -275,6 +296,31 @@ export function buildPeriodReturn(
     const endRec = balanceOnDate(account.id, endDate, snapshots)
     const startBal = startRec == null ? 0 : netWorthAmount(account, startRec)
     const endBal = endRec == null ? 0 : netWorthAmount(account, endRec)
+    const startBase = toBase(
+      startBal,
+      account.currency,
+      settings.baseCurrency,
+      settings.exchangeRates,
+      startPivot,
+    )
+    const endBase = toBase(
+      endBal,
+      account.currency,
+      settings.baseCurrency,
+      settings.exchangeRates,
+      endPivot,
+    )
+    const transfersBase = isGrowthAccount(account)
+      ? netTransfersInBase(
+          account.id,
+          startDate,
+          endDate,
+          transfers,
+          accounts,
+          settings,
+          rateBook,
+        )
+      : 0
     const growthBase = isGrowthAccount(account)
       ? (accountGrowthBase(
           account.id,
@@ -295,26 +341,50 @@ export function buildPeriodReturn(
       currency: account.currency,
       startBalance: startBal,
       endBalance: endBal,
-      startBase: toBase(
-        startBal,
-        account.currency,
-        settings.baseCurrency,
-        settings.exchangeRates,
-        startPivot,
-      ),
-      endBase: toBase(
-        endBal,
-        account.currency,
-        settings.baseCurrency,
-        settings.exchangeRates,
-        endPivot,
-      ),
+      startBase,
+      endBase,
+      balanceChangeBase: endBase - startBase,
+      transfersBase,
       growthBase,
     }
   }
 
   const includedAccounts = eligible.map(lineFor)
   const excludedAccounts = active.filter((a) => !isGrowthAccount(a)).map(lineFor)
+
+  const nameById = new Map(accounts.map((a) => [a.id, a.name]))
+  const transferMovements: PeriodReturnTransferLine[] = []
+  for (const t of transfers) {
+    if (t.date.localeCompare(startDate) <= 0) continue
+    if (t.date.localeCompare(endDate) > 0) continue
+    const from = accounts.find((a) => a.id === t.fromAccountId)
+    const to = accounts.find((a) => a.id === t.toAccountId)
+    if (!from || !to) continue
+    const fromGrowth = isGrowthAccount(from)
+    const toGrowth = isGrowthAccount(to)
+    if (!fromGrowth && !toGrowth) continue
+    const amountBase = convertAmount(
+      t.amount,
+      from.currency,
+      settings.baseCurrency,
+      settings,
+      t.date,
+      rateBook,
+    )
+    transferMovements.push({
+      id: t.id,
+      date: t.date,
+      fromAccountId: from.id,
+      fromName: nameById.get(from.id) ?? from.name,
+      toAccountId: to.id,
+      toName: nameById.get(to.id) ?? to.name,
+      amountBase,
+      crossesGrowthBoundary: fromGrowth !== toGrowth,
+    })
+  }
+  transferMovements.sort(
+    (a, b) => a.date.localeCompare(b.date) || a.fromName.localeCompare(b.fromName),
+  )
 
   return {
     startDate,
@@ -330,6 +400,7 @@ export function buildPeriodReturn(
       growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days),
     accountCount: eligible.length,
     flows: flowLines(startDate, endDate, flows),
+    transferMovements,
     includedAccounts,
     excludedAccounts,
   }
