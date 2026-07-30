@@ -199,7 +199,46 @@ describe('monthlyReturns', () => {
     expect(summary?.netFlow).toBe(0)
     expect(summary?.accountCount).toBe(1)
     expect(summary?.includedAccounts).toHaveLength(1)
+    expect(summary?.includedAccounts[0]?.growthBase).toBeCloseTo(10, 4)
     expect(summary?.excludedAccounts).toHaveLength(0)
     expect(summary?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
+  })
+
+  it('attributes +6 account growth after withdrawal of 16 (100→105→90)', () => {
+    const accounts = [
+      account({ id: 'a', name: 'Fund' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'a', amount: 100 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+      { id: 's2', date: '2026-01-02', lines: [{ accountId: 'a', amount: 105 }] },
+      {
+        id: 's3',
+        date: '2026-01-03',
+        lines: [
+          { accountId: 'a', amount: 90 },
+          { accountId: 'op', amount: 16 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-03',
+        fromAccountId: 'a',
+        toAccountId: 'op',
+        amount: 16,
+      },
+    ]
+    const summary = buildPeriodReturn(accounts, snapshots, settings, undefined, transfers)
+    expect(summary?.growth).toBe(6)
+    expect(summary?.includedAccounts[0]?.growthBase).toBe(6)
   })
 })

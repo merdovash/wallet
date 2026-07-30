@@ -33,7 +33,7 @@ export function ReturnBreakdownPanel({
 
   const includedSorted = periodReturn
     ? [...periodReturn.includedAccounts].sort(
-        (a, b) => b.endBase - b.startBase - (a.endBase - a.startBase) || a.name.localeCompare(b.name),
+        (a, b) => b.growthBase - a.growthBase || a.name.localeCompare(b.name),
       )
     : []
 
@@ -221,7 +221,7 @@ function AccountSection({
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
         {accounts.map((acc) => {
-          const delta = acc.endBase - acc.startBase
+          const delta = showDelta ? acc.growthBase : acc.endBase - acc.startBase
           return (
             <li key={acc.accountId} className="flex items-start justify-between gap-3 px-3 py-2">
               <span className="min-w-0">

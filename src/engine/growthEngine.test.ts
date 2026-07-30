@@ -287,4 +287,50 @@ describe('growthEngine', () => {
     expect(daily[0]).toMatchObject({ date: '2026-01-10', growth: 100 })
     expect(daily[1]).toMatchObject({ date: '2026-01-20', growth: -50 })
   })
+
+  it('gives +6 growth when balance falls after a 16 withdrawal (100→105→90)', () => {
+    const accounts = [
+      account({ id: 'a', name: 'Fund' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'a', amount: 100 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+      { id: 's2', date: '2026-01-02', lines: [{ accountId: 'a', amount: 105 }] },
+      {
+        id: 's3',
+        date: '2026-01-03',
+        lines: [
+          { accountId: 'a', amount: 90 },
+          { accountId: 'op', amount: 16 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-03',
+        fromAccountId: 'a',
+        toAccountId: 'op',
+        amount: 16,
+      },
+    ]
+
+    // 90 − 100 − (−16) = 6
+    expect(accountGrowth('a', '2026-01-01', '2026-01-03', snapshots, transfers, accounts, settings)).toBe(
+      6,
+    )
+    expect(periodGrowth(accounts, snapshots, settings, undefined, transfers)).toBe(6)
+    const series = buildTotalSeries(accounts, snapshots, settings, undefined, transfers)
+    expect(series[series.length - 1]?.growth).toBe(6)
+
+    const accountSeries = buildAccountSeries('a', snapshots, transfers, accounts, settings)
+    expect(accountSeries[accountSeries.length - 1]?.growth).toBe(6)
+  })
 })

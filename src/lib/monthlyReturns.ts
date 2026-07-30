@@ -1,4 +1,5 @@
 import {
+  accountGrowthBase,
   balanceOnDate,
   growthCapitalFlows,
   modifiedDietzReturn,
@@ -45,6 +46,8 @@ export interface PeriodReturnAccountLine {
   endBalance: number
   startBase: number
   endBase: number
+  /** Transfer-adjusted growth in base (end − start − net transfers in). */
+  growthBase: number
 }
 
 export interface PeriodReturnFlowLine {
@@ -272,6 +275,18 @@ export function buildPeriodReturn(
     const endRec = balanceOnDate(account.id, endDate, snapshots)
     const startBal = startRec == null ? 0 : netWorthAmount(account, startRec)
     const endBal = endRec == null ? 0 : netWorthAmount(account, endRec)
+    const growthBase = isGrowthAccount(account)
+      ? (accountGrowthBase(
+          account.id,
+          startDate,
+          endDate,
+          snapshots,
+          transfers,
+          accounts,
+          settings,
+          rateBook,
+        ) ?? 0)
+      : 0
     return {
       accountId: account.id,
       name: account.name,
@@ -294,6 +309,7 @@ export function buildPeriodReturn(
         settings.exchangeRates,
         endPivot,
       ),
+      growthBase,
     }
   }
 
