@@ -102,7 +102,7 @@ describe('creditFloatEngine', () => {
     expect(buckets.find((b) => b.month === '2026-04')?.remaining).toBe(50)
   })
 
-  it('attributes earned as repaid share of linked wallet growth (Dietz-weighted)', () => {
+  it('attributes earned from avg debt share of linked growth (Dietz-weighted)', () => {
     const credit = account({
       id: 'cc',
       name: 'Card',
@@ -118,7 +118,7 @@ describe('creditFloatEngine', () => {
         id: 's1',
         date: '2026-03-01',
         lines: [
-          { accountId: 'cc', amount: 200 },
+          { accountId: 'cc', amount: 200 }, // debt 100
           { accountId: 'float', amount: 1000 },
           { accountId: 'cash', amount: 500 },
         ],
@@ -127,54 +127,30 @@ describe('creditFloatEngine', () => {
         id: 's2',
         date: '2026-03-31',
         lines: [
-          // repaid 500 from float → available credit 200+500=700 capped by limit? store 250
-          { accountId: 'cc', amount: 250 },
-          // 1000 + 30 growth − 500 repayment = 530
-          { accountId: 'float', amount: 530 },
+          { accountId: 'cc', amount: 200 },
+          { accountId: 'float', amount: 1030 },
           { accountId: 'cash', amount: 500 },
         ],
-      },
-      {
-        id: 's3',
-        date: '2026-04-30',
-        lines: [
-          { accountId: 'cc', amount: 250 },
-          // no repayment in April; +20 growth
-          { accountId: 'float', amount: 550 },
-          { accountId: 'cash', amount: 500 },
-        ],
-      },
-    ]
-    const transfers: Transfer[] = [
-      {
-        id: 't1',
-        date: '2026-03-16',
-        fromAccountId: 'float',
-        toAccountId: 'cc',
-        amount: 500,
       },
     ]
 
     const summary = buildCreditFloatSummary(
       credit,
       snapshots,
-      transfers,
+      [],
       accounts,
       settings,
-      '2026-04-30',
+      '2026-03-31',
     )
     const march = summary.months.find((m) => m.month === '2026-03')
-    const april = summary.months.find((m) => m.month === '2026-04')
-
-    // March: growth = 30, flow −500 on day 15 of 30 → weight 0.5
-    // W = 1000 + (−500)×0.5 = 750; earned = 30 × min(1, 500/750) = 20
-    expect(march?.earned).toBeCloseTo(20, 8)
-    // April: growth 20 but no linked→card repayment → 0
-    expect(april?.earned).toBe(0)
-    expect(summary.cumulativeEarned).toBeCloseTo(20, 8)
+    // growth 30, W=1000, avgDebt=100 → share 0.1 → earned 3
+    expect(march?.linkedGrowth).toBeCloseTo(30, 8)
+    expect(march?.floatSharePct).toBeCloseTo(0.1, 8)
+    expect(march?.earned).toBeCloseTo(3, 8)
+    expect(summary.cumulativeEarned).toBeCloseTo(3, 8)
   })
 
-  it('earns nothing without repayments from the linked wallet', () => {
+  it('uses repayment amount when it exceeds average debt', () => {
     const credit = account({
       id: 'cc',
       name: 'Card',
@@ -197,7 +173,59 @@ describe('creditFloatEngine', () => {
         id: 's2',
         date: '2026-03-31',
         lines: [
-          { accountId: 'cc', amount: 200 },
+          { accountId: 'cc', amount: 250 },
+          { accountId: 'float', amount: 530 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-03-16',
+        fromAccountId: 'float',
+        toAccountId: 'cc',
+        amount: 500,
+      },
+    ]
+
+    const summary = buildCreditFloatSummary(
+      credit,
+      snapshots,
+      transfers,
+      accounts,
+      settings,
+      '2026-03-31',
+    )
+    const march = summary.months.find((m) => m.month === '2026-03')
+    // growth 30, flow −500 day 15/30 → W=750; principal=max(avgDebt, 500)=500
+    // earned = 30 × (500/750) = 20
+    expect(march?.earned).toBeCloseTo(20, 8)
+  })
+
+  it('earns nothing when there is no credit debt and no linked repayments', () => {
+    const credit = account({
+      id: 'cc',
+      name: 'Card',
+      kind: 'credit',
+      creditLimit: 300,
+      linkedAccountId: 'float',
+    })
+    const float = account({ id: 'float', name: 'Float' })
+    const accounts = [credit, float]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-03-01',
+        lines: [
+          { accountId: 'cc', amount: 300 }, // no debt
+          { accountId: 'float', amount: 1000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-03-31',
+        lines: [
+          { accountId: 'cc', amount: 300 },
           { accountId: 'float', amount: 1030 },
         ],
       },

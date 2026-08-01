@@ -117,7 +117,7 @@ export function FloatPanel() {
                 {signedAmount(summary.totalEarnedBase, currency)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Доля дохода связанного счёта от погашений кредитки
+                Доля дохода связанного счёта от долга и погашений
               </p>
             </Card>
             <Card>
@@ -134,9 +134,8 @@ export function FloatPanel() {
           <Card>
             <h2 className="mb-1 text-sm font-semibold text-slate-800">По месяцам</h2>
             <p className="mb-3 text-xs text-slate-500">
-              Заработано — доля прироста связанного счёта, приходящаяся на сумму погашений
-              (с учётом пополнений и взвешенной базы). Дедлайн: траты месяца N → конец N+срок
-              грейса.
+              Заработано — доля прироста связанного счёта от среднего долга и погашений (Dietz).
+              Дедлайн: траты месяца N → конец N+срок грейса.
             </p>
             {months.length === 0 ? (
               <EmptyState

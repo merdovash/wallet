@@ -29,6 +29,12 @@ export interface CreditMonthBucket {
 export interface CreditFloatMonthRow {
   /** Calendar month of the benefit / context (YYYY-MM) */
   month: string
+  /** Full linked-account growth for the month (ex-transfers). */
+  linkedGrowth: number
+  linkedGrowthBase: number
+  /** Share of linked capital attributed to float (0..1). */
+  floatSharePct: number | null
+  /** Linked growth × float share (interest-free credit benefit). */
   earned: number
   earnedBase: number
   spent: number
@@ -189,11 +195,21 @@ function accountCapitalFlows(
     .map(([date, amount]) => ({ date, amount }))
 }
 
+export type LinkedFloatAttribution = {
+  linkedGrowth: number
+  weightedCapital: number
+  /** Principal used for the share: max(avg debt, linked→card repayments). */
+  floatPrincipal: number
+  floatSharePct: number | null
+  earned: number
+}
+
 /**
- * Credit yield from linked→card repayments: share of linked-account growth
- * proportional to repaid / Dietz-weighted capital (top-ups & base changes).
+ * Credit float yield = linked-account growth × (float principal ÷ Dietz-weighted capital).
+ * Float principal = max(average credit debt, linked→card repayments), so months with
+ * outstanding debt still show benefit before / without a repayment transfer.
  */
-export function attributedLinkedRepaymentYield(
+export function attributedLinkedFloatYield(
   linkedAccountId: string,
   creditAccountId: string,
   startDate: string,
@@ -202,9 +218,18 @@ export function attributedLinkedRepaymentYield(
   transfers: Transfer[],
   accounts: Account[],
   settings: WalletSettings,
+  floatPrincipalInLinkedCurrency: number,
   rateBook?: RateBook,
-): number {
-  if (compareDate(startDate, endDate) >= 0) return 0
+): LinkedFloatAttribution {
+  const empty: LinkedFloatAttribution = {
+    linkedGrowth: 0,
+    weightedCapital: 0,
+    floatPrincipal: 0,
+    floatSharePct: null,
+    earned: 0,
+  }
+  if (compareDate(startDate, endDate) >= 0) return empty
+
   const repaid = repaymentsFromLinked(
     linkedAccountId,
     creditAccountId,
@@ -212,20 +237,23 @@ export function attributedLinkedRepaymentYield(
     endDate,
     transfers,
   )
-  if (repaid <= 0) return 0
+  const floatPrincipal = Math.max(0, floatPrincipalInLinkedCurrency, repaid)
 
   const startBal = balanceOnDate(linkedAccountId, startDate, snapshots)
-  const growth = accountGrowth(
-    linkedAccountId,
-    startDate,
-    endDate,
-    snapshots,
-    transfers,
-    accounts,
-    settings,
-    rateBook,
-  )
-  if (startBal == null || growth == null) return 0
+  const growth =
+    accountGrowth(
+      linkedAccountId,
+      startDate,
+      endDate,
+      snapshots,
+      transfers,
+      accounts,
+      settings,
+      rateBook,
+    ) ?? 0
+  if (startBal == null) {
+    return { ...empty, linkedGrowth: growth, floatPrincipal }
+  }
 
   const flows = accountCapitalFlows(
     linkedAccountId,
@@ -243,8 +271,50 @@ export function attributedLinkedRepaymentYield(
     endDate,
     flows,
   )
-  if (!Number.isFinite(weightedCapital) || weightedCapital <= 0) return 0
-  return growth * Math.min(1, repaid / weightedCapital)
+  if (!Number.isFinite(weightedCapital) || weightedCapital <= 0 || floatPrincipal <= 0) {
+    return {
+      linkedGrowth: growth,
+      weightedCapital,
+      floatPrincipal,
+      floatSharePct: null,
+      earned: 0,
+    }
+  }
+
+  const floatSharePct = Math.min(1, floatPrincipal / weightedCapital)
+  return {
+    linkedGrowth: growth,
+    weightedCapital,
+    floatPrincipal,
+    floatSharePct,
+    earned: growth * floatSharePct,
+  }
+}
+
+/** @deprecated use attributedLinkedFloatYield */
+export function attributedLinkedRepaymentYield(
+  linkedAccountId: string,
+  creditAccountId: string,
+  startDate: string,
+  endDate: string,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  return attributedLinkedFloatYield(
+    linkedAccountId,
+    creditAccountId,
+    startDate,
+    endDate,
+    snapshots,
+    transfers,
+    accounts,
+    settings,
+    0,
+    rateBook,
+  ).earned
 }
 
 /**
@@ -388,36 +458,15 @@ export function buildCreditFloatSummary(
   let cumulativeEarned = 0
   let cumulativeEarnedBase = 0
 
+  const linked = linkedId ? accounts.find((a) => a.id === linkedId) : undefined
+  const linkedCurrency = linked?.currency ?? credit.currency
+
   for (const ym of months) {
     const start = monthStart(ym)
     const end = monthEnd(ym)
     const periodEnd = compareDate(end, asOfDate) < 0 ? end : asOfDate
 
-    let earned = 0
-    if (linkedId && compareDate(periodEnd, start) > 0) {
-      earned = attributedLinkedRepaymentYield(
-        linkedId,
-        credit.id,
-        start,
-        periodEnd,
-        snapshots,
-        transfers,
-        accounts,
-        settings,
-        rateBook,
-      )
-    }
-
-    const linkedCurrency =
-      accounts.find((a) => a.id === linkedId)?.currency ?? credit.currency
-    const earnedBase = linkedId
-      ? convertAmount(earned, linkedCurrency, settings.baseCurrency, settings, periodEnd, rateBook)
-      : earned
-
-    cumulativeEarned += earned
-    cumulativeEarnedBase += earnedBase
-
-    // Debt stats within month from snapshot dates
+    // Debt stats within month from snapshot dates (needed for float principal).
     let maxDebt = 0
     let debtSum = 0
     let debtCount = 0
@@ -433,9 +482,61 @@ export function buildCreditFloatSummary(
     const avgDebt =
       debtCount > 0 ? debtSum / debtCount : (debtOnDate(credit, periodEnd, snapshots) ?? 0)
 
+    let linkedGrowth = 0
+    let floatSharePct: number | null = null
+    let earned = 0
+    if (linkedId && compareDate(periodEnd, start) > 0) {
+      const avgDebtInLinked =
+        credit.currency === linkedCurrency
+          ? avgDebt
+          : convertAmount(
+              avgDebt,
+              credit.currency,
+              linkedCurrency,
+              settings,
+              periodEnd,
+              rateBook,
+            )
+      const attr = attributedLinkedFloatYield(
+        linkedId,
+        credit.id,
+        start,
+        periodEnd,
+        snapshots,
+        transfers,
+        accounts,
+        settings,
+        avgDebtInLinked,
+        rateBook,
+      )
+      linkedGrowth = attr.linkedGrowth
+      floatSharePct = attr.floatSharePct
+      earned = attr.earned
+    }
+
+    const linkedGrowthBase = linkedId
+      ? convertAmount(
+          linkedGrowth,
+          linkedCurrency,
+          settings.baseCurrency,
+          settings,
+          periodEnd,
+          rateBook,
+        )
+      : linkedGrowth
+    const earnedBase = linkedId
+      ? convertAmount(earned, linkedCurrency, settings.baseCurrency, settings, periodEnd, rateBook)
+      : earned
+
+    cumulativeEarned += earned
+    cumulativeEarnedBase += earnedBase
+
     const bucket = bucketByMonth.get(ym)
     rows.push({
       month: ym,
+      linkedGrowth,
+      linkedGrowthBase,
+      floatSharePct,
       earned,
       earnedBase,
       spent: bucket?.spent ?? 0,
