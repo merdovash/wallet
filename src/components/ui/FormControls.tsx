@@ -6,7 +6,7 @@ import type {
   ChangeEvent,
   MouseEvent,
 } from 'react'
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import {
   DATE_RU_PLACEHOLDER,
   caretPosAfterRuDateDigits,
@@ -15,7 +15,11 @@ import {
   maskRuDateInput,
   parseRuToIso,
 } from '../../lib/format'
-import { sanitizeMoneyInput } from '../../lib/moneyInput'
+import {
+  caretPosAfterMoneyUnits,
+  moneySignificantCount,
+  normalizeMoneyInput,
+} from '../../lib/moneyInput'
 
 interface FieldProps {
   label: string
@@ -34,52 +38,83 @@ export function Field({ label, children, error, className = '' }: FieldProps) {
   )
 }
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  const { className = '', ...rest } = props
-  const widthClass =
-    className.includes('w-') || className.includes('flex-1') || className.includes('flex-')
-      ? ''
-      : 'w-full'
-  return (
-    <input
-      {...rest}
-      className={`min-w-0 max-w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
-    />
-  )
-}
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input(props, ref) {
+    const { className = '', ...rest } = props
+    const widthClass =
+      className.includes('w-') || className.includes('flex-1') || className.includes('flex-')
+        ? ''
+        : 'w-full'
+    return (
+      <input
+        ref={ref}
+        {...rest}
+        className={`min-w-0 max-w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
+      />
+    )
+  },
+)
 
-interface MoneyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'inputMode'> {
+interface MoneyInputProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'value' | 'onChange' | 'type' | 'inputMode'
+> {
   value: string
   onChange: (value: string) => void
   /** Allow leading minus (default true). */
   allowNegative?: boolean
 }
 
-/** Text input that only keeps digits, one decimal separator, and optional minus. */
-export function MoneyInput({
-  value,
-  onChange,
-  allowNegative = true,
-  className = '',
-  ...rest
-}: MoneyInputProps) {
+/** Text input with thousand separators (triads) for easier entry. */
+export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function MoneyInput(
+  { value, onChange, allowNegative = true, className = '', onFocus, onBlur, ...rest },
+  ref,
+) {
+  const localRef = useRef<HTMLInputElement>(null)
+  const caretRef = useRef<number | null>(null)
+  const displayValue = normalizeMoneyInput(value, { allowNegative })
+
+  useLayoutEffect(() => {
+    const el = localRef.current
+    const caret = caretRef.current
+    if (!el || caret === null) return
+    el.setSelectionRange(caret, caret)
+    caretRef.current = null
+  }, [displayValue])
+
+  function setRefs(node: HTMLInputElement | null) {
+    localRef.current = node
+    if (typeof ref === 'function') ref(node)
+    else if (ref) ref.current = node
+  }
+
+  function commit(raw: string, selectionStart: number) {
+    const units = moneySignificantCount(raw.slice(0, selectionStart))
+    const next = normalizeMoneyInput(raw, { allowNegative })
+    caretRef.current = caretPosAfterMoneyUnits(next, units)
+    onChange(next)
+  }
+
   return (
     <Input
       {...rest}
+      ref={setRefs}
       type="text"
       inputMode="decimal"
       autoComplete="off"
-      value={value}
+      value={displayValue}
       className={className}
-      onChange={(e) => onChange(sanitizeMoneyInput(e.target.value, { allowNegative }))}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onChange={(e) => commit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
       onPaste={(e) => {
         e.preventDefault()
         const text = e.clipboardData.getData('text')
-        onChange(sanitizeMoneyInput(text, { allowNegative }))
+        commit(text, text.length)
       }}
     />
   )
-}
+})
 
 interface DateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> {
   value: string
