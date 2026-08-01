@@ -15,6 +15,7 @@ import {
   formatCurrency,
   formatDateDisplay,
   formatShortDate,
+  signedAmount,
   todayIsoDate,
 } from '../../lib/format'
 import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns'
@@ -22,6 +23,42 @@ import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { ReturnBreakdownPanel } from '../dashboard/ReturnBreakdownPanel'
 import { Card, EmptyState, Field, Select } from '../ui/FormControls'
+
+type DayRow = {
+  date: string
+  growth: number
+  total: number
+  cumulativeGrowth: number
+  label: string
+  fill: string
+}
+
+function dateFromChartClick(
+  state: {
+    activePayload?: Array<{ payload?: { date?: string } }>
+    activeTooltipIndex?: number | string
+  } | null,
+  rows: DayRow[],
+): string | undefined {
+  const fromPayload = state?.activePayload?.[0]?.payload?.date
+  if (fromPayload) return fromPayload
+  const idx =
+    typeof state?.activeTooltipIndex === 'number'
+      ? state.activeTooltipIndex
+      : typeof state?.activeTooltipIndex === 'string'
+        ? Number(state.activeTooltipIndex)
+        : NaN
+  if (Number.isFinite(idx) && idx >= 0 && idx < rows.length) {
+    return rows[idx]?.date
+  }
+  return undefined
+}
+
+function dateFromBarClick(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined
+  const rec = data as { date?: string; payload?: { date?: string } }
+  return rec.payload?.date ?? rec.date
+}
 
 export function DailyGrowthPanel() {
   const accounts = useWalletStore((s) => s.accounts)
@@ -91,6 +128,11 @@ export function DailyGrowthPanel() {
 
   const fromOptions = checkInDates.filter((d) => !toDate || d <= toDate)
   const toOptions = checkInDates.filter((d) => !fromDate || d >= fromDate)
+
+  function openDay(date: string | undefined) {
+    if (!date) return
+    setSelectedEndDate(date)
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -172,19 +214,16 @@ export function DailyGrowthPanel() {
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-slate-800">Прирост по дням чек-инов</h2>
               <p className="text-xs text-slate-500">
-                Столбец — прирост за интервал до этой даты · клик открывает расшифровку
+                Столбец — прирост за интервал до этой даты · нажмите день для расшифровки
               </p>
             </div>
-            <div className="h-72 w-full sm:h-80">
+            <div className="h-72 w-full touch-manipulation sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={rows}
                   margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                   style={{ cursor: 'pointer' }}
-                  onClick={(state) => {
-                    const date = state?.activePayload?.[0]?.payload?.date as string | undefined
-                    if (date) setSelectedEndDate(date)
-                  }}
+                  onClick={(state) => openDay(dateFromChartClick(state, rows))}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
@@ -206,8 +245,17 @@ export function DailyGrowthPanel() {
                       const date = payload?.[0]?.payload?.date as string | undefined
                       return date ?? ''
                     }}
+                    // Avoid first-tap-only tooltip on mobile swallowing the open action.
+                    trigger="click"
                   />
-                  <Bar dataKey="growth" name="Прирост" radius={[4, 4, 0, 0]}>
+                  <Bar
+                    dataKey="growth"
+                    name="Прирост"
+                    radius={[4, 4, 0, 0]}
+                    // Tiny / zero bars stay tappable on phones.
+                    minPointSize={8}
+                    onClick={(data) => openDay(dateFromBarClick(data))}
+                  >
                     {rows.map((row) => (
                       <Cell key={row.date} fill={row.fill} />
                     ))}
@@ -215,6 +263,37 @@ export function DailyGrowthPanel() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Reliable tap targets for adaptive / touch layouts */}
+            <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 md:hidden">
+              {rows.map((row) => (
+                <li key={row.date}>
+                  <button
+                    type="button"
+                    onClick={() => openDay(row.date)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 active:bg-slate-100"
+                  >
+                    <span>
+                      <span className="block font-medium text-slate-900">
+                        {formatDateDisplay(row.date)}
+                      </span>
+                      <span className="text-[11px] text-blue-600">открыть расшифровку</span>
+                    </span>
+                    <span
+                      className={`shrink-0 tabular-nums font-medium ${
+                        row.growth > 0
+                          ? 'text-emerald-700'
+                          : row.growth < 0
+                            ? 'text-red-600'
+                            : 'text-slate-700'
+                      }`}
+                    >
+                      {signedAmount(row.growth, settings.baseCurrency)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </Card>
         </>
       )}
