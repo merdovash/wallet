@@ -3,6 +3,7 @@ import { balanceOnDate } from '../../engine/growthEngine'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { formatTransferLabel } from '../../lib/transferCheckIn'
+import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
 import { Button, DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -77,6 +78,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
   const [draftTransfer, setDraftTransfer] = useState<PendingTransfer | null>(null)
+  const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
 
   useEffect(() => {
     if (!open) return
@@ -285,7 +287,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         </Button>
       }
     >
-      <div className="space-y-4">
+      <div ref={rootRef} className="space-y-4">
         {locked && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             <p className="font-medium">Чек-ин создан переводом</p>
@@ -301,13 +303,19 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         )}
 
         <Field label="Дата">
-          <DateInput value={date} onChange={setDate} disabled={locked} />
+          <DateInput
+            value={date}
+            onChange={setDate}
+            disabled={locked}
+            {...focusKeyProps('date')}
+          />
         </Field>
         <Field label="Комментарий">
           <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Необязательно"
+            {...focusKeyProps('note')}
           />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -317,6 +325,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
               onChange={setIncome}
               allowNegative={false}
               placeholder="0"
+              {...focusKeyProps('income')}
             />
           </Field>
           <Field label="Расход за день (базовая валюта)">
@@ -325,6 +334,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
               onChange={setExpense}
               allowNegative={false}
               placeholder="0"
+              {...focusKeyProps('expense')}
             />
           </Field>
         </div>
@@ -371,6 +381,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
                         setAmounts((prev) => ({ ...prev, [account.id]: value }))
                       }
                       placeholder={hints[account.id] ?? '0'}
+                      {...focusKeyProps(`amount-${account.id}`)}
                     />
                   )}
                 </Field>
@@ -386,6 +397,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             savedTransfers={dateTransfers}
             pendingTransfers={pendingTransfers}
             draft={draftTransfer}
+            focusKeyProps={focusKeyProps}
             onStartDraft={startDraftTransfer}
             onDraftChange={setDraftTransfer}
             onCommitDraft={() => void commitDraftTransfer()}
@@ -413,6 +425,7 @@ function TransfersSection({
   savedTransfers,
   pendingTransfers,
   draft,
+  focusKeyProps,
   onStartDraft,
   onDraftChange,
   onCommitDraft,
@@ -425,6 +438,7 @@ function TransfersSection({
   savedTransfers: Transfer[]
   pendingTransfers: PendingTransfer[]
   draft: PendingTransfer | null
+  focusKeyProps: (key: string) => { 'data-focus-key': string }
   onStartDraft: () => void
   onDraftChange: (draft: PendingTransfer | null) => void
   onCommitDraft: () => void
@@ -535,6 +549,7 @@ function TransfersSection({
               onChange={(value) => onDraftChange({ ...draft, amount: value })}
               allowNegative={false}
               placeholder="0"
+              {...focusKeyProps('transfer-amount')}
             />
           </Field>
           <Field label="Комментарий">
@@ -542,6 +557,7 @@ function TransfersSection({
               value={draft.note}
               onChange={(e) => onDraftChange({ ...draft, note: e.target.value })}
               placeholder="Необязательно"
+              {...focusKeyProps('transfer-note')}
             />
           </Field>
           <div className="flex gap-2">
