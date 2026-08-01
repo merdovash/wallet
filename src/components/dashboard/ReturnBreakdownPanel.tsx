@@ -304,6 +304,26 @@ function PercentBreakdownView({
           }
           emphasize={focus === 'annualizedPct'}
         />
+        <Row
+          label="Вся масса на начало"
+          value={formatCurrency(periodReturn.startTotalAllMass, currency)}
+          hint="все счета, включая оперативные / наличку / кредит"
+        />
+        <Row
+          label="Прирост % от массы"
+          value={formatPercent(periodReturn.growthPctOfAllMass)}
+          hint="прирост портфеля ÷ вся масса на начало"
+        />
+        <Row
+          label="Годовых от массы"
+          value={formatPercent(periodReturn.annualizedPctOfAllMass)}
+          hint={
+            periodReturn.days > 0
+              ? `(1 + прирост%_от_массы) ^ (365 ÷ ${periodReturn.days}) − 1`
+              : undefined
+          }
+          emphasize={focus === 'annualizedPct'}
+        />
       </dl>
 
       {periodReturn.flows.length > 0 ? (
@@ -387,7 +407,8 @@ function PercentBreakdownView({
           lines={[
             'Сначала считается прирост% за период (Modified Dietz, см. выше).',
             `годовых = (1 + прирост%)^(365/${periodReturn.days || 'N'}) − 1`,
-            'Так простой процент за период пересчитывается в эквивалент за 365 дней.',
+            'Годовых от массы: прирост%_от_массы = прирост ÷ вся_масса_на_начало,',
+            `затем (1 + прирост%_от_массы)^(365/${periodReturn.days || 'N'}) − 1.`,
           ]}
         />
       )}

@@ -26,13 +26,11 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         ? 'text-red-600'
         : 'text-slate-800'
 
-  /** Absolute yearly growth estimate: whole net worth × portfolio annualized %. */
-  const annualGrowthAmount =
-    periodReturn?.annualizedPct != null ? total * periodReturn.annualizedPct : null
-  const annualGrowthColor =
-    (annualGrowthAmount ?? 0) > 0
+  const allMassAnnualized = periodReturn?.annualizedPctOfAllMass
+  const allMassColor =
+    (allMassAnnualized ?? 0) > 0
       ? 'text-emerald-700'
-      : (annualGrowthAmount ?? 0) < 0
+      : (allMassAnnualized ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800'
 
@@ -105,16 +103,14 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           type="button"
           onClick={() => setBreakdownFocus('annualizedPct')}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Годовой прирост от всей массы: остаток × % годовых"
+          title="Годовой прирост % от всей массы денег"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Годовой прирост</p>
-            <p
-              className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${annualGrowthColor}`}
-            >
-              {annualGrowthAmount != null ? signedAmount(annualGrowthAmount, currency) : '—'}
+            <p className="text-xs text-slate-500 sm:text-sm">Годовых от массы</p>
+            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${allMassColor}`}>
+              {formatPercent(allMassAnnualized)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">вся масса × % годовых</p>
+            <p className="mt-1 text-[10px] text-slate-500">прирост ÷ вся масса</p>
           </Card>
         </button>
       </div>

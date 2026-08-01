@@ -89,6 +89,12 @@ export interface PeriodReturnSummary {
   growth: number
   growthPct: number | null
   annualizedPct: number | null
+  /** All-accounts net worth at period start (base currency). */
+  startTotalAllMass: number
+  /** Growth ÷ all-money start total (period). */
+  growthPctOfAllMass: number | null
+  /** Annualized growth % relative to entire money mass. */
+  annualizedPctOfAllMass: number | null
   /** Number of fund/deposit/investment accounts in the calculation. */
   accountCount: number
   flows: PeriodReturnFlowLine[]
@@ -282,6 +288,15 @@ export function buildPeriodReturn(
     flows,
   )
   const days = daysBetween(startDate, endDate)
+  const startTotalAllMass = totalOnDate(startDate, accounts, snapshots, settings, { rateBook })
+  const growthPctOfAllMass =
+    Number.isFinite(startTotalAllMass) && startTotalAllMass !== 0
+      ? growth / startTotalAllMass
+      : null
+  const annualizedPctOfAllMass =
+    growthPctOfAllMass == null || days <= 0
+      ? null
+      : annualizePeriodReturn(growthPctOfAllMass, days)
 
   const startPivot =
     (rateBook ? resolvePivotForDate(startDate, rateBook) : null) ??
@@ -402,6 +417,9 @@ export function buildPeriodReturn(
     growthPct,
     annualizedPct:
       growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days),
+    startTotalAllMass,
+    growthPctOfAllMass,
+    annualizedPctOfAllMass,
     accountCount: eligible.length,
     flows: flowLines(startDate, endDate, flows),
     transferMovements,

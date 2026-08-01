@@ -203,6 +203,9 @@ describe('monthlyReturns', () => {
     expect(summary?.includedAccounts[0]?.growthBase).toBeCloseTo(10, 4)
     expect(summary?.excludedAccounts).toHaveLength(0)
     expect(summary?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
+    expect(summary?.startTotalAllMass).toBeCloseTo(100, 8)
+    expect(summary?.growthPctOfAllMass).toBeCloseTo(0.1, 8)
+    expect(summary?.annualizedPctOfAllMass).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
   })
 
   it('attributes +6 account growth after withdrawal of 16 (100→105→90)', () => {

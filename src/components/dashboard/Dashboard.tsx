@@ -63,7 +63,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Дашборд</h1>
           <p className="text-sm text-slate-500">
-            Остаток и годовой прирост — вся масса. Прирост % — накопления, вклады и инвестиции
+            Остаток — все счета. «В годовых» — портфель роста. «Годовых от массы» — прирост ÷ вся
+            масса
           </p>
         </div>
         <Button type="button" onClick={() => setCheckInOpen(true)}>
