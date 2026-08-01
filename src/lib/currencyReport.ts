@@ -3,6 +3,7 @@ import {
   accountGrowth,
   accountGrowthBase,
   balanceOnDate,
+  netWorthAmount,
   snapshotDates,
   type RateBook,
 } from '../engine/growthEngine'
@@ -91,7 +92,8 @@ export function buildCurrencyReport(
   >()
 
   for (const account of active) {
-    const balance = balanceOnDate(account.id, t1, snapshots) ?? 0
+    const recorded = balanceOnDate(account.id, t1, snapshots) ?? 0
+    const balance = netWorthAmount(account, recorded)
     const countGrowth = t0 != null && (opts?.allKindsGrowth || isGrowthAccount(account))
     const growth = countGrowth
       ? (accountGrowth(

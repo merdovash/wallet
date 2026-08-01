@@ -74,6 +74,24 @@ describe('buildCurrencyValueSeries', () => {
     })
     expect(currencies).toEqual(['RUB', 'USD'])
   })
+
+  it('tracks foreign credit cards as negative debt, not available limit', () => {
+    const accounts = [
+      account({
+        id: 'card',
+        name: 'USD credit',
+        currency: 'USD',
+        kind: 'credit',
+        creditLimit: 5_000,
+      }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'card', amount: 4_000 }] },
+    ]
+
+    const { points } = buildCurrencyValueSeries(accounts, snapshots, settings)
+    expect(points[0]?.values.USD).toBe(-100_000)
+  })
 })
 
 describe('summarizeCurrencyValueChange', () => {

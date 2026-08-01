@@ -61,7 +61,7 @@ export function CreditFloatSummary() {
         <p className="text-xs text-slate-500 sm:text-sm">Долг по кредиткам</p>
         <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
           {formatCurrency(
-            summary.cards.reduce((s, c) => s + c.totalDebt, 0),
+            summary.cards.reduce((s, c) => s + c.totalDebtBase, 0),
             currency,
           )}
         </p>

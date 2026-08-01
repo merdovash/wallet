@@ -5,6 +5,8 @@ import {
   buildAccountSeries,
   buildDailyGrowthSeries,
   buildTotalSeries,
+  growthCapitalFlows,
+  modifiedDietzReturn,
   netTransfersIn,
   periodGrowth,
   totalOnDate,
@@ -332,5 +334,62 @@ describe('growthEngine', () => {
 
     const accountSeries = buildAccountSeries('a', snapshots, transfers, accounts, settings)
     expect(accountSeries[accountSeries.length - 1]?.growth).toBe(6)
+  })
+
+  it('does not report a Modified Dietz percentage for non-positive capital', () => {
+    expect(
+      modifiedDietzReturn(100, 10, '2026-01-01', '2026-01-31', [
+        { date: '2026-01-02', amount: -200 },
+      ]).growthPct,
+    ).toBeNull()
+    expect(modifiedDietzReturn(0, 10, '2026-01-01', '2026-01-31', []).growthPct).toBeNull()
+  })
+
+  it('uses the transfer interval boundary (start, end]', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'fund', name: 'Fund' }),
+    ]
+    const transfers: Transfer[] = [
+      { id: 'start', date: '2026-01-01', fromAccountId: 'op', toAccountId: 'fund', amount: 100 },
+      { id: 'end', date: '2026-01-31', fromAccountId: 'op', toAccountId: 'fund', amount: 50 },
+    ]
+    const flows = growthCapitalFlows(
+      '2026-01-01',
+      '2026-01-31',
+      [],
+      transfers,
+      accounts,
+      settings,
+    )
+    expect(flows).toEqual([{ date: '2026-01-31', amount: 50 }])
+  })
+
+  it('treats a newly recorded funded growth account as contributed capital', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'fund', name: 'New fund' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'op', amount: 1000 }] },
+      {
+        id: 's2',
+        date: '2026-01-15',
+        lines: [
+          { accountId: 'op', amount: 900 },
+          { accountId: 'fund', amount: 100 },
+        ],
+      },
+      { id: 's3', date: '2026-01-31', lines: [{ accountId: 'fund', amount: 101 }] },
+    ]
+    const flows = growthCapitalFlows(
+      '2026-01-01',
+      '2026-01-31',
+      snapshots,
+      [],
+      accounts,
+      settings,
+    )
+    expect(flows).toEqual([{ date: '2026-01-15', amount: 100 }])
   })
 })

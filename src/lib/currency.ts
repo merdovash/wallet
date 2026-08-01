@@ -31,11 +31,12 @@ export function toBase(
   }
 
   const rate = rates[fromCurrency]
-  if (rate == null || !Number.isFinite(rate)) return amount
+  if (rate == null || !Number.isFinite(rate) || rate <= 0) return Number.NaN
   // Manual rates are expressed as base-currency units per 1 fromCurrency
   // when base is RUB this matches CBR pivot; for other bases treat as relative to base.
   if (baseCurrency === 'RUB') return amount * rate
-  const baseRate = rates[baseCurrency] ?? 1
+  const baseRate = rates[baseCurrency]
+  if (baseRate == null || !Number.isFinite(baseRate) || baseRate <= 0) return Number.NaN
   return (amount * rate) / baseRate
 }
 

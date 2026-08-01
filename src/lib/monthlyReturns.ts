@@ -34,7 +34,7 @@ export interface MonthlyReturnRow {
   weightedCapital: number
   /** Modified Dietz return for the month. */
   growthPct: number | null
-  /** (1 + growthPct)^12 − 1 */
+  /** Annualized using the actual number of calendar days in this row. */
   annualizedPct: number | null
 }
 
@@ -136,8 +136,8 @@ export function annualizeMonthlyReturn(monthlyPct: number): number {
 }
 
 /** Annualize a return observed over `days` calendar days. */
-export function annualizePeriodReturn(periodPct: number, days: number): number {
-  if (!(days > 0) || !Number.isFinite(periodPct)) return periodPct
+export function annualizePeriodReturn(periodPct: number, days: number): number | null {
+  if (!(days > 0) || !Number.isFinite(periodPct) || periodPct <= -1) return null
   return (1 + periodPct) ** (365 / days) - 1
 }
 
@@ -236,7 +236,10 @@ export function buildMonthlyReturns(
       netFlow,
       weightedCapital,
       growthPct,
-      annualizedPct: growthPct == null ? null : annualizeMonthlyReturn(growthPct),
+      annualizedPct:
+        growthPct == null
+          ? null
+          : annualizePeriodReturn(growthPct, daysBetween(startDate, endDate)),
     })
   }
   return rows

@@ -52,6 +52,7 @@ export interface CreditFloatSummary {
   cumulativeEarned: number
   cumulativeEarnedBase: number
   totalDebt: number
+  totalDebtBase: number
   months: CreditFloatMonthRow[]
 }
 
@@ -422,12 +423,22 @@ export function buildCreditFloatSummary(
   asOfDate: string,
   rateBook?: RateBook,
 ): CreditFloatSummary {
+  const totalDebt = credit.kind === 'credit' ? (debtOnDate(credit, asOfDate, snapshots) ?? 0) : 0
+  const totalDebtBase = convertAmount(
+    totalDebt,
+    credit.currency,
+    settings.baseCurrency,
+    settings,
+    asOfDate,
+    rateBook,
+  )
   const empty: CreditFloatSummary = {
     creditAccountId: credit.id,
     linkedAccountId: credit.linkedAccountId,
     cumulativeEarned: 0,
     cumulativeEarnedBase: 0,
-    totalDebt: debtOnDate(credit, asOfDate, snapshots) ?? 0,
+    totalDebt,
+    totalDebtBase,
     months: [],
   }
   if (credit.kind !== 'credit') return empty
@@ -554,7 +565,8 @@ export function buildCreditFloatSummary(
     linkedAccountId: linkedId,
     cumulativeEarned,
     cumulativeEarnedBase,
-    totalDebt: debtOnDate(credit, asOfDate, snapshots) ?? 0,
+    totalDebt,
+    totalDebtBase,
     months: rows,
   }
 }

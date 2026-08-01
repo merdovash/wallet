@@ -3,7 +3,12 @@ import {
   accountKindLabel,
   normalizeAccountKind,
 } from './accountKinds'
-import { balanceOnDate, snapshotDates, type RateBook } from '../engine/growthEngine'
+import {
+  balanceOnDate,
+  netWorthAmount,
+  snapshotDates,
+  type RateBook,
+} from '../engine/growthEngine'
 import { resolvePivotForDate } from './cbrRates'
 import type { Account, BalanceSnapshot, WalletSettings } from '../types/wallet'
 
@@ -135,8 +140,8 @@ export function buildCurrencyFxBreakdown(
     const startRec = balanceOnDate(account.id, fromDate, snapshots)
     const endRec = balanceOnDate(account.id, toDate, snapshots)
     if (startRec == null && endRec == null) continue
-    const startBalance = startRec ?? 0
-    const endBalance = endRec ?? 0
+    const startBalance = netWorthAmount(account, startRec ?? 0)
+    const endBalance = netWorthAmount(account, endRec ?? 0)
     const startBase = toBase(
       startBalance,
       account.currency,
@@ -253,7 +258,14 @@ export function buildCurrencyValueSeries(
         if (account.currency !== currency) continue
         const bal = balanceOnDate(account.id, date, snapshots)
         if (bal == null) continue
-        sum += toBase(bal, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
+        const netWorth = netWorthAmount(account, bal)
+        sum += toBase(
+          netWorth,
+          account.currency,
+          settings.baseCurrency,
+          settings.exchangeRates,
+          pivot,
+        )
       }
       values[currency] = sum
     }

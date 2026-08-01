@@ -1,4 +1,5 @@
 export function formatCurrency(amount: number, currency: string): string {
+  if (!Number.isFinite(amount)) return '—'
   try {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',

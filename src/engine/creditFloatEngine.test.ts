@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildAllCreditFloatSummaries,
   buildCreditBuckets,
   buildCreditFloatSummary,
   creditDebt,
@@ -312,5 +313,37 @@ describe('creditFloatEngine', () => {
       dueDate: '2026-05-31',
       overdue: false,
     })
+  })
+
+  it('converts each card debt before aggregating currencies', () => {
+    const accounts = [
+      account({ id: 'rub', name: 'RUB card', kind: 'credit', creditLimit: 100_000 }),
+      account({
+        id: 'usd',
+        name: 'USD card',
+        kind: 'credit',
+        currency: 'USD',
+        creditLimit: 2_000,
+      }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'rub', amount: 50_000 },
+          { accountId: 'usd', amount: 1_000 },
+        ],
+      },
+    ]
+    const summary = buildAllCreditFloatSummaries(
+      accounts,
+      snapshots,
+      [],
+      { baseCurrency: 'RUB', exchangeRates: { RUB: 1, USD: 90 } },
+      '2026-01-31',
+    )
+
+    expect(summary.cards.reduce((sum, card) => sum + card.totalDebtBase, 0)).toBe(140_000)
   })
 })

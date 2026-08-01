@@ -2,10 +2,9 @@ import { useMemo } from 'react'
 import {
   balanceOnDate,
   netWorthAmount,
-  totalOnDate,
   type RateBook,
 } from '../../engine/growthEngine'
-import { accountKindLabel, normalizeAccountKind } from '../../lib/accountKinds'
+import { accountKindLabel, isGrowthAccount, normalizeAccountKind } from '../../lib/accountKinds'
 import { toBase } from '../../lib/currency'
 import { resolvePivotForDate } from '../../lib/cbrRates'
 import { formatCurrency, formatDateDisplay, signedAmount } from '../../lib/format'
@@ -49,8 +48,8 @@ export function DayTotalsPanel({
 
   const total = useMemo(() => {
     if (!date || mode !== 'total') return null
-    return totalOnDate(date, accounts, snapshots, settings, { rateBook })
-  }, [date, mode, accounts, snapshots, settings, rateBook])
+    return (point as TotalPoint | undefined)?.total ?? null
+  }, [date, mode, point])
 
   const accountRows = useMemo(() => {
     if (!date || mode !== 'total') return []
@@ -58,7 +57,7 @@ export function DayTotalsPanel({
       (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
       (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
     return accounts
-      .filter((a) => !a.archived)
+      .filter((a) => !a.archived && isGrowthAccount(a))
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
       .map((account) => {
         const recorded = balanceOnDate(account.id, date, snapshots)
@@ -96,7 +95,7 @@ export function DayTotalsPanel({
             <>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Stat
-                  label="Итого"
+                  label="Капитал роста"
                   value={formatCurrency(total ?? 0, settings.baseCurrency)}
                 />
                 <Stat

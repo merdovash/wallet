@@ -78,7 +78,7 @@ describe('monthlyReturns', () => {
     // Jan: 1000 / 100000 = 1%
     expect(rows[0]?.yearMonth).toBe('2026-01')
     expect(rows[0]?.growthPct).toBeCloseTo(0.01, 8)
-    expect(rows[0]?.annualizedPct).toBeCloseTo(annualizeMonthlyReturn(0.01), 8)
+    expect(rows[0]?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.01, 30)!, 8)
 
     // Feb: end 107020 - start 101000 - transfer 5000 = 1020; income ignored
     // Flow on last day → weight 0 → denom = 101000
@@ -208,6 +208,43 @@ describe('monthlyReturns', () => {
     expect(summary?.annualizedPctOfAllMass).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
   })
 
+  it('keeps ordinary growthPct on funds/deposits/investments only (ignores cash mass)', () => {
+    const accounts = [
+      account({ id: 'fund', name: 'Fund', kind: 'fund' }),
+      account({ id: 'cash', name: 'Cash', kind: 'cash' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 100 },
+          { accountId: 'cash', amount: 10_000 },
+          { accountId: 'op', amount: 5_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'fund', amount: 110 },
+          { accountId: 'cash', amount: 20_000 },
+          { accountId: 'op', amount: 8_000 },
+        ],
+      },
+    ]
+    const summary = buildPeriodReturn(accounts, snapshots, settings)
+    // Ordinary %: only fund 100→110 → 10%, not diluted by cash/op
+    expect(summary?.startTotal).toBeCloseTo(100, 8)
+    expect(summary?.growth).toBeCloseTo(10, 8)
+    expect(summary?.growthPct).toBeCloseTo(0.1, 8)
+    expect(summary?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
+    // All-mass % uses full net worth as denominator
+    expect(summary?.startTotalAllMass).toBeCloseTo(15_100, 8)
+    expect(summary?.growthPctOfAllMass).toBeCloseTo(10 / 15_100, 8)
+  })
+
   it('attributes +6 account growth after withdrawal of 16 (100→105→90)', () => {
     const accounts = [
       account({ id: 'a', name: 'Fund' }),
@@ -309,5 +346,29 @@ describe('monthlyReturns', () => {
     expect(day?.includedAccounts[0]?.growthBase).toBe(1)
     expect(day?.includedAccounts[0]?.transfersBase).toBe(-16)
     expect(day?.transferMovements).toHaveLength(1)
+  })
+
+  it('does not annualize a total loss or worse', () => {
+    expect(annualizePeriodReturn(-1, 30)).toBeNull()
+    expect(annualizePeriodReturn(-1.5, 30)).toBeNull()
+  })
+
+  it('includes FX revaluation in period return', () => {
+    const accounts = [account({ id: 'usd', name: 'USD fund', currency: 'USD' })]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'usd', amount: 10 }] },
+      { id: 's2', date: '2026-01-31', lines: [{ accountId: 'usd', amount: 9 }] },
+    ]
+    const rateBook = {
+      '2026-01-01': { RUB: 1, USD: 100 },
+      '2026-01-31': { RUB: 1, USD: 120 },
+    }
+
+    const summary = buildPeriodReturn(accounts, snapshots, settings, rateBook)
+    expect(summary?.startTotal).toBe(1000)
+    expect(summary?.endTotal).toBe(1080)
+    expect(summary?.growth).toBe(80)
+    expect(summary?.growthPct).toBeCloseTo(0.08, 8)
+    expect(summary?.includedAccounts[0]?.growthBase).toBe(80)
   })
 })

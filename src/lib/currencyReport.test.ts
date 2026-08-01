@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildCurrencyReport } from './currencyReport'
+import { totalOnDate } from '../engine/growthEngine'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 const settings: WalletSettings = {
@@ -136,5 +137,37 @@ describe('buildCurrencyReport', () => {
     })
     expect(allKinds.rows[0]?.growth).toBe(2)
     expect(allKinds.rows[0]?.growthBase).toBe(200)
+  })
+
+  it('values credit cards as negative debt and matches wallet net worth', () => {
+    const accounts = [
+      account({ id: 'cash', name: 'Cash', currency: 'RUB', kind: 'operational' }),
+      account({
+        id: 'card',
+        name: 'Credit card',
+        currency: 'RUB',
+        kind: 'credit',
+        creditLimit: 300_000,
+      }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'cash', amount: 1_000_000 },
+          { accountId: 'card', amount: 200_000 },
+        ],
+      },
+    ]
+
+    const report = buildCurrencyReport(accounts, snapshots, [], settings)
+    expect(report.grandTotalBase).toBe(900_000)
+    expect(report.grandTotalBase).toBe(
+      totalOnDate('2026-02-01', accounts, snapshots, settings),
+    )
+    expect(report.rows[0]?.accounts.find((row) => row.accountId === 'card')?.balance).toBe(
+      -100_000,
+    )
   })
 })

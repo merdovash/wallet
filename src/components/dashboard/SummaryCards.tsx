@@ -11,7 +11,13 @@ interface SummaryCardsProps {
   periodReturn?: PeriodReturnSummary | null
 }
 
-type BreakdownFocus = 'growth' | 'growthPct' | 'annualizedPct' | 'topUp' | null
+type BreakdownFocus =
+  | 'growth'
+  | 'growthPct'
+  | 'annualizedPct'
+  | 'annualizedPctOfAllMass'
+  | 'topUp'
+  | null
 
 export function SummaryCards({ total, growth, currency, periodReturn }: SummaryCardsProps) {
   const [breakdownFocus, setBreakdownFocus] = useState<BreakdownFocus>(null)
@@ -42,6 +48,7 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
             {formatCurrency(total, currency)}
           </p>
+          <p className="mt-1 text-[10px] text-slate-500">все счета · чистая стоимость</p>
         </Card>
         <button
           type="button"
@@ -54,17 +61,17 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
               {signedAmount(growth, currency)}
             </p>
-            <p className="mt-1 text-[10px] text-blue-600">как считается</p>
+            <p className="mt-1 text-[10px] text-blue-600">портфель роста · как считается</p>
           </Card>
         </button>
         <button
           type="button"
           onClick={() => setBreakdownFocus('topUp')}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Показать расшифровку пополнений"
+          title="Показать расшифровку чистого потока"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Пополнения</p>
+            <p className="text-xs text-slate-500 sm:text-sm">Чистый поток</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${topUpColor}`}>
               {periodReturn ? signedAmount(topUp, currency) : '—'}
             </p>
@@ -75,33 +82,33 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           type="button"
           onClick={() => setBreakdownFocus('growthPct')}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Показать расчёт прироста %"
+          title="Прирост % только по фондам, вкладам и инвестициям"
         >
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
               {formatPercent(periodReturn?.growthPct)}
             </p>
-            <p className="mt-1 text-[10px] text-blue-600">как считается</p>
+            <p className="mt-1 text-[10px] text-slate-500">фонды · вклады · инвестиции</p>
           </Card>
         </button>
         <button
           type="button"
           onClick={() => setBreakdownFocus('annualizedPct')}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Показать расчёт годовых"
+          title="Годовые % только по фондам, вкладам и инвестициям"
         >
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 sm:text-sm">В годовых</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
               {formatPercent(periodReturn?.annualizedPct)}
             </p>
-            <p className="mt-1 text-[10px] text-blue-600">как считается</p>
+            <p className="mt-1 text-[10px] text-slate-500">фонды · вклады · инвестиции</p>
           </Card>
         </button>
         <button
           type="button"
-          onClick={() => setBreakdownFocus('annualizedPct')}
+          onClick={() => setBreakdownFocus('annualizedPctOfAllMass')}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           title="Годовой прирост % от всей массы денег"
         >

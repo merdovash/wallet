@@ -198,14 +198,13 @@ export function DailyGrowthPanel() {
                       : 'text-slate-800'
                 }`}
               >
-                {rangeSum > 0 ? '+' : ''}
-                {formatCurrency(rangeSum, settings.baseCurrency)}
+                {signedAmount(rangeSum, settings.baseCurrency)}
               </p>
             </Card>
             <Card className="!p-2.5 sm:!p-3">
               <p className="text-xs text-slate-500 sm:text-sm">Дней с приростом</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
-                {rows.length}
+                {rows.filter((row) => row.growth > 0).length}
               </p>
             </Card>
           </div>

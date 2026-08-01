@@ -105,7 +105,7 @@ export function convertAmount(
   if (toCurrency === settings.baseCurrency) return inBase
 
   const inverse = toBase(1, toCurrency, settings.baseCurrency, settings.exchangeRates, pivot)
-  if (!inverse) return inBase
+  if (!Number.isFinite(inverse) || inverse <= 0) return Number.NaN
   return inBase / inverse
 }
 
@@ -160,7 +160,10 @@ export function accountGrowth(
   const bal0 = balanceOnDate(accountId, t0, snapshots)
   const bal1 = balanceOnDate(accountId, t1, snapshots)
   if (bal0 == null || bal1 == null) return null
-  return bal1 - bal0 - netTransfersIn(accountId, t0, t1, transfers, accounts, settings, rateBook)
+  const account = accountById(accounts).get(accountId)
+  const value0 = account ? netWorthAmount(account, bal0) : bal0
+  const value1 = account ? netWorthAmount(account, bal1) : bal1
+  return value1 - value0 - netTransfersIn(accountId, t0, t1, transfers, accounts, settings, rateBook)
 }
 
 /**
@@ -305,7 +308,7 @@ export function totalOnDate(
 export function growthCapitalFlows(
   t0: string,
   t1: string,
-  _snapshots: BalanceSnapshot[],
+  snapshots: BalanceSnapshot[],
   transfers: Transfer[],
   accounts: Account[],
   settings: WalletSettings,
@@ -334,6 +337,38 @@ export function growthCapitalFlows(
     )
     const signed = toGrowth && !fromGrowth ? amountBase : -amountBase
     byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
+  }
+
+  // A growth account first recorded inside the period with a non-zero balance
+  // represents contributed capital, not investment return. Infer that flow only
+  // when no recorded transfer already explains the account's opening balance.
+  const orderedSnapshots = sortSnapshots(snapshots)
+  for (const account of accounts.filter((a) => !a.archived && isGrowthAccount(a))) {
+    if (balanceOnDate(account.id, t0, snapshots) != null) continue
+    const first = orderedSnapshots.find(
+      (snapshot) =>
+        compareDate(snapshot.date, t0) > 0 &&
+        compareDate(snapshot.date, t1) <= 0 &&
+        snapshot.lines.some((line) => line.accountId === account.id),
+    )
+    const opening = first?.lines.find((line) => line.accountId === account.id)?.amount
+    if (!first || opening == null || opening === 0) continue
+    const explainedByTransfer = transfers.some(
+      (transfer) =>
+        transfer.toAccountId === account.id &&
+        compareDate(transfer.date, t0) > 0 &&
+        compareDate(transfer.date, first.date) <= 0,
+    )
+    if (explainedByTransfer) continue
+    const amountBase = convertAmount(
+      opening,
+      account.currency,
+      settings.baseCurrency,
+      settings,
+      first.date,
+      rateBook,
+    )
+    byDate.set(first.date, (byDate.get(first.date) ?? 0) + amountBase)
   }
 
   return [...byDate.entries()]
@@ -379,7 +414,7 @@ export function modifiedDietzReturn(
     }
   }
   const weightedCapital = startTotal + weightedFlows
-  if (!Number.isFinite(weightedCapital) || weightedCapital === 0) {
+  if (!Number.isFinite(weightedCapital) || weightedCapital <= 0) {
     return { growthPct: null, weightedCapital }
   }
   return { growthPct: growth / weightedCapital, weightedCapital }
