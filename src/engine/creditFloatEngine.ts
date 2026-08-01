@@ -8,7 +8,9 @@ import {
   accountGrowth,
   balanceOnDate,
   convertAmount,
+  modifiedDietzReturn,
   netTransfersIn,
+  type DatedCapitalFlow,
   type RateBook,
   sortSnapshots,
   sortTransfers,
@@ -133,6 +135,118 @@ function repaymentsToCard(
   return Math.max(0, net)
 }
 
+/** Sum of transfers linked → credit over (t0, t1] in the linked account currency. */
+function repaymentsFromLinked(
+  linkedAccountId: string,
+  creditAccountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+): number {
+  let sum = 0
+  for (const t of sortTransfers(transfers)) {
+    if (compareDate(t.date, t0) <= 0) continue
+    if (compareDate(t.date, t1) > 0) continue
+    if (t.fromAccountId !== linkedAccountId || t.toAccountId !== creditAccountId) continue
+    sum += t.amount
+  }
+  return sum
+}
+
+/** Dated net capital flows into an account (account currency) for Modified Dietz. */
+function accountCapitalFlows(
+  accountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const map = new Map(accounts.map((a) => [a.id, a]))
+  const account = map.get(accountId)
+  if (!account) return []
+  const byDate = new Map<string, number>()
+  for (const t of sortTransfers(transfers)) {
+    if (compareDate(t.date, t0) <= 0) continue
+    if (compareDate(t.date, t1) > 0) continue
+    if (t.fromAccountId === accountId) {
+      byDate.set(t.date, (byDate.get(t.date) ?? 0) - t.amount)
+      continue
+    }
+    if (t.toAccountId === accountId) {
+      const from = map.get(t.fromAccountId)
+      const amount =
+        from && from.currency !== account.currency
+          ? convertAmount(t.amount, from.currency, account.currency, settings, t.date, rateBook)
+          : t.amount
+      byDate.set(t.date, (byDate.get(t.date) ?? 0) + amount)
+    }
+  }
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => compareDate(a, b))
+    .map(([date, amount]) => ({ date, amount }))
+}
+
+/**
+ * Credit yield from linked→card repayments: share of linked-account growth
+ * proportional to repaid / Dietz-weighted capital (top-ups & base changes).
+ */
+export function attributedLinkedRepaymentYield(
+  linkedAccountId: string,
+  creditAccountId: string,
+  startDate: string,
+  endDate: string,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  if (compareDate(startDate, endDate) >= 0) return 0
+  const repaid = repaymentsFromLinked(
+    linkedAccountId,
+    creditAccountId,
+    startDate,
+    endDate,
+    transfers,
+  )
+  if (repaid <= 0) return 0
+
+  const startBal = balanceOnDate(linkedAccountId, startDate, snapshots)
+  const growth = accountGrowth(
+    linkedAccountId,
+    startDate,
+    endDate,
+    snapshots,
+    transfers,
+    accounts,
+    settings,
+    rateBook,
+  )
+  if (startBal == null || growth == null) return 0
+
+  const flows = accountCapitalFlows(
+    linkedAccountId,
+    startDate,
+    endDate,
+    transfers,
+    accounts,
+    settings,
+    rateBook,
+  )
+  const { weightedCapital } = modifiedDietzReturn(
+    startBal,
+    growth,
+    startDate,
+    endDate,
+    flows,
+  )
+  if (!Number.isFinite(weightedCapital) || weightedCapital <= 0) return 0
+  return growth * Math.min(1, repaid / weightedCapital)
+}
+
 /**
  * Infer spending month buckets and apply repayments FIFO (oldest month first).
  */
@@ -226,7 +340,8 @@ function debtOnDate(credit: Account, date: string, snapshots: BalanceSnapshot[])
 }
 
 /**
- * Monthly float benefit from linked wallet growth (ex-transfers), plus grace context.
+ * Monthly float benefit: share of linked-wallet growth attributed to
+ * repayments from that wallet onto this credit card (Dietz-weighted).
  */
 export function buildCreditFloatSummary(
   credit: Account,
@@ -280,9 +395,17 @@ export function buildCreditFloatSummary(
 
     let earned = 0
     if (linkedId && compareDate(periodEnd, start) > 0) {
-      earned =
-        accountGrowth(linkedId, start, periodEnd, snapshots, transfers, accounts, settings, rateBook) ??
-        0
+      earned = attributedLinkedRepaymentYield(
+        linkedId,
+        credit.id,
+        start,
+        periodEnd,
+        snapshots,
+        transfers,
+        accounts,
+        settings,
+        rateBook,
+      )
     }
 
     const linkedCurrency =

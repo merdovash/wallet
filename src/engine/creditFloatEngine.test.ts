@@ -102,7 +102,7 @@ describe('creditFloatEngine', () => {
     expect(buckets.find((b) => b.month === '2026-04')?.remaining).toBe(50)
   })
 
-  it('attributes monthly earned from linked wallet growth', () => {
+  it('attributes earned as repaid share of linked wallet growth (Dietz-weighted)', () => {
     const credit = account({
       id: 'cc',
       name: 'Card',
@@ -127,8 +127,10 @@ describe('creditFloatEngine', () => {
         id: 's2',
         date: '2026-03-31',
         lines: [
-          { accountId: 'cc', amount: 200 },
-          { accountId: 'float', amount: 1030 },
+          // repaid 500 from float → available credit 200+500=700 capped by limit? store 250
+          { accountId: 'cc', amount: 250 },
+          // 1000 + 30 growth − 500 repayment = 530
+          { accountId: 'float', amount: 530 },
           { accountId: 'cash', amount: 500 },
         ],
       },
@@ -136,26 +138,80 @@ describe('creditFloatEngine', () => {
         id: 's3',
         date: '2026-04-30',
         lines: [
-          { accountId: 'cc', amount: 200 },
-          { accountId: 'float', amount: 1050 },
+          { accountId: 'cc', amount: 250 },
+          // no repayment in April; +20 growth
+          { accountId: 'float', amount: 550 },
           { accountId: 'cash', amount: 500 },
         ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-03-16',
+        fromAccountId: 'float',
+        toAccountId: 'cc',
+        amount: 500,
       },
     ]
 
     const summary = buildCreditFloatSummary(
       credit,
       snapshots,
-      [],
+      transfers,
       accounts,
       settings,
       '2026-04-30',
     )
     const march = summary.months.find((m) => m.month === '2026-03')
     const april = summary.months.find((m) => m.month === '2026-04')
-    expect(march?.earned).toBe(30)
-    expect(april?.earned).toBe(20)
-    expect(summary.cumulativeEarned).toBe(50)
+
+    // March: growth = 30, flow −500 on day 15 of 30 → weight 0.5
+    // W = 1000 + (−500)×0.5 = 750; earned = 30 × min(1, 500/750) = 20
+    expect(march?.earned).toBeCloseTo(20, 8)
+    // April: growth 20 but no linked→card repayment → 0
+    expect(april?.earned).toBe(0)
+    expect(summary.cumulativeEarned).toBeCloseTo(20, 8)
+  })
+
+  it('earns nothing without repayments from the linked wallet', () => {
+    const credit = account({
+      id: 'cc',
+      name: 'Card',
+      kind: 'credit',
+      creditLimit: 300,
+      linkedAccountId: 'float',
+    })
+    const float = account({ id: 'float', name: 'Float' })
+    const accounts = [credit, float]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-03-01',
+        lines: [
+          { accountId: 'cc', amount: 200 },
+          { accountId: 'float', amount: 1000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-03-31',
+        lines: [
+          { accountId: 'cc', amount: 200 },
+          { accountId: 'float', amount: 1030 },
+        ],
+      },
+    ]
+    const summary = buildCreditFloatSummary(
+      credit,
+      snapshots,
+      [],
+      accounts,
+      settings,
+      '2026-03-31',
+    )
+    expect(summary.months.find((m) => m.month === '2026-03')?.earned).toBe(0)
+    expect(summary.cumulativeEarned).toBe(0)
   })
 
   it('does not count available credit as asset in total', () => {
