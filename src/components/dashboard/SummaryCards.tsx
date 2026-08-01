@@ -26,9 +26,19 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         ? 'text-red-600'
         : 'text-slate-800'
 
+  /** Absolute yearly growth estimate: whole net worth × portfolio annualized %. */
+  const annualGrowthAmount =
+    periodReturn?.annualizedPct != null ? total * periodReturn.annualizedPct : null
+  const annualGrowthColor =
+    (annualGrowthAmount ?? 0) > 0
+      ? 'text-emerald-700'
+      : (annualGrowthAmount ?? 0) < 0
+        ? 'text-red-600'
+        : 'text-slate-800'
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Card className="!p-2.5 sm:!p-3">
           <p className="text-xs text-slate-500 sm:text-sm">Остаток</p>
           <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
@@ -89,6 +99,22 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
               {formatPercent(periodReturn?.annualizedPct)}
             </p>
             <p className="mt-1 text-[10px] text-blue-600">как считается</p>
+          </Card>
+        </button>
+        <button
+          type="button"
+          onClick={() => setBreakdownFocus('annualizedPct')}
+          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          title="Годовой прирост от всей массы: остаток × % годовых"
+        >
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">Годовой прирост</p>
+            <p
+              className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${annualGrowthColor}`}
+            >
+              {annualGrowthAmount != null ? signedAmount(annualGrowthAmount, currency) : '—'}
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">вся масса × % годовых</p>
           </Card>
         </button>
       </div>
