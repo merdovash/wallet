@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
+import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
 import { formatTransferLabel } from '../../lib/transferCheckIn'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
+import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
 import { Button, DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -40,6 +42,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const deleteSnapshot = useWalletStore((s) => s.deleteSnapshot)
   const addTransfer = useWalletStore((s) => s.addTransfer)
   const deleteTransfer = useWalletStore((s) => s.deleteTransfer)
+  const rateBook = useRatesStore((s) => s.byDate)
+  const settings = useWalletStore((s) => s.settings)
 
   const editing = useMemo(
     () => (snapshotId ? snapshots.find((s) => s.id === snapshotId) ?? null : null),
@@ -78,6 +82,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
   const [draftTransfer, setDraftTransfer] = useState<PendingTransfer | null>(null)
+  const [cashflowManual, setCashflowManual] = useState(false)
   const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
 
   useEffect(() => {
@@ -88,11 +93,13 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       setNote(editing.note ?? '')
       setIncome(editing.income ? String(editing.income) : '')
       setExpense(editing.expense ? String(editing.expense) : '')
+      setCashflowManual(true)
     } else {
       setDate(todayIsoDate())
       setNote('')
       setIncome('')
       setExpense('')
+      setCashflowManual(false)
     }
     setAmounts({})
     setPendingTransfers([])
@@ -123,6 +130,75 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     }
     return next
   }, [formAccounts, date, editing, snapshots])
+
+  const effectiveLines = useMemo((): SnapshotLine[] => {
+    return formAccounts.map((account) => {
+      const raw = amounts[account.id]?.trim() ?? ''
+      if (raw !== '') {
+        const parsed = parseMoneyInput(raw)
+        if (parsed != null) return { accountId: account.id, amount: parsed }
+      }
+      if (editing) {
+        const line = editing.lines.find((l) => l.accountId === account.id)
+        if (line != null) return { accountId: account.id, amount: line.amount }
+      }
+      const prev = balanceOnDate(account.id, date || todayIsoDate(), snapshots)
+      return { accountId: account.id, amount: prev ?? 0 }
+    })
+  }, [formAccounts, amounts, editing, date, snapshots])
+
+  const transferInputsForSuggest = useMemo(() => {
+    const pending = pendingTransfers
+      .map((t) => {
+        const value = parseMoneyInput(t.amount)
+        if (value == null || value <= 0) return null
+        return {
+          fromAccountId: t.fromAccountId,
+          toAccountId: t.toAccountId,
+          amount: value,
+        }
+      })
+      .filter((t): t is NonNullable<typeof t> => t != null)
+    return [
+      ...dateTransfers.map((t) => ({
+        fromAccountId: t.fromAccountId,
+        toAccountId: t.toAccountId,
+        amount: t.amount,
+      })),
+      ...pending,
+    ]
+  }, [dateTransfers, pendingTransfers])
+
+  const suggestedCashflow = useMemo(
+    () =>
+      suggestCheckInCashflow({
+        date: date || todayIsoDate(),
+        accounts,
+        snapshots,
+        settings,
+        lines: effectiveLines,
+        transfers: transferInputsForSuggest,
+        rateBook,
+        excludeSnapshotId: editing?.id,
+      }),
+    [
+      date,
+      accounts,
+      snapshots,
+      settings,
+      effectiveLines,
+      transferInputsForSuggest,
+      rateBook,
+      editing?.id,
+    ],
+  )
+
+  useEffect(() => {
+    if (!open || locked || cashflowManual) return
+    if (!suggestedCashflow.hasPrevious) return
+    setIncome(suggestedCashflow.income > 0 ? String(suggestedCashflow.income) : '')
+    setExpense(suggestedCashflow.expense > 0 ? String(suggestedCashflow.expense) : '')
+  }, [open, locked, cashflowManual, suggestedCashflow])
 
   function typedLines(): SnapshotLine[] {
     return formAccounts
@@ -322,7 +398,10 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           <Field label="Доход за день (базовая валюта)">
             <MoneyInput
               value={income}
-              onChange={setIncome}
+              onChange={(value) => {
+                setCashflowManual(true)
+                setIncome(value)
+              }}
               allowNegative={false}
               placeholder="0"
               {...focusKeyProps('income')}
@@ -331,7 +410,10 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           <Field label="Расход за день (базовая валюта)">
             <MoneyInput
               value={expense}
-              onChange={setExpense}
+              onChange={(value) => {
+                setCashflowManual(true)
+                setExpense(value)
+              }}
               allowNegative={false}
               placeholder="0"
               {...focusKeyProps('expense')}
@@ -340,6 +422,21 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         </div>
         <p className="text-xs text-slate-500">
           Внешние доходы и расходы не считаются приростом — нужны для корректных процентов.
+          {!locked && suggestedCashflow.hasPrevious && !cashflowManual
+            ? ' Подставляются автоматически по дельте оперативных / налички / кредиток (с учётом переводов).'
+            : null}
+          {!locked && cashflowManual && suggestedCashflow.hasPrevious ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="text-blue-600 hover:underline"
+                onClick={() => setCashflowManual(false)}
+              >
+                Вернуть автозаполнение
+              </button>
+            </>
+          ) : null}
         </p>
 
         {!locked && (
