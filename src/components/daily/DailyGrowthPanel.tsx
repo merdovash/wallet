@@ -23,7 +23,7 @@ import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { ReturnBreakdownPanel } from '../dashboard/ReturnBreakdownPanel'
-import { Card, EmptyState, Field, Select } from '../ui/FormControls'
+import { Card, DateInput, EmptyState, Field } from '../ui/FormControls'
 
 type DayRow = {
   date: string
@@ -34,6 +34,13 @@ type DayRow = {
   growthPctOfAllMass: number | null
   label: string
   fill: string
+}
+
+function clampIsoDate(value: string, min: string, max: string): string {
+  if (!value) return min
+  if (min && value < min) return min
+  if (max && value > max) return max
+  return value
 }
 
 function dateFromChartClick(
@@ -85,11 +92,9 @@ export function DailyGrowthPanel() {
       setToDate('')
       return
     }
-    setFromDate((prev) =>
-      prev && checkInDates.includes(prev) ? prev : firstDate,
-    )
-    setToDate((prev) => (prev && checkInDates.includes(prev) ? prev : lastDate))
-  }, [firstDate, lastDate, checkInDates])
+    setFromDate((prev) => clampIsoDate(prev || firstDate, firstDate, lastDate))
+    setToDate((prev) => clampIsoDate(prev || lastDate, firstDate, lastDate))
+  }, [firstDate, lastDate])
 
   useEffect(() => {
     void ensureRates([...checkInDates, todayIsoDate()])
@@ -140,8 +145,21 @@ export function DailyGrowthPanel() {
     return buildPeriodReturn(accounts, snapshots, settings, rateBook, transfers, interval)
   }, [selectedEndDate, checkInDates, accounts, snapshots, settings, rateBook, transfers])
 
-  const fromOptions = checkInDates.filter((d) => !toDate || d <= toDate)
-  const toOptions = checkInDates.filter((d) => !fromDate || d >= fromDate)
+  function setFromClamped(iso: string) {
+    if (!firstDate || !lastDate) {
+      setFromDate(iso)
+      return
+    }
+    setFromDate(clampIsoDate(iso, firstDate, lastDate))
+  }
+
+  function setToClamped(iso: string) {
+    if (!firstDate || !lastDate) {
+      setToDate(iso)
+      return
+    }
+    setToDate(clampIsoDate(iso, firstDate, lastDate))
+  }
 
   function openDay(date: string | undefined) {
     if (!date) return
@@ -158,34 +176,27 @@ export function DailyGrowthPanel() {
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="С даты" className="w-36">
-            <Select
+          <Field label="С даты" className="w-40">
+            <DateInput
               value={fromDate}
-              disabled={checkInDates.length === 0}
-              onChange={(e) => setFromDate(e.target.value)}
-            >
-              {fromOptions.map((d) => (
-                <option key={d} value={d}>
-                  {formatShortDate(d)}
-                </option>
-              ))}
-            </Select>
+              disabled={!firstDate}
+              onChange={setFromClamped}
+            />
           </Field>
-          <Field label="По дату" className="w-36">
-            <Select
+          <Field label="По дату" className="w-40">
+            <DateInput
               value={toDate}
-              disabled={checkInDates.length === 0}
-              onChange={(e) => setToDate(e.target.value)}
-            >
-              {toOptions.map((d) => (
-                <option key={d} value={d}>
-                  {formatShortDate(d)}
-                </option>
-              ))}
-            </Select>
+              disabled={!lastDate}
+              onChange={setToClamped}
+            />
           </Field>
         </div>
       </div>
+      {firstDate && lastDate ? (
+        <p className="text-xs text-slate-500">
+          Доступный интервал: {formatDateDisplay(firstDate)} — {formatDateDisplay(lastDate)}
+        </p>
+      ) : null}
 
       {checkInDates.length < 2 ? (
         <Card>
