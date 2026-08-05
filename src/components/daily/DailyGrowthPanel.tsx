@@ -9,11 +9,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { buildDailyGrowthSeries, snapshotDates } from '../../engine/growthEngine'
+import { buildDailyGrowthSeries, snapshotDates, totalOnDate } from '../../engine/growthEngine'
 import {
   formatCompactAxisValue,
   formatCurrency,
   formatDateDisplay,
+  formatPercent,
   formatShortDate,
   signedAmount,
   todayIsoDate,
@@ -29,6 +30,8 @@ type DayRow = {
   growth: number
   total: number
   cumulativeGrowth: number
+  /** Growth ÷ all-money mass at the start of the interval. */
+  growthPctOfAllMass: number | null
   label: string
   fill: string
 }
@@ -106,12 +109,21 @@ export function DailyGrowthPanel() {
 
   const rows = useMemo(
     () =>
-      filtered.map((p) => ({
-        ...p,
-        label: formatShortDate(p.date),
-        fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
-      })),
-    [filtered],
+      filtered.map((p) => {
+        const interval = dailyGrowthInterval(p.date, checkInDates)
+        const massStart = interval
+          ? totalOnDate(interval.startDate, accounts, snapshots, settings, { rateBook })
+          : 0
+        const growthPctOfAllMass =
+          Number.isFinite(massStart) && massStart !== 0 ? p.growth / massStart : null
+        return {
+          ...p,
+          growthPctOfAllMass,
+          label: formatShortDate(p.date),
+          fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
+        }
+      }),
+    [filtered, checkInDates, accounts, snapshots, settings, rateBook],
   )
 
   const rangeSum = useMemo(
@@ -236,10 +248,12 @@ export function DailyGrowthPanel() {
                     width={48}
                   />
                   <Tooltip
-                    formatter={(value: number) => [
-                      formatCurrency(value, settings.baseCurrency),
-                      'Прирост',
-                    ]}
+                    formatter={(value: number, _name, item) => {
+                      const pct = (item?.payload as DayRow | undefined)?.growthPctOfAllMass
+                      const amount = formatCurrency(value, settings.baseCurrency)
+                      if (pct == null) return [amount, 'Прирост']
+                      return [`${amount} (${formatPercent(pct)} от массы)`, 'Прирост']
+                    }}
                     labelFormatter={(_, payload) => {
                       const date = payload?.[0]?.payload?.date as string | undefined
                       return date ?? ''
@@ -279,7 +293,7 @@ export function DailyGrowthPanel() {
                       <span className="text-[11px] text-blue-600">открыть расшифровку</span>
                     </span>
                     <span
-                      className={`shrink-0 tabular-nums font-medium ${
+                      className={`shrink-0 text-right tabular-nums font-medium ${
                         row.growth > 0
                           ? 'text-emerald-700'
                           : row.growth < 0
@@ -287,7 +301,12 @@ export function DailyGrowthPanel() {
                             : 'text-slate-700'
                       }`}
                     >
-                      {signedAmount(row.growth, settings.baseCurrency)}
+                      <span className="block">{signedAmount(row.growth, settings.baseCurrency)}</span>
+                      {row.growthPctOfAllMass != null ? (
+                        <span className="block text-[11px] font-normal text-slate-500">
+                          {formatPercent(row.growthPctOfAllMass)} от массы
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 </li>

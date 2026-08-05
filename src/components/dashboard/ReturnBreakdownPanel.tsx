@@ -118,6 +118,13 @@ function GrowthMovementsView({
           emphasize
         />
         <Row
+          label="Относительный к общей массе"
+          value={formatPercent(periodReturn.growthPctOfAllMass)}
+          valueClassName={tone(periodReturn.growthPctOfAllMass ?? 0)}
+          hint={`прирост ÷ вся масса на начало (${formatCurrency(periodReturn.startTotalAllMass, currency)})`}
+          emphasize
+        />
+        <Row
           label="Переводы (чистые)"
           value={signedAmount(totalTransfers, currency)}
           valueClassName={tone(totalTransfers)}
