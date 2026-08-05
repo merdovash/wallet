@@ -109,20 +109,22 @@ export function DailyGrowthPanel() {
 
   const rows = useMemo(
     () =>
-      filtered.map((p) => {
-        const interval = dailyGrowthInterval(p.date, checkInDates)
-        const massStart = interval
-          ? totalOnDate(interval.startDate, accounts, snapshots, settings, { rateBook })
-          : 0
-        const growthPctOfAllMass =
-          Number.isFinite(massStart) && massStart !== 0 ? p.growth / massStart : null
-        return {
-          ...p,
-          growthPctOfAllMass,
-          label: formatShortDate(p.date),
-          fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
-        }
-      }),
+      [...filtered]
+        .reverse()
+        .map((p) => {
+          const interval = dailyGrowthInterval(p.date, checkInDates)
+          const massStart = interval
+            ? totalOnDate(interval.startDate, accounts, snapshots, settings, { rateBook })
+            : 0
+          const growthPctOfAllMass =
+            Number.isFinite(massStart) && massStart !== 0 ? p.growth / massStart : null
+          return {
+            ...p,
+            growthPctOfAllMass,
+            label: formatShortDate(p.date),
+            fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
+          }
+        }),
     [filtered, checkInDates, accounts, snapshots, settings, rateBook],
   )
 
@@ -225,7 +227,8 @@ export function DailyGrowthPanel() {
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-slate-800">Прирост по дням чек-инов</h2>
               <p className="text-xs text-slate-500">
-                Столбец — прирост за интервал до этой даты · нажмите день для расшифровки
+                Столбец — прирост за интервал до этой даты · новые дни слева · нажмите день для
+                расшифровки
               </p>
             </div>
             <div className="h-72 w-full touch-manipulation sm:h-80">
