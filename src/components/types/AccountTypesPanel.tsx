@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { buildAccountTypeReport } from '../../lib/accountTypeReport'
-import { formatCurrency, signedAmount } from '../../lib/format'
+import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { AccountKind } from '../../types/wallet'
@@ -14,6 +14,13 @@ function accountCountLabel(count: number): string {
   if (count === 1) return '1 счёт'
   if (count > 1 && count < 5) return `${count} счёта`
   return `${count} счетов`
+}
+
+function pctTone(value: number | null): string {
+  if (value == null) return 'text-slate-500'
+  if (value > 0) return 'text-emerald-700'
+  if (value < 0) return 'text-red-600'
+  return 'text-slate-700'
 }
 
 interface AccountTypesPanelProps {
@@ -45,6 +52,46 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
         </p>
       </div>
 
+      {report.rows.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">Итого</p>
+            <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
+              {formatCurrency(report.grandTotalBase, report.baseCurrency)}
+            </p>
+          </Card>
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+            <p
+              className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.grandGrowthBase)}`}
+            >
+              {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">фонд · вклад · инвестиции</p>
+          </Card>
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
+            <p
+              className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.growthPct)}`}
+            >
+              {formatPercent(report.growthPct)}
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">относительный за период</p>
+          </Card>
+          <Card className="!p-2.5 sm:!p-3">
+            <p className="text-xs text-slate-500 sm:text-sm">В годовых</p>
+            <p
+              className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.annualizedPct)}`}
+            >
+              {formatPercent(report.annualizedPct)}
+            </p>
+            <p className="mt-1 text-[10px] text-slate-500">
+              {report.days > 0 ? `${report.days} дн.` : '—'}
+            </p>
+          </Card>
+        </div>
+      ) : null}
+
       <Card className="!p-0">
         {report.rows.length === 0 ? (
           <div className="p-4">
@@ -57,14 +104,17 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
           <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-500">
-                <th className="w-[40%] px-3 py-3 font-medium sm:px-4">Тип</th>
+                <th className="w-[34%] px-3 py-3 font-medium sm:px-4">Тип</th>
                 <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Счетов</th>
-                <th className="w-[34%] px-3 py-3 font-medium tabular-nums sm:px-4">
+                <th className="w-[28%] px-3 py-3 font-medium tabular-nums sm:px-4">
                   В {report.baseCurrency}
                 </th>
-                <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Доля</th>
-                <th className="w-[26%] px-3 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
+                <th className="hidden px-4 py-3 font-medium tabular-nums lg:table-cell">Доля</th>
+                <th className="w-[20%] px-3 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
                   Прирост
+                </th>
+                <th className="w-[18%] px-2 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
+                  %
                 </th>
               </tr>
             </thead>
@@ -92,6 +142,8 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                     balanceBase={row.balanceBase}
                     share={row.share}
                     growthBase={row.growthBase}
+                    growthPct={row.growthPct}
+                    annualizedPct={row.annualizedPct}
                     growthColor={growthColor}
                     balanceColor={balanceColor}
                     baseCurrency={report.baseCurrency}
@@ -112,9 +164,15 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                 <td className="px-3 py-3 tabular-nums sm:px-4">
                   {formatCurrency(report.grandTotalBase, report.baseCurrency)}
                 </td>
-                <td className="hidden px-4 py-3 tabular-nums md:table-cell">—</td>
+                <td className="hidden px-4 py-3 tabular-nums lg:table-cell">—</td>
                 <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
                   {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+                </td>
+                <td className="px-2 py-3 text-right tabular-nums sm:px-4 sm:text-left">
+                  <div className={pctTone(report.growthPct)}>{formatPercent(report.growthPct)}</div>
+                  <div className={`text-xs font-normal ${pctTone(report.annualizedPct)}`}>
+                    {formatPercent(report.annualizedPct)} год.
+                  </div>
                 </td>
               </tr>
             </tfoot>
@@ -134,6 +192,8 @@ function TypeGroup({
   balanceBase,
   share,
   growthBase,
+  growthPct,
+  annualizedPct,
   growthColor,
   balanceColor,
   baseCurrency,
@@ -147,6 +207,8 @@ function TypeGroup({
   balanceBase: number
   share: number
   growthBase: number
+  growthPct: number | null
+  annualizedPct: number | null
   growthColor: string
   balanceColor: string
   baseCurrency: string
@@ -184,11 +246,21 @@ function TypeGroup({
         <td className={`px-3 py-3 tabular-nums sm:px-4 ${balanceColor}`}>
           {formatCurrency(balanceBase, baseCurrency)}
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 lg:table-cell">
           {formatShare(Math.abs(share))}
         </td>
         <td className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${growthColor}`}>
           {signedAmount(growthBase, baseCurrency)}
+        </td>
+        <td className="px-2 py-3 text-right tabular-nums sm:px-4 sm:text-left">
+          <div className={pctTone(growthPct)}>{formatPercent(growthPct)}</div>
+          {growthPct != null ? (
+            <div className={`text-xs ${pctTone(annualizedPct)}`}>
+              {formatPercent(annualizedPct)} год.
+            </div>
+          ) : (
+            <div className="text-xs text-slate-400">—</div>
+          )}
         </td>
       </tr>
       {open &&
@@ -226,7 +298,7 @@ function TypeGroup({
                   </div>
                 )}
               </td>
-              <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
+              <td className="hidden px-4 py-2 text-slate-400 lg:table-cell">—</td>
               <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
                 <div className={nativeTone}>{signedAmount(acc.growth, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
@@ -235,6 +307,7 @@ function TypeGroup({
                   </div>
                 )}
               </td>
+              <td className="px-2 py-2 text-slate-400 sm:px-4">—</td>
             </tr>
           )
         })}

@@ -3,8 +3,11 @@ import {
   accountGrowth,
   accountGrowthBase,
   balanceOnDate,
+  convertAmount,
+  modifiedDietzReturn,
   netWorthAmount,
   snapshotDates,
+  type DatedCapitalFlow,
   type RateBook,
 } from '../engine/growthEngine'
 import { resolvePivotForDate } from './cbrRates'
@@ -12,8 +15,10 @@ import {
   ACCOUNT_KIND_ORDER,
   accountKindLabel,
   isGrowthAccount,
+  isGrowthKind,
   normalizeAccountKind,
 } from './accountKinds'
+import { annualizePeriodReturn } from './monthlyReturns'
 import type {
   Account,
   AccountKind,
@@ -39,17 +44,92 @@ export interface AccountTypeReportRow {
   label: string
   accountCount: number
   balanceBase: number
+  /** Net-worth at the first check-in (base). */
+  startBalanceBase: number
   growthBase: number
+  /** Modified Dietz relative growth for this kind (null if not applicable). */
+  growthPct: number | null
+  /** Annualized relative growth for this kind. */
+  annualizedPct: number | null
   share: number
   accounts: AccountTypeReportAccountRow[]
 }
 
 export interface AccountTypeReport {
   asOfDate: string | null
+  startDate: string | null
+  days: number
   baseCurrency: string
   grandTotalBase: number
   grandGrowthBase: number
+  /** Relative growth across all growth kinds (fund/deposit/investment). */
+  growthPct: number | null
+  annualizedPct: number | null
   rows: AccountTypeReportRow[]
+}
+
+function daysBetween(startDate: string, endDate: string): number {
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0
+  return Math.max(0, Math.round((end - start) / 86_400_000))
+}
+
+function kindCapitalFlows(
+  kind: AccountKind,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const map = new Map(accounts.map((a) => [a.id, a]))
+  const byDate = new Map<string, number>()
+
+  for (const t of transfers) {
+    if (t.date <= t0 || t.date > t1) continue
+    const from = map.get(t.fromAccountId)
+    const to = map.get(t.toAccountId)
+    if (!from || !to) continue
+    const fromKind = normalizeAccountKind(from.kind)
+    const toKind = normalizeAccountKind(to.kind)
+    if (fromKind === toKind) continue
+    if (fromKind !== kind && toKind !== kind) continue
+
+    const amountBase = convertAmount(
+      t.amount,
+      from.currency,
+      settings.baseCurrency,
+      settings,
+      t.date,
+      rateBook,
+    )
+    const signed = toKind === kind ? amountBase : -amountBase
+    byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
+  }
+
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, amount]) => ({ date, amount }))
+}
+
+function emptyReport(
+  asOfDate: string | null,
+  baseCurrency: string,
+): AccountTypeReport {
+  return {
+    asOfDate,
+    startDate: null,
+    days: 0,
+    baseCurrency,
+    grandTotalBase: 0,
+    grandGrowthBase: 0,
+    growthPct: null,
+    annualizedPct: null,
+    rows: [],
+  }
 }
 
 export function buildAccountTypeReport(
@@ -67,23 +147,24 @@ export function buildAccountTypeReport(
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
 
   if (!t1 || active.length === 0) {
-    return {
-      asOfDate: t1,
-      baseCurrency: settings.baseCurrency,
-      grandTotalBase: 0,
-      grandGrowthBase: 0,
-      rows: [],
-    }
+    return emptyReport(t1, settings.baseCurrency)
   }
 
-  const pivot =
+  const days = t0 != null ? daysBetween(t0, t1) : 0
+  const pivotT1 =
     (rateBook ? resolvePivotForDate(t1, rateBook) : null) ??
     (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+  const pivotT0 =
+    t0 != null
+      ? ((rateBook ? resolvePivotForDate(t0, rateBook) : null) ??
+        (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null))
+      : null
 
   const byKind = new Map<
     AccountKind,
     {
       balanceBase: number
+      startBalanceBase: number
       growthBase: number
       accounts: AccountTypeReportAccountRow[]
     }
@@ -113,8 +194,19 @@ export function buildAccountTypeReport(
       account.currency,
       settings.baseCurrency,
       settings.exchangeRates,
-      pivot,
+      pivotT1,
     )
+    const startRecorded = t0 != null ? balanceOnDate(account.id, t0, snapshots) : null
+    const startBalanceBase =
+      t0 != null && startRecorded != null
+        ? toBase(
+            netWorthAmount(account, startRecorded),
+            account.currency,
+            settings.baseCurrency,
+            settings.exchangeRates,
+            pivotT0,
+          )
+        : 0
     const growthBase =
       t0 != null && isGrowthAccount(account)
         ? (accountGrowthBase(
@@ -131,10 +223,12 @@ export function buildAccountTypeReport(
 
     const bucket = byKind.get(kind) ?? {
       balanceBase: 0,
+      startBalanceBase: 0,
       growthBase: 0,
       accounts: [],
     }
     bucket.balanceBase += balanceBase
+    bucket.startBalanceBase += startBalanceBase
     bucket.growthBase += growthBase
     bucket.accounts.push({
       accountId: account.id,
@@ -154,23 +248,110 @@ export function buildAccountTypeReport(
   const rows: AccountTypeReportRow[] = ACCOUNT_KIND_ORDER.filter((kind) => byKind.has(kind)).map(
     (kind) => {
       const data = byKind.get(kind)!
+      let growthPct: number | null = null
+      let annualizedPct: number | null = null
+      if (t0 != null && t0 !== t1 && isGrowthKind(kind)) {
+        const flows = kindCapitalFlows(kind, t0, t1, transfers, accounts, settings, rateBook)
+        const dietz = modifiedDietzReturn(
+          data.startBalanceBase,
+          data.growthBase,
+          t0,
+          t1,
+          flows,
+        )
+        growthPct = dietz.growthPct
+        annualizedPct =
+          growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
+      }
       return {
         kind,
         label: accountKindLabel(kind),
         accountCount: data.accounts.length,
         balanceBase: data.balanceBase,
+        startBalanceBase: data.startBalanceBase,
         growthBase: data.growthBase,
+        growthPct,
+        annualizedPct,
         share: grandTotalBase !== 0 ? data.balanceBase / Math.abs(grandTotalBase) : 0,
         accounts: data.accounts,
       }
     },
   )
 
+  const growthRows = rows.filter((r) => isGrowthKind(r.kind))
+  const growthStart = growthRows.reduce((s, r) => s + r.startBalanceBase, 0)
+  const growthAmount = growthRows.reduce((s, r) => s + r.growthBase, 0)
+  let growthPct: number | null = null
+  let annualizedPct: number | null = null
+  if (t0 != null && t0 !== t1 && growthRows.length > 0) {
+    const growthAccountIds = new Set(
+      growthRows.flatMap((r) => r.accounts.map((a) => a.accountId)),
+    )
+    const growthAccountsList = active.filter((a) => growthAccountIds.has(a.id))
+    // Boundary flows into the whole growth portfolio (any growth kind).
+    const flows = kindCapitalFlowsForAccounts(
+      growthAccountsList,
+      t0,
+      t1,
+      transfers,
+      accounts,
+      settings,
+      rateBook,
+    )
+    const dietz = modifiedDietzReturn(growthStart, growthAmount, t0, t1, flows)
+    growthPct = dietz.growthPct
+    annualizedPct =
+      growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
+  }
+
   return {
     asOfDate: t1,
+    startDate: t0,
+    days,
     baseCurrency: settings.baseCurrency,
     grandTotalBase,
     grandGrowthBase,
+    growthPct,
+    annualizedPct,
     rows,
   }
+}
+
+/** Flows into a set of accounts from outside that set. */
+function kindCapitalFlowsForAccounts(
+  subset: Account[],
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const subsetIds = new Set(subset.map((a) => a.id))
+  const map = new Map(accounts.map((a) => [a.id, a]))
+  const byDate = new Map<string, number>()
+
+  for (const t of transfers) {
+    if (t.date <= t0 || t.date > t1) continue
+    const fromIn = subsetIds.has(t.fromAccountId)
+    const toIn = subsetIds.has(t.toAccountId)
+    if (fromIn === toIn) continue
+    const from = map.get(t.fromAccountId)
+    if (!from) continue
+    const amountBase = convertAmount(
+      t.amount,
+      from.currency,
+      settings.baseCurrency,
+      settings,
+      t.date,
+      rateBook,
+    )
+    const signed = toIn && !fromIn ? amountBase : -amountBase
+    byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
+  }
+
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, amount]) => ({ date, amount }))
 }

@@ -58,5 +58,43 @@ describe('buildAccountTypeReport', () => {
     expect(report.rows.find((r) => r.kind === 'credit')?.balanceBase).toBe(-20_000)
     expect(report.rows.find((r) => r.kind === 'investment')?.balanceBase).toBe(50_000)
     expect(report.grandTotalBase).toBe(42_000)
+    expect(report.growthPct).toBeNull()
+    expect(report.annualizedPct).toBeNull()
+  })
+
+  it('computes relative and annualized growth per growth kind', () => {
+    const accounts: Account[] = [
+      account({ id: 'fund', name: 'Фонд', kind: 'fund' }),
+      account({ id: 'dep', name: 'Вклад', kind: 'deposit' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 100_000 },
+          { accountId: 'dep', amount: 50_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'fund', amount: 101_000 },
+          { accountId: 'dep', amount: 50_500 },
+        ],
+      },
+    ]
+
+    const report = buildAccountTypeReport(accounts, snapshots, [], settings)
+    expect(report.days).toBe(31)
+    const fund = report.rows.find((r) => r.kind === 'fund')
+    const dep = report.rows.find((r) => r.kind === 'deposit')
+    expect(fund?.growthBase).toBe(1_000)
+    expect(fund?.growthPct).toBeCloseTo(0.01, 8)
+    expect(dep?.growthBase).toBe(500)
+    expect(dep?.growthPct).toBeCloseTo(0.01, 8)
+    expect(report.growthPct).toBeCloseTo(0.01, 8)
+    expect(report.annualizedPct).not.toBeNull()
   })
 })
