@@ -130,17 +130,21 @@ export function CurrencyReportTable({
               </td>
               <td className="hidden px-4 py-3 tabular-nums md:table-cell">{totalAccounts}</td>
               <td className="px-3 py-3 tabular-nums sm:px-4">
-                <div className="lg:hidden">
+                <div className="whitespace-nowrap lg:hidden">
                   {formatCurrency(report.grandTotalBase, report.baseCurrency)}
                 </div>
                 <div className="hidden text-slate-400 lg:block">—</div>
               </td>
               <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
-                {formatCurrency(report.grandTotalBase, report.baseCurrency)}
+                <span className="whitespace-nowrap">
+                  {formatCurrency(report.grandTotalBase, report.baseCurrency)}
+                </span>
               </td>
               <td className="hidden px-4 py-3 tabular-nums md:table-cell">100%</td>
               <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
-                {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+                <span className="whitespace-nowrap">
+                  {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+                </span>
               </td>
             </tr>
           </tfoot>
@@ -217,23 +221,25 @@ function CurrencyGroup({
           {accountCount}
         </td>
         <td className="px-3 py-3 tabular-nums text-slate-900 sm:px-4">
-          <div className="break-words">{formatCurrency(balance, currency)}</div>
+          <div className="whitespace-nowrap">{formatCurrency(balance, currency)}</div>
           {currency !== baseCurrency && (
-            <div className="mt-0.5 text-xs text-slate-500 lg:hidden">
+            <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500 lg:hidden">
               ≈ {formatCurrency(balanceBase, baseCurrency)}
             </div>
           )}
         </td>
         <td className="hidden px-4 py-3 tabular-nums text-slate-900 lg:table-cell">
-          {formatCurrency(balanceBase, baseCurrency)}
+          <span className="whitespace-nowrap">{formatCurrency(balanceBase, baseCurrency)}</span>
         </td>
         <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
           {formatShare(share)}
         </td>
         <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
-          <div className={`break-words ${growthTone(growth)}`}>{signedAmount(growth, currency)}</div>
+          <div className={`whitespace-nowrap ${growthTone(growth)}`}>
+            {signedAmount(growth, currency)}
+          </div>
           {currency !== baseCurrency && (
-            <div className={`mt-0.5 text-xs ${growthTone(growthBase)}`}>
+            <div className={`mt-0.5 whitespace-nowrap text-xs ${growthTone(growthBase)}`}>
               ≈ {signedAmount(growthBase, baseCurrency)}
             </div>
           )}
@@ -253,23 +259,25 @@ function CurrencyGroup({
             </td>
             <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
             <td className="px-3 py-2 tabular-nums text-slate-700 sm:px-4">
-              <div className="break-words">{formatCurrency(acc.balance, currency)}</div>
+              <div className="whitespace-nowrap">{formatCurrency(acc.balance, currency)}</div>
               {currency !== baseCurrency && (
-                <div className="mt-0.5 text-xs text-slate-500 lg:hidden">
+                <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500 lg:hidden">
                   ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
                 </div>
               )}
             </td>
             <td className="hidden px-4 py-2 tabular-nums text-slate-700 lg:table-cell">
-              {formatCurrency(acc.balanceBase, baseCurrency)}
+              <span className="whitespace-nowrap">
+                {formatCurrency(acc.balanceBase, baseCurrency)}
+              </span>
             </td>
             <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
             <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
-              <div className={`break-words ${growthTone(acc.growth)}`}>
+              <div className={`whitespace-nowrap ${growthTone(acc.growth)}`}>
                 {signedAmount(acc.growth, currency)}
               </div>
               {currency !== baseCurrency && (
-                <div className={`mt-0.5 text-xs ${growthTone(acc.growthBase)}`}>
+                <div className={`mt-0.5 whitespace-nowrap text-xs ${growthTone(acc.growthBase)}`}>
                   ≈ {signedAmount(acc.growthBase, baseCurrency)}
                 </div>
               )}
