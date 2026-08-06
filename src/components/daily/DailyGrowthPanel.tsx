@@ -279,7 +279,7 @@ export function DailyGrowthPanel() {
                       const pct = (item?.payload as DayRow | undefined)?.growthPctOfAllMass
                       const amount = formatCurrency(value, settings.baseCurrency)
                       if (pct == null) return [amount, 'Прирост']
-                      return [`${amount} (${formatPercent(pct)} от массы)`, 'Прирост']
+                      return [`${amount} (${formatPercent(pct, 3)} от массы)`, 'Прирост']
                     }}
                     labelFormatter={(_, payload) => {
                       const date = payload?.[0]?.payload?.date as string | undefined
@@ -331,7 +331,7 @@ export function DailyGrowthPanel() {
                       <span className="block">{signedAmount(row.growth, settings.baseCurrency)}</span>
                       {row.growthPctOfAllMass != null ? (
                         <span className="block text-[11px] font-normal text-slate-500">
-                          {formatPercent(row.growthPctOfAllMass)} от массы
+                          {formatPercent(row.growthPctOfAllMass, 3)} от массы
                         </span>
                       ) : null}
                     </span>
