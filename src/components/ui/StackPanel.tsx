@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 interface StackPanelProps {
   open: boolean
@@ -9,13 +9,23 @@ interface StackPanelProps {
   headerActions?: ReactNode
 }
 
+const DISMISS_DRAG_PX = 72
+
 /** Нижняя стековая панель (sheet) поверх контента. */
 export function StackPanel({ open, title, onClose, children, headerActions }: StackPanelProps) {
   const openedAtRef = useRef(0)
+  const dragStartYRef = useRef<number | null>(null)
+  const dragOffsetRef = useRef(0)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     if (!open) return
     openedAtRef.current = Date.now()
+    dragOffsetRef.current = 0
+    setDragOffset(0)
+    setDragging(false)
+    dragStartYRef.current = null
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
@@ -35,6 +45,34 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
     onClose()
   }
 
+  function beginDrag(clientY: number) {
+    dragStartYRef.current = clientY
+    setDragging(true)
+  }
+
+  function moveDrag(clientY: number) {
+    if (dragStartYRef.current == null) return
+    const next = Math.max(0, clientY - dragStartYRef.current)
+    dragOffsetRef.current = next
+    setDragOffset(next)
+  }
+
+  function endDrag() {
+    if (dragStartYRef.current == null) return
+    const shouldClose = dragOffsetRef.current >= DISMISS_DRAG_PX
+    dragStartYRef.current = null
+    dragOffsetRef.current = 0
+    setDragging(false)
+    setDragOffset(0)
+    if (shouldClose) onClose()
+  }
+
+  const sheetStyle = {
+    transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
+    transition: dragging ? 'none' : 'transform 200ms ease-out',
+    animation: dragOffset > 0 ? undefined : 'stack-panel-up 200ms ease-out',
+  }
+
   return (
     <div className="fixed inset-0 z-[60]">
       <button
@@ -48,22 +86,49 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
         aria-modal="true"
         aria-label={title}
         className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-b-0 border-slate-200 bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-2xl"
-        style={{ animation: 'stack-panel-up 200ms ease-out' }}
+        style={sheetStyle}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900">{title}</h2>
-          <div className="flex shrink-0 items-center gap-2">
-            {headerActions}
-            <button
-              type="button"
-              className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-              onClick={onClose}
-            >
-              Закрыть
-            </button>
+        <div
+          className="flex shrink-0 cursor-grab touch-none flex-col items-center border-b border-slate-100 active:cursor-grabbing"
+          aria-hidden
+          onPointerDown={(e) => {
+            if (e.button !== 0) return
+            beginDrag(e.clientY)
+            e.currentTarget.setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={(e) => {
+            if (dragStartYRef.current == null) return
+            moveDrag(e.clientY)
+          }}
+          onPointerUp={(e) => {
+            if (dragStartYRef.current == null) return
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            endDrag()
+          }}
+          onPointerCancel={(e) => {
+            if (dragStartYRef.current == null) return
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            endDrag()
+          }}
+        >
+          <div className="mt-2 h-1 w-10 rounded-full bg-slate-300" />
+          <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
+            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900">{title}</h2>
+            <div className="flex shrink-0 items-center gap-2">
+              {headerActions}
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                onClick={onClose}
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
+          {children}
+        </div>
       </div>
     </div>
   )
