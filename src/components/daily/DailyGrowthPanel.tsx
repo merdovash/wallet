@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { buildDailyGrowthSeries, snapshotDates, totalOnDate } from '../../engine/growthEngine'
+import { buildDailyGrowthSeries, snapshotDates, totalOnDate, type RateBook } from '../../engine/growthEngine'
 import {
   formatCompactAxisValue,
   formatCurrency,
@@ -70,6 +70,28 @@ function dateFromBarClick(data: unknown): string | undefined {
   return rec.payload?.date ?? rec.date
 }
 
+function buildDayRow(
+  p: { date: string; growth: number; total: number; cumulativeGrowth: number },
+  checkInDates: string[],
+  accounts: Parameters<typeof totalOnDate>[1],
+  snapshots: Parameters<typeof totalOnDate>[2],
+  settings: Parameters<typeof totalOnDate>[3],
+  rateBook?: RateBook,
+): DayRow {
+  const interval = dailyGrowthInterval(p.date, checkInDates)
+  const massStart = interval
+    ? totalOnDate(interval.startDate, accounts, snapshots, settings, { rateBook })
+    : 0
+  const growthPctOfAllMass =
+    Number.isFinite(massStart) && massStart !== 0 ? p.growth / massStart : null
+  return {
+    ...p,
+    growthPctOfAllMass,
+    label: formatShortDate(p.date),
+    fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
+  }
+}
+
 export function DailyGrowthPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
@@ -112,24 +134,15 @@ export function DailyGrowthPanel() {
     return allPoints.filter((p) => p.date >= lo && p.date <= hi)
   }, [allPoints, fromDate, toDate])
 
-  const rows = useMemo(
-    () =>
-      [...filtered]
-        .reverse()
-        .map((p) => {
-          const interval = dailyGrowthInterval(p.date, checkInDates)
-          const massStart = interval
-            ? totalOnDate(interval.startDate, accounts, snapshots, settings, { rateBook })
-            : 0
-          const growthPctOfAllMass =
-            Number.isFinite(massStart) && massStart !== 0 ? p.growth / massStart : null
-          return {
-            ...p,
-            growthPctOfAllMass,
-            label: formatShortDate(p.date),
-            fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
-          }
-        }),
+  const buildRow = (p: (typeof filtered)[number]): DayRow =>
+    buildDayRow(p, checkInDates, accounts, snapshots, settings, rateBook)
+
+  /** Chart: oldest → newest (left to right). */
+  const chartRows = useMemo(() => filtered.map(buildRow), [filtered, checkInDates, accounts, snapshots, settings, rateBook])
+
+  /** Mobile list: newest → oldest. */
+  const tableRows = useMemo(
+    () => [...filtered].reverse().map(buildRow),
     [filtered, checkInDates, accounts, snapshots, settings, rateBook],
   )
 
@@ -205,7 +218,7 @@ export function DailyGrowthPanel() {
             description="Нужны минимум два чек-ина, чтобы показать прирост по дням."
           />
         </Card>
-      ) : rows.length === 0 ? (
+      ) : chartRows.length === 0 ? (
         <Card>
           <p className="text-sm text-slate-500">В выбранном интервале нет точек прироста.</p>
         </Card>
@@ -229,7 +242,7 @@ export function DailyGrowthPanel() {
             <Card className="!p-2.5 sm:!p-3">
               <p className="text-xs text-slate-500 sm:text-sm">Дней с приростом</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
-                {rows.filter((row) => row.growth > 0).length}
+                {chartRows.filter((row) => row.growth > 0).length}
               </p>
             </Card>
           </div>
@@ -238,17 +251,17 @@ export function DailyGrowthPanel() {
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-slate-800">Прирост по дням чек-инов</h2>
               <p className="text-xs text-slate-500">
-                Столбец — прирост за интервал до этой даты · новые дни слева · нажмите день для
+                Столбец — прирост за интервал до этой даты · слева старые дни · нажмите день для
                 расшифровки
               </p>
             </div>
             <div className="h-72 w-full touch-manipulation sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={rows}
+                  data={chartRows}
                   margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                   style={{ cursor: 'pointer' }}
-                  onClick={(state) => openDay(dateFromChartClick(state, rows))}
+                  onClick={(state) => openDay(dateFromChartClick(state, chartRows))}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
@@ -283,7 +296,7 @@ export function DailyGrowthPanel() {
                     minPointSize={8}
                     onClick={(data) => openDay(dateFromBarClick(data))}
                   >
-                    {rows.map((row) => (
+                    {chartRows.map((row) => (
                       <Cell key={row.date} fill={row.fill} />
                     ))}
                   </Bar>
@@ -293,7 +306,7 @@ export function DailyGrowthPanel() {
 
             {/* Reliable tap targets for adaptive / touch layouts */}
             <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 md:hidden">
-              {rows.map((row) => (
+              {tableRows.map((row) => (
                 <li key={row.date}>
                   <button
                     type="button"
