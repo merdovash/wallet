@@ -9,11 +9,11 @@ type NavIcon = (props: SVGProps<SVGSVGElement>) => React.ReactElement
 const NAV_ITEMS: { id: AppSection; label: string; Icon: NavIcon }[] = [
   { id: 'dashboard', label: 'Дашборд', Icon: ChartIcon },
   { id: 'checkins', label: 'Чек-ины', Icon: CheckInIcon },
+  { id: 'daily', label: 'По дням', Icon: DailyIcon },
   { id: 'accounts', label: 'Счета', Icon: AccountsIcon },
   { id: 'types', label: 'По типам', Icon: TypesIcon },
   { id: 'currencies', label: 'Валюты', Icon: CurrenciesIcon },
   { id: 'monthly', label: 'Помесячно', Icon: MonthlyIcon },
-  { id: 'daily', label: 'По дням', Icon: DailyIcon },
   { id: 'float', label: 'Float', Icon: FloatIcon },
   { id: 'settings', label: 'Настройки', Icon: SettingsIcon },
 ]
