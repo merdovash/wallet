@@ -82,7 +82,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
   const [draftTransfer, setDraftTransfer] = useState<PendingTransfer | null>(null)
-  const [cashflowManual, setCashflowManual] = useState(false)
+  const [incomeManual, setIncomeManual] = useState(false)
   const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
 
   useEffect(() => {
@@ -93,13 +93,13 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       setNote(editing.note ?? '')
       setIncome(editing.income ? String(editing.income) : '')
       setExpense(editing.expense ? String(editing.expense) : '')
-      setCashflowManual(true)
+      setIncomeManual(true)
     } else {
       setDate(todayIsoDate())
       setNote('')
       setIncome('')
       setExpense('')
-      setCashflowManual(false)
+      setIncomeManual(false)
     }
     setAmounts({})
     setPendingTransfers([])
@@ -194,11 +194,10 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   )
 
   useEffect(() => {
-    if (!open || locked || cashflowManual) return
+    if (!open || locked || incomeManual) return
     if (!suggestedCashflow.hasPrevious) return
     setIncome(suggestedCashflow.income > 0 ? String(suggestedCashflow.income) : '')
-    setExpense(suggestedCashflow.expense > 0 ? String(suggestedCashflow.expense) : '')
-  }, [open, locked, cashflowManual, suggestedCashflow])
+  }, [open, locked, incomeManual, suggestedCashflow])
 
   function typedLines(): SnapshotLine[] {
     return formAccounts
@@ -399,7 +398,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             <MoneyInput
               value={income}
               onChange={(value) => {
-                setCashflowManual(true)
+                setIncomeManual(true)
                 setIncome(value)
               }}
               allowNegative={false}
@@ -411,7 +410,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             <MoneyInput
               value={expense}
               onChange={(value) => {
-                setCashflowManual(true)
+                setIncomeManual(true)
                 setExpense(value)
               }}
               allowNegative={false}
@@ -422,18 +421,18 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         </div>
         <p className="text-xs text-slate-500">
           Внешние доходы и расходы не считаются приростом — нужны для корректных процентов.
-          {!locked && suggestedCashflow.hasPrevious && !cashflowManual
-            ? ' Подставляются автоматически по дельте оперативных / налички / кредиток (с учётом переводов).'
+          {!locked && suggestedCashflow.hasPrevious && !incomeManual
+            ? ' Доход подставляется автоматически по дельте неинвестиционных счетов (оперативные / наличка / кредитки, с учётом переводов).'
             : null}
-          {!locked && cashflowManual && suggestedCashflow.hasPrevious ? (
+          {!locked && incomeManual && suggestedCashflow.hasPrevious ? (
             <>
               {' '}
               <button
                 type="button"
                 className="text-blue-600 hover:underline"
-                onClick={() => setCashflowManual(false)}
+                onClick={() => setIncomeManual(false)}
               >
-                Вернуть автозаполнение
+                Вернуть автозаполнение дохода
               </button>
             </>
           ) : null}
