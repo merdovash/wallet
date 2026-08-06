@@ -9,6 +9,7 @@ import { AccountTypesPanel } from './components/types/AccountTypesPanel'
 import { CurrenciesPanel } from './components/currencies/CurrenciesPanel'
 import { MonthlyPanel } from './components/monthly/MonthlyPanel'
 import { DailyGrowthPanel } from './components/daily/DailyGrowthPanel'
+import { CashbackPanel } from './components/cashback/CashbackPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
@@ -144,6 +145,8 @@ function SectionContent({
       return <DailyGrowthPanel />
     case 'float':
       return <FloatPanel />
+    case 'cashback':
+      return <CashbackPanel />
     case 'settings':
       return <SettingsPanel />
   }

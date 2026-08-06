@@ -3,6 +3,7 @@ import type { ExchangeRates } from '../types/wallet'
 
 export const CURRENCY_OPTIONS: { code: string; name: string }[] = [
   { code: 'RUB', name: 'Российский рубль' },
+  { code: 'CBK', name: 'Кэшбек (1 = 1 ₽)' },
   { code: 'USD', name: 'Доллар США' },
   { code: 'EUR', name: 'Евро' },
   { code: 'USDT', name: 'Tether (USDT)' },
@@ -23,6 +24,7 @@ export function toBase(
   rates: ExchangeRates,
   pivotPerUnit?: Record<string, number> | null,
 ): number {
+  if (fromCurrency === 'CBK' && baseCurrency === 'RUB') return amount
   if (fromCurrency === baseCurrency) return amount
 
   if (pivotPerUnit && Object.keys(pivotPerUnit).length > 0) {

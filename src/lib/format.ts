@@ -1,5 +1,8 @@
 export function formatCurrency(amount: number, currency: string): string {
   if (!Number.isFinite(amount)) return '—'
+  if (currency === 'CBK') {
+    return `${amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} кэшбек`
+  }
   try {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',

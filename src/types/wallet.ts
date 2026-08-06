@@ -7,6 +7,7 @@ export type AppSection =
   | 'monthly'
   | 'daily'
   | 'float'
+  | 'cashback'
   | 'settings'
 
 export type SnapshotOrigin = 'manual' | 'transfer'
@@ -18,6 +19,7 @@ export type AccountKind =
   | 'deposit'
   | 'cash'
   | 'credit'
+  | 'cashback'
 
 export interface Account {
   id: string
@@ -96,6 +98,7 @@ export const DEFAULT_SETTINGS: WalletSettings = {
   baseCurrency: 'RUB',
   exchangeRates: {
     RUB: 1,
+    CBK: 1,
     USD: 90,
     EUR: 100,
     USDT: 90,

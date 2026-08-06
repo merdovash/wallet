@@ -7,9 +7,11 @@ export type DbAccountKind =
   | 'investment'
   | 'cash'
   | 'credit'
+  | 'cashback'
 
 function normalizeKind(kind: string | null | undefined): DbAccountKind {
   if (kind === 'credit') return 'credit'
+  if (kind === 'cashback') return 'cashback'
   if (kind === 'cash') return 'cash'
   if (kind === 'investment') return 'investment'
   if (kind === 'deposit') return 'deposit'

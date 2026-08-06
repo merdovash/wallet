@@ -12,6 +12,7 @@ import { creditDebt } from '../../engine/creditFloatEngine'
 import { balanceOnDate, buildAccountSeries, snapshotDates } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '../../lib/accountKinds'
+import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRatesStore } from '../../store/ratesStore'
@@ -154,6 +155,25 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
           graceMonths: grace,
         })
       }
+    } else if (kind === 'cashback') {
+      if (editingId) {
+        await updateAccount(editingId, {
+          name: trimmed,
+          currency: CASHBACK_CURRENCY,
+          color,
+          kind: 'cashback',
+          creditLimit: null,
+          linkedAccountId: null,
+          graceMonths: null,
+        })
+      } else {
+        await addAccount({
+          name: trimmed,
+          currency: CASHBACK_CURRENCY,
+          color,
+          kind: 'cashback',
+        })
+      }
     } else if (editingId) {
       await updateAccount(editingId, {
         name: trimmed,
@@ -279,7 +299,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
           <Field label="Тип">
             <Select
               value={kind}
-              onChange={(e) => setKind(e.target.value as AccountKind)}
+              onChange={(e) => {
+                const next = e.target.value as AccountKind
+                setKind(next)
+                if (next === 'cashback') setCurrency(CASHBACK_CURRENCY)
+              }}
             >
               {ACCOUNT_KINDS.map((k) => (
                 <option key={k} value={k}>
@@ -289,7 +313,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
             </Select>
           </Field>
           <Field label="Валюта">
-            <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            <Select
+              value={kind === 'cashback' ? CASHBACK_CURRENCY : currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              disabled={kind === 'cashback'}
+            >
               {CURRENCY_OPTIONS.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.code} — {c.name}

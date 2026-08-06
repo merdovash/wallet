@@ -15,6 +15,7 @@ const NAV_ITEMS: { id: AppSection; label: string; Icon: NavIcon }[] = [
   { id: 'currencies', label: 'Валюты', Icon: CurrenciesIcon },
   { id: 'monthly', label: 'Помесячно', Icon: MonthlyIcon },
   { id: 'float', label: 'Float', Icon: FloatIcon },
+  { id: 'cashback', label: 'Кэшбек', Icon: CashbackIcon },
   { id: 'settings', label: 'Настройки', Icon: SettingsIcon },
 ]
 
@@ -319,6 +320,19 @@ function FloatIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinejoin="round"
         d="M4 19V5M4 19h16M7 15c1.5-2 3-3 5-3s3.5 1 5 3M7 10c1.5-2 3-3 5-3s3.5 1 5 3"
       />
+    </svg>
+  )
+}
+
+function CashbackIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 3c-4 0-7 2.5-7 6 0 2.2 1.2 4.1 3 5.2V19a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-4.8c1.8-1.1 3-3 3-5.2 0-3.5-3-6-7-6Z"
+      />
+      <path strokeLinecap="round" d="M9 12h6" />
     </svg>
   )
 }

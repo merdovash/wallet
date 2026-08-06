@@ -7,6 +7,7 @@ export const ACCOUNT_KINDS = [
   'investment',
   'cash',
   'credit',
+  'cashback',
 ] as const satisfies readonly AccountKind[]
 
 export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
@@ -16,6 +17,7 @@ export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
   investment: 'Инвестиции',
   cash: 'Наличка',
   credit: 'Кредитка',
+  cashback: 'Кэшбек',
 }
 
 /** Display order on the types summary tab. */
@@ -26,6 +28,7 @@ export const ACCOUNT_KIND_ORDER: AccountKind[] = [
   'investment',
   'cash',
   'credit',
+  'cashback',
 ]
 
 /** Kinds whose balance changes count toward portfolio growth. */
@@ -33,6 +36,7 @@ const GROWTH_KINDS = new Set<AccountKind>(['fund', 'deposit', 'investment'])
 
 export function normalizeAccountKind(kind: string | null | undefined): AccountKind {
   if (kind === 'credit') return 'credit'
+  if (kind === 'cashback') return 'cashback'
   if (kind === 'cash') return 'cash'
   if (kind === 'investment') return 'investment'
   if (kind === 'deposit') return 'deposit'
@@ -47,7 +51,11 @@ export function isCreditKind(kind: AccountKind): boolean {
   return kind === 'credit'
 }
 
-/** Operational, cash and credit are excluded from growth / return metrics. */
+export function isCashbackKind(kind: AccountKind): boolean {
+  return kind === 'cashback'
+}
+
+/** Operational, cash, credit and cashback are excluded from growth / return metrics. */
 export function isGrowthKind(kind: AccountKind): boolean {
   return GROWTH_KINDS.has(kind)
 }
