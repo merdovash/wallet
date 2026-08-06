@@ -20,7 +20,7 @@ export function AuthControls() {
   if (user) {
     return (
       <div className="space-y-2">
-        <p className="truncate px-1 text-xs text-slate-500" title={user.email}>
+        <p className="truncate px-1 text-xs text-slate-500 dark:text-slate-400" title={user.email}>
           {user.email}
         </p>
         <Button
@@ -40,7 +40,7 @@ export function AuthControls() {
     return (
       <a
         href={portalUrl}
-        className="flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        className="flex w-full items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
       >
         Войти через Portal
       </a>
@@ -48,7 +48,7 @@ export function AuthControls() {
   }
 
   return (
-    <p className="px-1 text-xs text-slate-500">
+    <p className="px-1 text-xs text-slate-500 dark:text-slate-400">
       Задайте VITE_PORTAL_URL для входа через хаб-портал.
     </p>
   )

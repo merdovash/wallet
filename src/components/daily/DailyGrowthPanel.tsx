@@ -19,7 +19,9 @@ import {
   signedAmount,
   todayIsoDate,
 } from '../../lib/format'
+import { getChartTheme } from '../../lib/chartTheme'
 import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns'
+import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { ReturnBreakdownPanel } from '../dashboard/ReturnBreakdownPanel'
@@ -99,6 +101,8 @@ export function DailyGrowthPanel() {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
+  const { mode: themeMode } = useTheme()
+  const chartTheme = useMemo(() => getChartTheme(), [themeMode])
 
   const checkInDates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const firstDate = checkInDates[0] ?? ''
@@ -183,8 +187,8 @@ export function DailyGrowthPanel() {
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">По дням</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">По дням</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Прирост портфеля роста между чек-инами · фонд / вклад / инвестиции
           </p>
         </div>
@@ -206,7 +210,7 @@ export function DailyGrowthPanel() {
         </div>
       </div>
       {firstDate && lastDate ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Доступный интервал: {formatDateDisplay(firstDate)} — {formatDateDisplay(lastDate)}
         </p>
       ) : null}
@@ -220,28 +224,28 @@ export function DailyGrowthPanel() {
         </Card>
       ) : chartRows.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-500">В выбранном интервале нет точек прироста.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">В выбранном интервале нет точек прироста.</p>
         </Card>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
             <Card className="!p-2.5 sm:!p-3">
-              <p className="text-xs text-slate-500 sm:text-sm">Сумма за период</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Сумма за период</p>
               <p
                 className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${
                   rangeSum > 0
                     ? 'text-emerald-700'
                     : rangeSum < 0
                       ? 'text-red-600'
-                      : 'text-slate-800'
+                      : 'text-slate-800 dark:text-slate-200'
                 }`}
               >
                 {signedAmount(rangeSum, settings.baseCurrency)}
               </p>
             </Card>
             <Card className="!p-2.5 sm:!p-3">
-              <p className="text-xs text-slate-500 sm:text-sm">Дней с приростом</p>
-              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
+              <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Дней с приростом</p>
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
                 {chartRows.filter((row) => row.growth > 0).length}
               </p>
             </Card>
@@ -249,8 +253,8 @@ export function DailyGrowthPanel() {
 
           <Card className="!p-3 sm:!p-4">
             <div className="mb-3">
-              <h2 className="text-sm font-semibold text-slate-800">Прирост по дням чек-инов</h2>
-              <p className="text-xs text-slate-500">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Прирост по дням чек-инов</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Столбец — прирост за интервал до этой даты · слева старые дни · нажмите день для
                 расшифровки
               </p>
@@ -263,14 +267,14 @@ export function DailyGrowthPanel() {
                   style={{ cursor: 'pointer' }}
                   onClick={(state) => openDay(dateFromChartClick(state, chartRows))}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    tick={{ fontSize: 11, fill: chartTheme.tick }}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    tick={{ fontSize: 11, fill: chartTheme.tick }}
                     tickFormatter={formatCompactAxisValue}
                     width={48}
                   />
@@ -305,16 +309,16 @@ export function DailyGrowthPanel() {
             </div>
 
             {/* Reliable tap targets for adaptive / touch layouts */}
-            <ul className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 md:hidden">
+            <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 md:hidden">
               {tableRows.map((row) => (
                 <li key={row.date}>
                   <button
                     type="button"
                     onClick={() => openDay(row.date)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 active:bg-slate-100"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60 active:bg-slate-100 dark:active:bg-slate-800"
                   >
                     <span>
-                      <span className="block font-medium text-slate-900">
+                      <span className="block font-medium text-slate-900 dark:text-slate-100">
                         {formatDateDisplay(row.date)}
                       </span>
                       <span className="text-[11px] text-blue-600">открыть расшифровку</span>
@@ -325,12 +329,12 @@ export function DailyGrowthPanel() {
                           ? 'text-emerald-700'
                           : row.growth < 0
                             ? 'text-red-600'
-                            : 'text-slate-700'
+                            : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <span className="block">{signedAmount(row.growth, settings.baseCurrency)}</span>
                       {row.growthPctOfAllMass != null ? (
-                        <span className="block text-[11px] font-normal text-slate-500">
+                        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">
                           {formatPercent(row.growthPctOfAllMass, 3)} от массы
                         </span>
                       ) : null}

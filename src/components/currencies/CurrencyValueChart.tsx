@@ -10,7 +10,9 @@ import {
   YAxis,
 } from 'recharts'
 import { buildCurrencyValueSeries } from '../../lib/currencyValueSeries'
+import { getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
+import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -22,6 +24,8 @@ export function CurrencyValueChart() {
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
+  const { mode: themeMode } = useTheme()
+  const chartTheme = useMemo(() => getChartTheme(), [themeMode])
 
   const { currencies, points } = useMemo(
     () =>
@@ -53,7 +57,7 @@ export function CurrencyValueChart() {
   if (rows.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-slate-500">Пока нет чек-инов для графика.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Пока нет чек-инов для графика.</p>
       </Card>
     )
   }
@@ -61,18 +65,18 @@ export function CurrencyValueChart() {
   return (
     <Card className="!p-3 sm:!p-4">
       <div className="mb-3">
-        <h2 className="text-sm font-semibold text-slate-800">Стоимость валютных счетов</h2>
-        <p className="text-xs text-slate-500">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Стоимость валютных счетов</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           В {settings.baseCurrency} по курсам на даты чек-инов · без {settings.baseCurrency}
         </p>
       </div>
       <div className="h-64 w-full sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} interval="preserveStartEnd" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: chartTheme.tick }} interval="preserveStartEnd" />
             <YAxis
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: chartTheme.tick }}
               tickFormatter={formatCompactAxisValue}
               width={48}
             />

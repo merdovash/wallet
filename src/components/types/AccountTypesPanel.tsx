@@ -17,10 +17,10 @@ function accountCountLabel(count: number): string {
 }
 
 function pctTone(value: number | null): string {
-  if (value == null) return 'text-slate-500'
+  if (value == null) return 'text-slate-500 dark:text-slate-400'
   if (value > 0) return 'text-emerald-700'
   if (value < 0) return 'text-red-600'
-  return 'text-slate-700'
+  return 'text-slate-700 dark:text-slate-300'
 }
 
 interface AccountTypesPanelProps {
@@ -45,8 +45,8 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">По типам</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">По типам</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Сводка остатков и прироста по видам счетов
           {report.asOfDate ? ` на ${report.asOfDate}` : ''}
         </p>
@@ -55,37 +55,37 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
       {report.rows.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Итого</p>
-            <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Итого</p>
+            <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
               {formatCurrency(report.grandTotalBase, report.baseCurrency)}
             </p>
           </Card>
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост</p>
             <p
               className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.grandGrowthBase)}`}
             >
               {signedAmount(report.grandGrowthBase, report.baseCurrency)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">фонд · вклад · инвестиции</p>
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонд · вклад · инвестиции</p>
           </Card>
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост %</p>
             <p
               className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.growthPct)}`}
             >
               {formatPercent(report.growthPct)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">относительный за период</p>
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">относительный за период</p>
           </Card>
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">В годовых</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
             <p
               className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.annualizedPct)}`}
             >
               {formatPercent(report.annualizedPct)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
               {report.days > 0 ? `${report.days} дн.` : '—'}
             </p>
           </Card>
@@ -103,7 +103,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
         ) : (
           <table className="w-full table-fixed text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
+              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
                 <th className="w-[34%] px-3 py-3 font-medium sm:px-4">Тип</th>
                 <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Счетов</th>
                 <th className="w-[28%] px-3 py-3 font-medium tabular-nums sm:px-4">
@@ -126,9 +126,9 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                     ? 'text-emerald-700'
                     : row.growthBase < 0
                       ? 'text-red-600'
-                      : 'text-slate-700'
+                      : 'text-slate-700 dark:text-slate-300'
                 const balanceColor =
-                  row.balanceBase < 0 ? 'text-red-600' : 'text-slate-900'
+                  row.balanceBase < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'
                 return (
                   <TypeGroup
                     key={row.kind}
@@ -153,10 +153,10 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-100">
                 <td className="px-3 py-3 sm:px-4">
                   <div>Итого</div>
-                  <div className="text-xs font-normal text-slate-500 md:hidden">
+                  <div className="text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
                     {accountCountLabel(totalAccounts)}
                   </div>
                 </td>
@@ -224,29 +224,29 @@ function TypeGroup({
 }) {
   return (
     <>
-      <tr className="border-b border-slate-100 hover:bg-slate-50">
+      <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60">
         <td className="px-3 py-3 sm:px-4">
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900"
+            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-100"
           >
-            <span className="inline-block w-3 shrink-0 text-slate-400">{open ? '▾' : '▸'}</span>
+            <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
             <span className="min-w-0">
               <span className="block truncate">{label}</span>
-              <span className="mt-0.5 block text-xs font-normal text-slate-500 md:hidden">
+              <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
                 {accountCountLabel(accountCount)} · {formatShare(Math.abs(share))}
               </span>
             </span>
           </button>
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
           {accountCount}
         </td>
         <td className={`px-3 py-3 tabular-nums sm:px-4 ${balanceColor}`}>
           {formatCurrency(balanceBase, baseCurrency)}
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 lg:table-cell">
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 lg:table-cell">
           {formatShare(Math.abs(share))}
         </td>
         <td className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${growthColor}`}>
@@ -259,7 +259,7 @@ function TypeGroup({
               {formatPercent(annualizedPct)} год.
             </div>
           ) : (
-            <div className="text-xs text-slate-400">—</div>
+            <div className="text-xs text-slate-400 dark:text-slate-500">—</div>
           )}
         </td>
       </tr>
@@ -270,35 +270,35 @@ function TypeGroup({
               ? 'text-emerald-700'
               : acc.growth < 0
                 ? 'text-red-600'
-                : 'text-slate-600'
+                : 'text-slate-600 dark:text-slate-400'
           const baseTone =
             acc.growthBase > 0
               ? 'text-emerald-700'
               : acc.growthBase < 0
                 ? 'text-red-600'
-                : 'text-slate-600'
+                : 'text-slate-600 dark:text-slate-400'
           return (
-            <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50/70">
+            <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/60/70">
               <td className="px-3 py-2 pl-9 sm:px-4 sm:pl-10">
                 <button
                   type="button"
                   onClick={() => onOpenAccount(acc.accountId)}
-                  className="text-left text-slate-700 hover:text-blue-700 hover:underline"
+                  className="text-left text-slate-700 dark:text-slate-300 hover:text-blue-700 hover:underline"
                 >
                   {acc.name}
-                  <span className="ml-1.5 text-xs text-slate-400">{acc.currency}</span>
+                  <span className="ml-1.5 text-xs text-slate-400 dark:text-slate-500">{acc.currency}</span>
                 </button>
               </td>
-              <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
-              <td className="px-3 py-2 tabular-nums text-slate-700 sm:px-4">
+              <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4">
                 <div>{formatCurrency(acc.balance, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
-                  <div className="mt-0.5 text-xs text-slate-500">
+                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                     ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
                   </div>
                 )}
               </td>
-              <td className="hidden px-4 py-2 text-slate-400 lg:table-cell">—</td>
+              <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 lg:table-cell">—</td>
               <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
                 <div className={nativeTone}>{signedAmount(acc.growth, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
@@ -307,7 +307,7 @@ function TypeGroup({
                   </div>
                 )}
               </td>
-              <td className="px-2 py-2 text-slate-400 sm:px-4">—</td>
+              <td className="px-2 py-2 text-slate-400 dark:text-slate-500 sm:px-4">—</td>
             </tr>
           )
         })}

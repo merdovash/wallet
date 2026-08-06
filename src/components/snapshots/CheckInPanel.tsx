@@ -419,7 +419,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             />
           </Field>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Внешние доходы и расходы не считаются приростом — нужны для корректных процентов.
           {!locked && suggestedCashflow.hasPrevious && !incomeManual
             ? ' Доход подставляется автоматически по дельте неинвестиционных счетов (оперативные / наличка / кредитки, с учётом переводов).'
@@ -439,7 +439,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         </p>
 
         {!locked && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Серым — текущий остаток. Введите новое значение только для изменившихся счетов;
             пустое поле оставляет остаток без изменений. Для кредитки — доступный остаток
             лимита.
@@ -447,7 +447,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         )}
 
         {formAccounts.length === 0 ? (
-          <p className="text-sm text-slate-500">Сначала добавьте хотя бы один счёт.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Сначала добавьте хотя бы один счёт.</p>
         ) : (
           <div className="space-y-3">
             {formAccounts.map((account) => {
@@ -468,7 +468,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
                       value={hints[account.id] ?? '0'}
                       disabled
                       readOnly
-                      className="bg-slate-50 text-slate-700"
+                      className="bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300"
                     />
                   ) : (
                     <MoneyInput
@@ -545,32 +545,32 @@ function TransfersSection({
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   return (
-    <div className="space-y-3 border-t border-slate-100 pt-4">
+    <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-800">Переводы за день</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Переводы за день</h3>
         {!draft && accounts.length >= 2 && (
           <Button type="button" variant="secondary" className="!px-2 !py-1" onClick={onStartDraft}>
             Добавить
           </Button>
         )}
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         Укажите переводы между счетами на {date || '…'}, чтобы они не считались приростом.
       </p>
 
       {savedTransfers.length === 0 && pendingTransfers.length === 0 && !draft && (
-        <p className="text-sm text-slate-500">Переводов нет</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Переводов нет</p>
       )}
 
       <ul className="space-y-2">
         {savedTransfers.map((t) => (
           <li
             key={t.id}
-            className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+            className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-sm"
           >
             <div>
-              <p className="font-medium text-slate-900">{formatTransferLabel(t, accounts)}</p>
-              {t.note ? <p className="text-xs text-slate-500">{t.note}</p> : null}
+              <p className="font-medium text-slate-900 dark:text-slate-100">{formatTransferLabel(t, accounts)}</p>
+              {t.note ? <p className="text-xs text-slate-500 dark:text-slate-400">{t.note}</p> : null}
             </div>
             <button
               type="button"
@@ -587,13 +587,13 @@ function TransfersSection({
           return (
             <li
               key={t.key}
-              className="flex items-start justify-between gap-2 rounded-lg border border-dashed border-slate-200 px-3 py-2 text-sm"
+              className="flex items-start justify-between gap-2 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
             >
               <div>
-                <p className="font-medium text-slate-900">
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   {from?.name ?? '—'} → {to?.name ?? '—'}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {formatCurrency(parseMoneyInput(t.amount) ?? 0, from?.currency ?? 'RUB')}
                   {t.note ? ` · ${t.note}` : ''}
                   {' · '}будет сохранён с чек-ином
@@ -612,7 +612,7 @@ function TransfersSection({
       </ul>
 
       {draft && (
-        <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+        <div className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
           <Field label="Откуда">
             <Select
               value={draft.fromAccountId}

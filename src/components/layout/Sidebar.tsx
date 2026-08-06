@@ -49,7 +49,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
 
   return (
     <div className="shrink-0 md:contents">
-      <aside className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom,0px)] md:hidden">
+      <aside className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pb-[env(safe-area-inset-bottom,0px)] md:hidden">
         <nav className="flex items-stretch gap-0.5 overflow-x-auto px-1 py-1.5">
           <button
             type="button"
@@ -57,7 +57,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             title="Меню"
             aria-label="Открыть меню"
             aria-expanded={mobileMenuOpen}
-            className="flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-slate-600 hover:bg-slate-100"
+            className="flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
           >
             <MenuIcon className="h-5 w-5" aria-hidden />
             <span className="text-[10px] font-medium leading-none">Меню</span>
@@ -85,16 +85,16 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             onClick={() => setMobileMenuOpen(false)}
           />
           <aside
-            className="absolute inset-y-0 left-0 flex w-[min(18rem,85vw)] flex-col border-r border-slate-200 bg-white shadow-xl"
+            className="absolute inset-y-0 left-0 flex w-[min(18rem,85vw)] flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl"
             style={{ animation: 'mobile-drawer-in 180ms ease-out' }}
             aria-label="Навигация"
           >
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
               <PortalHomeLink />
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
               >
                 Закрыть
               </button>
@@ -112,7 +112,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
                 />
               ))}
             </nav>
-            <div className="shrink-0 border-t border-slate-200 p-3">
+            <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 p-3">
               <AuthControls />
             </div>
           </aside>
@@ -120,12 +120,12 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
       )}
 
       <aside
-        className={`absolute inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-200 bg-white shadow-md transition-[width] duration-200 md:flex ${
+        className={`absolute inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-md transition-[width] duration-200 md:flex ${
           collapsed ? 'w-14' : 'w-56'
         }`}
       >
         <div
-          className={`shrink-0 border-b border-slate-100 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}
+          className={`shrink-0 border-b border-slate-100 dark:border-slate-800 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}
         >
           <PortalHomeLink collapsed={collapsed} />
         </div>
@@ -147,12 +147,12 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
           ))}
         </nav>
 
-        <div className="shrink-0 space-y-2 border-t border-slate-200 bg-white p-2">
+        <div className="shrink-0 space-y-2 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2">
           {!collapsed && <AuthControls />}
           <button
             type="button"
             onClick={() => onCollapsedChange(!collapsed)}
-            className="flex w-full items-center justify-center rounded-lg px-2 py-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            className="flex w-full items-center justify-center rounded-lg px-2 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-800 dark:text-slate-200"
             title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
             aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
           >
@@ -170,12 +170,12 @@ function PortalHomeLink({ collapsed = false }: { collapsed?: boolean }) {
       href={portalHomeUrl()}
       title="На главную"
       aria-label="На главную"
-      className={`flex items-center gap-2 rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
+      className={`flex items-center gap-2 rounded-lg text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-100 ${
         collapsed ? 'justify-center p-1.5' : 'px-1 py-0.5'
       }`}
     >
       <HomeIcon className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
-      {!collapsed && <span className="text-sm font-semibold text-slate-900">Портал</span>}
+      {!collapsed && <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Портал</span>}
     </a>
   )
 }
@@ -200,8 +200,8 @@ function NavButton({
       ? 'flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5'
       : 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm'
   const activeCls = isActive
-    ? 'bg-blue-50 text-blue-700'
-    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
 
   return (
     <a

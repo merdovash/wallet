@@ -10,7 +10,9 @@ import {
   YAxis,
 } from 'recharts'
 import type { RateBook } from '../../engine/growthEngine'
+import { getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
+import { useTheme } from '../../lib/useTheme'
 import type { Account, AccountPoint, BalanceSnapshot, TotalPoint, WalletSettings } from '../../types/wallet'
 import { Card } from '../ui/FormControls'
 import { DayTotalsPanel } from './DayTotalsPanel'
@@ -36,6 +38,8 @@ export function GrowthChart({
   rateBook,
   accountId = null,
 }: GrowthChartProps) {
+  const { mode: themeMode } = useTheme()
+  const chartTheme = useMemo(() => getChartTheme(), [themeMode])
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const rows = useMemo(
@@ -51,7 +55,7 @@ export function GrowthChart({
   if (rows.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-slate-500">Пока нет точек для графика — сделайте первый чек-ин.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Пока нет точек для графика — сделайте первый чек-ин.</p>
       </Card>
     )
   }
@@ -70,7 +74,7 @@ export function GrowthChart({
     <>
       <Card className="!p-3 sm:!p-4">
         {canOpenDay && (
-          <p className="mb-2 text-xs text-slate-500">Нажмите на точку или дату, чтобы открыть итоги.</p>
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">Нажмите на точку или дату, чтобы открыть итоги.</p>
         )}
         <div className="h-64 w-full sm:h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -83,18 +87,18 @@ export function GrowthChart({
               }}
               style={{ cursor: canOpenDay ? 'pointer' : undefined }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} interval="preserveStartEnd" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: chartTheme.tick }} interval="preserveStartEnd" />
               <YAxis
                 yAxisId="primary"
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 11, fill: chartTheme.tick }}
                 tickFormatter={formatCompactAxisValue}
                 width={48}
               />
               <YAxis
                 yAxisId="growth"
                 orientation="right"
-                tick={{ fontSize: 11, fill: '#059669' }}
+                tick={{ fontSize: 11, fill: chartTheme.growthTick }}
                 tickFormatter={formatCompactAxisValue}
                 width={48}
                 domain={([dataMin, dataMax]) => {
@@ -126,7 +130,7 @@ export function GrowthChart({
                 type="monotone"
                 dataKey="primary"
                 name="primary"
-                stroke="#2563eb"
+                stroke={chartTheme.primaryLine}
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 activeDot={{ r: 6 }}
@@ -136,7 +140,7 @@ export function GrowthChart({
                 type="monotone"
                 dataKey="growth"
                 name="growth"
-                stroke="#059669"
+                stroke={chartTheme.growthLine}
                 strokeWidth={2}
                 strokeDasharray="4 4"
                 dot={{ r: 3 }}

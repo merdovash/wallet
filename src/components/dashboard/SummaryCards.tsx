@@ -22,15 +22,15 @@ type BreakdownFocus =
 export function SummaryCards({ total, growth, currency, periodReturn }: SummaryCardsProps) {
   const [breakdownFocus, setBreakdownFocus] = useState<BreakdownFocus>(null)
 
-  const growthColor = growth > 0 ? 'text-emerald-700' : growth < 0 ? 'text-red-600' : 'text-slate-800'
+  const growthColor = growth > 0 ? 'text-emerald-700' : growth < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
   const topUp = periodReturn?.netFlow ?? 0
-  const topUpColor = topUp > 0 ? 'text-emerald-700' : topUp < 0 ? 'text-red-600' : 'text-slate-800'
+  const topUpColor = topUp > 0 ? 'text-emerald-700' : topUp < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
   const pctColor =
     (periodReturn?.growthPct ?? 0) > 0
       ? 'text-emerald-700'
       : (periodReturn?.growthPct ?? 0) < 0
         ? 'text-red-600'
-        : 'text-slate-800'
+        : 'text-slate-800 dark:text-slate-200'
 
   const allMassAnnualized = periodReturn?.annualizedPctOfAllMass
   const allMassColor =
@@ -38,17 +38,17 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
       ? 'text-emerald-700'
       : (allMassAnnualized ?? 0) < 0
         ? 'text-red-600'
-        : 'text-slate-800'
+        : 'text-slate-800 dark:text-slate-200'
 
   return (
     <>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 sm:text-sm">Остаток</p>
-          <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 sm:text-lg">
+          <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Остаток</p>
+          <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
             {formatCurrency(total, currency)}
           </p>
-          <p className="mt-1 text-[10px] text-slate-500">все счета · чистая стоимость</p>
+          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">все счета · чистая стоимость</p>
         </Card>
         <button
           type="button"
@@ -57,7 +57,7 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           title="Показать расшифровку прироста"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Прирост</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
               {signedAmount(growth, currency)}
             </p>
@@ -71,7 +71,7 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           title="Показать расшифровку чистого потока"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Чистый поток</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Чистый поток</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${topUpColor}`}>
               {periodReturn ? signedAmount(topUp, currency) : '—'}
             </p>
@@ -85,11 +85,11 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           title="Прирост % только по фондам, вкладам и инвестициям"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Прирост %</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост %</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
               {formatPercent(periodReturn?.growthPct)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">фонды · вклады · инвестиции</p>
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонды · вклады · инвестиции</p>
           </Card>
         </button>
         <button
@@ -99,11 +99,11 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           title="Годовые % только по фондам, вкладам и инвестициям"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">В годовых</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
               {formatPercent(periodReturn?.annualizedPct)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">фонды · вклады · инвестиции</p>
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонды · вклады · инвестиции</p>
           </Card>
         </button>
         <button
@@ -113,11 +113,11 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
           title="Годовой прирост % от всей массы денег"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Годовых от массы</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Годовых от массы</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${allMassColor}`}>
               {formatPercent(allMassAnnualized)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">прирост ÷ вся масса</p>
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">прирост ÷ вся масса</p>
           </Card>
         </button>
       </div>

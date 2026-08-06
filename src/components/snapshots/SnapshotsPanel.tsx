@@ -60,8 +60,8 @@ export function SnapshotsPanel() {
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Чек-ины</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Чек-ины</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Остатки по датам и переводы между счетами
           </p>
         </div>
@@ -87,7 +87,7 @@ export function SnapshotsPanel() {
         />
       ) : (
         <Card className="!p-0">
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {sortedSnapshots.map((snap) => {
               const snapTotal = totalOnDate(snap.date, accounts, snapshots, settings, {
                 rateBook,
@@ -99,11 +99,11 @@ export function SnapshotsPanel() {
                   <button
                     type="button"
                     onClick={() => openEdit(snap.id)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-slate-900 dark:text-slate-100">
                           {formatDateDisplay(snap.date)}
                         </span>
                         {isTransfer ? (
@@ -112,7 +112,7 @@ export function SnapshotsPanel() {
                           </span>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 block text-xs text-slate-500">
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
                         {isTransfer && dayTransfers.length > 0
                           ? dayTransfers
                               .map((t) => formatTransferLabel(t, accounts))
@@ -142,7 +142,7 @@ export function SnapshotsPanel() {
                         {snap.note ? ` · ${snap.note}` : ''}
                       </span>
                     </span>
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-slate-900 dark:text-slate-100">
                       {formatCurrency(snapTotal, settings.baseCurrency)}
                     </span>
                   </button>

@@ -85,11 +85,11 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-b-0 border-slate-200 bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-2xl"
+        className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-b-0 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pb-[env(safe-area-inset-bottom,0px)] shadow-2xl"
         style={sheetStyle}
       >
         <div
-          className="flex shrink-0 cursor-grab touch-none flex-col items-center border-b border-slate-100 active:cursor-grabbing"
+          className="flex shrink-0 cursor-grab touch-none flex-col items-center border-b border-slate-100 dark:border-slate-800 active:cursor-grabbing"
           aria-hidden
           onPointerDown={(e) => {
             if (e.button !== 0) return
@@ -113,12 +113,12 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
         >
           <div className="mt-2 h-1 w-10 rounded-full bg-slate-300" />
           <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900">{title}</h2>
+            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
             <div className="flex shrink-0 items-center gap-2">
               {headerActions}
               <button
                 type="button"
-                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-800 dark:text-slate-200"
                 onClick={onClose}
               >
                 Закрыть

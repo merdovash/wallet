@@ -57,19 +57,19 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
       ? 'text-emerald-700'
       : (change?.absolute ?? 0) < 0
         ? 'text-red-600'
-        : 'text-slate-800'
+        : 'text-slate-800 dark:text-slate-200'
   const relColor =
     (change?.relative ?? 0) > 0
       ? 'text-emerald-700'
       : (change?.relative ?? 0) < 0
         ? 'text-red-600'
-        : 'text-slate-800'
+        : 'text-slate-800 dark:text-slate-200'
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Валюты</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Валюты</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Эквивалент иностранных валют в {settings.baseCurrency} (без {settings.baseCurrency})
           {foreignCurrencyCount > 0 ? ` · ${foreignCurrencyCount} вал.` : ''}
         </p>
@@ -83,7 +83,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
           title="Показать расшифровку курсовой разницы"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Курсовая разница</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Курсовая разница</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${absColor}`}>
               {change ? signedAmount(change.absolute, settings.baseCurrency) : '—'}
             </p>
@@ -101,7 +101,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
           title="Показать расшифровку курсовой разницы"
         >
           <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 sm:text-sm">Курсовая разница %</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Курсовая разница %</p>
             <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${relColor}`}>
               {formatPercent(change?.relative)}
             </p>

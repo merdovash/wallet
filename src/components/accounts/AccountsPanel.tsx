@@ -211,8 +211,8 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Счета</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Счета</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий.
           </p>
         </div>
@@ -230,7 +230,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." />
       ) : (
         <Card className="!p-0">
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {visible.map((account) => (
               <AccountListItem
                 key={account.id}
@@ -330,7 +330,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                   ))}
                 </Select>
               </Field>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 В чек-ине — доступный остаток лимита. Траты месяца N закрыть до конца месяца
                 N+срок. Выгода float — по приросту связанного кошелька (без переводов).
               </p>
@@ -376,7 +376,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
       >
         {detailAccount && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Валюта: {detailAccount.currency}.
               {detailAccount.kind === 'credit'
                 ? ' На графике — доступный остаток лимита; прирост без переводов.'
@@ -400,7 +400,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               />
             )}
             {detailSeries.length > 0 && detailAccount.kind !== 'credit' && (
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
                 Последний остаток:{' '}
                 <span className="font-medium">
                   {formatCurrency(detailSeries[detailSeries.length - 1]!.balance, detailAccount.currency)}
@@ -441,13 +441,13 @@ function CreditDetailStats({
   const graceLabel =
     graceMonths === 1 ? '1 месяц' : graceMonths < 5 ? `${graceMonths} месяца` : `${graceMonths} месяцев`
   return (
-    <div className="space-y-1 text-sm text-slate-700">
+    <div className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
       <p>
         Лимит: <span className="font-medium">{formatCurrency(limit, currency)}</span>
       </p>
       <p>
         Грейс: <span className="font-medium">{graceLabel}</span>
-        <span className="text-slate-500"> (траты N → конец N+{graceMonths})</span>
+        <span className="text-slate-500 dark:text-slate-400"> (траты N → конец N+{graceMonths})</span>
       </p>
       <p>
         Доступно:{' '}
@@ -457,9 +457,9 @@ function CreditDetailStats({
         Долг: <span className="font-medium">{formatCurrency(debt, currency)}</span>
       </p>
       {linkedName ? (
-        <p className="text-slate-500">Float-кошелёк: {linkedName}</p>
+        <p className="text-slate-500 dark:text-slate-400">Float-кошелёк: {linkedName}</p>
       ) : (
-        <p className="text-slate-500">Float-кошелёк не выбран</p>
+        <p className="text-slate-500 dark:text-slate-400">Float-кошелёк не выбран</p>
       )}
     </div>
   )
@@ -572,7 +572,7 @@ function AccountListItem({
       onDrop={onDrop}
       className={`relative overflow-hidden sm:flex sm:items-center sm:gap-2 sm:overflow-visible sm:px-4 sm:py-3 ${
         isDragging ? 'opacity-40' : ''
-      } ${isOver ? 'bg-blue-50' : ''}`}
+      } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''}`}
     >
       <div className="absolute inset-y-0 right-0 flex items-center gap-1 px-2 sm:static sm:order-last sm:inset-auto sm:shrink-0 sm:px-0">
         <AccountIconButton
@@ -599,7 +599,7 @@ function AccountListItem({
         ref={foregroundRef}
         onTouchStart={handleTouchStart}
         style={{ transform: mobileTransform }}
-        className={`relative flex w-full touch-pan-y items-center gap-1 bg-white px-2 py-2 transition-transform duration-200 ease-out sm:w-auto sm:flex-1 sm:translate-x-0 sm:bg-transparent sm:px-0 sm:py-0 ${
+        className={`relative flex w-full touch-pan-y items-center gap-1 bg-white dark:bg-slate-900 px-2 py-2 transition-transform duration-200 ease-out sm:w-auto sm:flex-1 sm:translate-x-0 sm:bg-transparent sm:px-0 sm:py-0 ${
           dragOffset === null ? '' : '!duration-0'
         }`}
       >
@@ -609,7 +609,7 @@ function AccountListItem({
           draggable
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
-          className="flex h-9 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+          className="flex h-9 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-600 dark:text-slate-400 active:cursor-grabbing"
           title="Перетащить"
           aria-label={`Перетащить ${account.name}`}
         >
@@ -628,27 +628,27 @@ function AccountListItem({
             style={{ backgroundColor: account.color }}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-slate-900">
+            <span className="block truncate font-medium text-slate-900 dark:text-slate-100">
               {account.name}
-              <span className="ml-2 text-xs font-normal text-slate-400">
+              <span className="ml-2 text-xs font-normal text-slate-400 dark:text-slate-500">
                 {ACCOUNT_KIND_LABELS[account.kind].toLowerCase()}
               </span>
               {account.archived ? (
-                <span className="ml-2 text-xs font-normal text-slate-400">архив</span>
+                <span className="ml-2 text-xs font-normal text-slate-400 dark:text-slate-500">архив</span>
               ) : null}
             </span>
-            <span className="text-xs text-slate-500">{account.currency}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{account.currency}</span>
           </span>
           <span className="shrink-0 text-right tabular-nums">
             {balance == null ? (
-              <span className="text-sm text-slate-400">нет данных</span>
+              <span className="text-sm text-slate-400 dark:text-slate-500">нет данных</span>
             ) : (
               <>
-                <span className="block text-sm font-medium text-slate-900">
+                <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">
                   {formatCurrency(balance, account.currency)}
                 </span>
                 {account.kind === 'credit' && account.creditLimit != null ? (
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
                     долг {formatCurrency(creditDebt(account.creditLimit, balance), account.currency)}
                   </span>
                 ) : null}
@@ -676,7 +676,7 @@ function AccountIconButton({
       type="button"
       title={title}
       onClick={onClick}
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-800"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-600 transition hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 dark:text-slate-200"
       {...rest}
     >
       {children}

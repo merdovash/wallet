@@ -92,7 +92,7 @@ export default function App() {
           }`}
         >
           {!authInitialized || (user && walletLoading && !walletLoaded) ? (
-            <p className="text-sm text-slate-500">Загрузка…</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Загрузка…</p>
           ) : !user ? (
             <EmptyState
               title="Войдите в аккаунт"

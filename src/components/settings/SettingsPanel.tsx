@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { resolvePivotForDate } from '../../lib/cbrRates'
 import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
 import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
+import { useTheme } from '../../lib/useTheme'
+import type { ThemeMode } from '../../lib/theme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, Field, Select } from '../ui/FormControls'
@@ -11,6 +13,7 @@ export function SettingsPanel() {
   const settings = useWalletStore((s) => s.settings)
   const accounts = useWalletStore((s) => s.accounts)
   const setSettings = useWalletStore((s) => s.setSettings)
+  const { mode: themeMode, setMode: setThemeMode } = useTheme()
   const byDate = useRatesStore((s) => s.byDate)
   const status = useRatesStore((s) => s.status)
   const error = useRatesStore((s) => s.error)
@@ -47,11 +50,24 @@ export function SettingsPanel() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Настройки</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Настройки</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Базовая валюта и курсы ЦБ РФ на дату чек-ина (cbr-xml-daily.ru)
         </p>
       </div>
+
+      <Card className="space-y-4">
+        <Field label="Тема оформления">
+          <Select
+            value={themeMode}
+            onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+          >
+            <option value="system">Как в системе</option>
+            <option value="light">Светлая</option>
+            <option value="dark">Тёмная</option>
+          </Select>
+        </Field>
+      </Card>
 
       <Card className="space-y-4">
         <Field label="Базовая валюта">
@@ -73,15 +89,15 @@ export function SettingsPanel() {
       <Card className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">Курсы ЦБ</h2>
-            <p className="mt-1 text-xs text-slate-500">{statusLabel}</p>
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Курсы ЦБ</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{statusLabel}</p>
             {lastFetchedAt && (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                 Обновлено: {formatDateTimeDisplay(lastFetchedAt)}
               </p>
             )}
             {effectiveRateDate && (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 День котировки ЦБ: {formatDateDisplay(effectiveRateDate)}
                 {effectiveRateDate !== today
                   ? ` (для ${formatDateDisplay(today)})`
@@ -110,17 +126,17 @@ export function SettingsPanel() {
           </div>
         </div>
 
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Для каждого чек-ина берётся курс ЦБ на эту дату (в выходные — последний рабочий день).
           USDT считается как USD.
         </p>
 
         {pivot && (
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               1 единица → {settings.baseCurrency} (сегодня)
             </h3>
-            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               {currenciesInUse.map((code) => {
                 if (code === settings.baseCurrency) {
                   return (
@@ -135,7 +151,7 @@ export function SettingsPanel() {
                 const rub = pivot[code]
                 if (rub == null) {
                   return (
-                    <li key={code} className="flex justify-between px-3 py-2 text-sm text-slate-400">
+                    <li key={code} className="flex justify-between px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
                       <span>
                         {code} — {currencyLabel(code)}
                       </span>

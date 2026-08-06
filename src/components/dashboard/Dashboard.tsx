@@ -61,8 +61,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Дашборд</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Дашборд</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Остаток — все счета. «В годовых» — портфель роста. «Годовых от массы» — прирост ÷ вся
             масса
           </p>

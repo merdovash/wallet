@@ -70,9 +70,9 @@ export function CurrencyReportTable({
 
   return (
     <Card className="!p-0">
-      <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-800">Счета</h2>
-        <p className="text-sm text-slate-500">{accountCountLabel(accountCount)}</p>
+      <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Счета</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{accountCountLabel(accountCount)}</p>
       </div>
       {report.rows.length === 0 ? (
         <div className="p-4">
@@ -84,7 +84,7 @@ export function CurrencyReportTable({
       ) : (
         <table className="w-full table-fixed text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
               <th className="w-[42%] px-3 py-3 font-medium sm:w-auto sm:px-4">Валюта</th>
               <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Счетов</th>
               <th className="w-[32%] px-3 py-3 font-medium tabular-nums sm:px-4">Остаток</th>
@@ -121,10 +121,10 @@ export function CurrencyReportTable({
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-100">
               <td className="px-3 py-3 sm:px-4">
                 <div>Итого</div>
-                <div className="text-xs font-normal text-slate-500 md:hidden">
+                <div className="text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
                   {accountCountLabel(totalAccounts)} · 100%
                 </div>
               </td>
@@ -133,7 +133,7 @@ export function CurrencyReportTable({
                 <div className="whitespace-nowrap lg:hidden">
                   {formatCurrency(report.grandTotalBase, report.baseCurrency)}
                 </div>
-                <div className="hidden text-slate-400 lg:block">—</div>
+                <div className="hidden text-slate-400 dark:text-slate-500 lg:block">—</div>
               </td>
               <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
                 <span className="whitespace-nowrap">
@@ -157,7 +157,7 @@ export function CurrencyReportTable({
 function growthTone(value: number): string {
   if (value > 0) return 'text-emerald-700'
   if (value < 0) return 'text-red-600'
-  return 'text-slate-700'
+  return 'text-slate-700 dark:text-slate-300'
 }
 
 function CurrencyGroup({
@@ -198,40 +198,40 @@ function CurrencyGroup({
 }) {
   return (
     <>
-      <tr className="border-b border-slate-100 hover:bg-slate-50">
+      <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60">
         <td className="px-3 py-3 sm:px-4">
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900"
+            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-100"
           >
-            <span className="inline-block w-3 shrink-0 text-slate-400">{open ? '▾' : '▸'}</span>
+            <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
             <span className="min-w-0">
               <span className="block truncate">
                 {currency}
-                <span className="ml-1.5 hidden font-normal text-slate-500 sm:inline">{label}</span>
+                <span className="ml-1.5 hidden font-normal text-slate-500 dark:text-slate-400 sm:inline">{label}</span>
               </span>
-              <span className="mt-0.5 block text-xs font-normal text-slate-500 md:hidden">
+              <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
                 {accountCountLabel(accountCount)} · {formatShare(share)}
               </span>
             </span>
           </button>
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
           {accountCount}
         </td>
-        <td className="px-3 py-3 tabular-nums text-slate-900 sm:px-4">
+        <td className="px-3 py-3 tabular-nums text-slate-900 dark:text-slate-100 sm:px-4">
           <div className="whitespace-nowrap">{formatCurrency(balance, currency)}</div>
           {currency !== baseCurrency && (
-            <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500 lg:hidden">
+            <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 lg:hidden">
               ≈ {formatCurrency(balanceBase, baseCurrency)}
             </div>
           )}
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-900 lg:table-cell">
+        <td className="hidden px-4 py-3 tabular-nums text-slate-900 dark:text-slate-100 lg:table-cell">
           <span className="whitespace-nowrap">{formatCurrency(balanceBase, baseCurrency)}</span>
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 md:table-cell">
+        <td className="hidden px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
           {formatShare(share)}
         </td>
         <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
@@ -247,31 +247,31 @@ function CurrencyGroup({
       </tr>
       {open &&
         accounts.map((acc) => (
-          <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50/70">
+          <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/60/70">
             <td className="px-3 py-2 pl-9 sm:px-4 sm:pl-10">
               <button
                 type="button"
                 onClick={() => onOpenAccount(acc.accountId)}
-                className="text-left text-slate-700 hover:text-blue-700 hover:underline"
+                className="text-left text-slate-700 dark:text-slate-300 hover:text-blue-700 hover:underline"
               >
                 {acc.name}
               </button>
             </td>
-            <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
-            <td className="px-3 py-2 tabular-nums text-slate-700 sm:px-4">
+            <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
+            <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4">
               <div className="whitespace-nowrap">{formatCurrency(acc.balance, currency)}</div>
               {currency !== baseCurrency && (
-                <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500 lg:hidden">
+                <div className="mt-0.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 lg:hidden">
                   ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
                 </div>
               )}
             </td>
-            <td className="hidden px-4 py-2 tabular-nums text-slate-700 lg:table-cell">
+            <td className="hidden px-4 py-2 tabular-nums text-slate-700 dark:text-slate-300 lg:table-cell">
               <span className="whitespace-nowrap">
                 {formatCurrency(acc.balanceBase, baseCurrency)}
               </span>
             </td>
-            <td className="hidden px-4 py-2 text-slate-400 md:table-cell">—</td>
+            <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
             <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
               <div className={`whitespace-nowrap ${growthTone(acc.growth)}`}>
                 {signedAmount(acc.growth, currency)}

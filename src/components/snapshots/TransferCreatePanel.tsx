@@ -87,7 +87,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Будет создан чек-ин с обновлёнными остатками. Суммы в нём нельзя менять вручную —
           только удалить перевод или весь чек-ин.
         </p>

@@ -31,7 +31,7 @@ interface FieldProps {
 export function Field({ label, children, error, className = '' }: FieldProps) {
   return (
     <label className={`block min-w-0 max-w-full space-y-1 ${className}`}>
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       {children}
       {error && <span className="text-xs text-red-600">{error}</span>}
     </label>
@@ -49,7 +49,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <input
         ref={ref}
         {...rest}
-        className={`min-w-0 max-w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
+        className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
       />
     )
   },
@@ -216,7 +216,7 @@ export function DateInput({ value, onChange, className = '', id, disabled, ...re
         }}
         onChange={handleChange}
         onBlur={handleBlur}
-        className="min-w-0 flex-1 rounded-l-lg border border-r-0 border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+        className="min-w-0 flex-1 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 dark:disabled:bg-slate-800 dark:bg-slate-800/60"
       />
       <button
         type="button"
@@ -224,7 +224,7 @@ export function DateInput({ value, onChange, className = '', id, disabled, ...re
         onClick={openPicker}
         title="Выбрать дату"
         aria-label="Выбрать дату"
-        className="inline-flex shrink-0 items-center justify-center rounded-r-lg border border-slate-300 bg-white px-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
+        className="inline-flex shrink-0 items-center justify-center rounded-r-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800/60 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 disabled:opacity-50"
       >
         <CalendarIcon className="h-4 w-4" />
       </button>
@@ -263,7 +263,7 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...rest}
-      className={`min-w-0 max-w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
+      className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
     />
   )
 }
@@ -274,8 +274,8 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   const variants = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
-    secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50',
-    danger: 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100',
+    secondary: 'bg-white dark:bg-slate-900 text-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60',
+    danger: 'bg-red-50 dark:bg-red-950/40 text-red-700 border border-red-200 hover:bg-red-100',
   }
   return (
     <button
@@ -287,7 +287,7 @@ export function Button({
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${className}`}>
+    <div className={`min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-5 ${className}`}>
       {children}
     </div>
   )
@@ -295,9 +295,9 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-      <p className="font-medium text-slate-700">{title}</p>
-      <p className="mt-1 text-sm text-slate-500">{description}</p>
+    <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/60 px-6 py-10 text-center">
+      <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
     </div>
   )
 }

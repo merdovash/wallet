@@ -19,9 +19,9 @@ export function MonthlyReturnsTable() {
 
   return (
     <Card className="!p-0">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-800">Помесячный прирост</h2>
-        <p className="mt-0.5 text-xs text-slate-500">
+      <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Помесячный прирост</h2>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
           Без учёта доходов/расходов; пополнения — только переводы; % — Modified Dietz
         </p>
       </div>
@@ -35,7 +35,7 @@ export function MonthlyReturnsTable() {
       ) : (
         <table className="w-full table-fixed text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
               <th className="w-[28%] px-3 py-3 font-medium sm:px-4">Месяц</th>
               <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Прирост</th>
               <th className="w-[36%] px-3 py-3 font-medium tabular-nums sm:px-4">За месяц</th>
@@ -51,16 +51,16 @@ export function MonthlyReturnsTable() {
                   ? 'text-emerald-700'
                   : (row.growthPct ?? 0) < 0
                     ? 'text-red-600'
-                    : 'text-slate-700'
+                    : 'text-slate-700 dark:text-slate-300'
               return (
-                <tr key={row.yearMonth} className="border-b border-slate-100">
-                  <td className="px-3 py-3 font-medium text-slate-900 sm:px-4">
+                <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800">
+                  <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100 sm:px-4">
                     <div>{row.label}</div>
-                    <div className="mt-0.5 text-xs font-normal text-slate-500 md:hidden">
+                    <div className="mt-0.5 text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
                       {signedAmount(row.growth, settings.baseCurrency)}
                     </div>
                   </td>
-                  <td className="hidden px-4 py-3 tabular-nums text-slate-800 md:table-cell">
+                  <td className="hidden px-4 py-3 tabular-nums text-slate-800 dark:text-slate-200 md:table-cell">
                     {signedAmount(row.growth, settings.baseCurrency)}
                   </td>
                   <td className={`px-3 py-3 tabular-nums sm:px-4 ${pctColor}`}>
@@ -70,7 +70,7 @@ export function MonthlyReturnsTable() {
                     className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${pctColor}`}
                   >
                     {formatPercent(row.annualizedPct)}
-                    <div className="mt-0.5 hidden text-xs text-slate-400 sm:block">
+                    <div className="mt-0.5 hidden text-xs text-slate-400 dark:text-slate-500 sm:block">
                       от {formatCurrency(row.startTotal, settings.baseCurrency)}
                     </div>
                   </td>
