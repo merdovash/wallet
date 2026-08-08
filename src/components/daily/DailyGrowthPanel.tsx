@@ -34,8 +34,17 @@ type DayRow = {
   cumulativeGrowth: number
   /** Growth ÷ all-money mass at the start of the interval. */
   growthPctOfAllMass: number | null
+  /** Calendar days since the previous check-in. */
+  intervalDays: number | null
   label: string
   fill: string
+}
+
+function calendarDaysBetween(startDate: string, endDate: string): number | null {
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+  return Math.max(0, Math.round((end - start) / 86_400_000))
 }
 
 function clampIsoDate(value: string, min: string, max: string): string {
@@ -89,6 +98,7 @@ function buildDayRow(
   return {
     ...p,
     growthPctOfAllMass,
+    intervalDays: interval ? calendarDaysBetween(interval.startDate, interval.endDate) : null,
     label: formatShortDate(p.date),
     fill: p.growth > 0 ? '#059669' : p.growth < 0 ? '#dc2626' : '#94a3b8',
   }
@@ -154,6 +164,21 @@ export function DailyGrowthPanel() {
     () => filtered.reduce((s, p) => s + p.growth, 0),
     [filtered],
   )
+
+  /** Dates of the best / worst day in the visible range (only meaningful with 2+ rows). */
+  const { bestDate, worstDate } = useMemo(() => {
+    if (filtered.length < 2) return { bestDate: null, worstDate: null }
+    let best = filtered[0]!
+    let worst = filtered[0]!
+    for (const p of filtered) {
+      if (p.growth > best.growth) best = p
+      if (p.growth < worst.growth) worst = p
+    }
+    return {
+      bestDate: best.growth > 0 ? best.date : null,
+      worstDate: worst.growth < 0 ? worst.date : null,
+    }
+  }, [filtered])
 
   const dayBreakdown = useMemo(() => {
     if (!selectedEndDate) return null
@@ -317,27 +342,47 @@ export function DailyGrowthPanel() {
                     onClick={() => openDay(row.date)}
                     className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60 active:bg-slate-100 dark:active:bg-slate-800"
                   >
-                    <span>
-                      <span className="block font-medium text-slate-900 dark:text-slate-100">
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100">
                         {formatDateDisplay(row.date)}
+                        {row.date === bestDate ? (
+                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                            лучший день
+                          </span>
+                        ) : null}
+                        {row.date === worstDate ? (
+                          <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/40 dark:text-red-400">
+                            худший день
+                          </span>
+                        ) : null}
                       </span>
-                      <span className="text-[11px] text-blue-600">открыть расшифровку</span>
+                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                        Портфель {formatCurrency(row.total, settings.baseCurrency)}
+                        {row.intervalDays != null && row.intervalDays > 1
+                          ? ` · за ${row.intervalDays} дн.`
+                          : ''}
+                      </span>
                     </span>
-                    <span
-                      className={`shrink-0 text-right tabular-nums font-medium ${
-                        row.growth > 0
-                          ? 'text-emerald-700'
-                          : row.growth < 0
-                            ? 'text-red-600'
-                            : 'text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <span className="block">{signedAmount(row.growth, settings.baseCurrency)}</span>
-                      {row.growthPctOfAllMass != null ? (
-                        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">
-                          {formatPercent(row.growthPctOfAllMass, 3)} от массы
-                        </span>
-                      ) : null}
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span
+                        className={`text-right tabular-nums font-medium ${
+                          row.growth > 0
+                            ? 'text-emerald-700'
+                            : row.growth < 0
+                              ? 'text-red-600'
+                              : 'text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <span className="block">{signedAmount(row.growth, settings.baseCurrency)}</span>
+                        {row.growthPctOfAllMass != null ? (
+                          <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                            {formatPercent(row.growthPctOfAllMass, 3)} от массы
+                          </span>
+                        ) : null}
+                      </span>
+                      <span aria-hidden className="text-slate-300 dark:text-slate-600">
+                        ›
+                      </span>
                     </span>
                   </button>
                 </li>
