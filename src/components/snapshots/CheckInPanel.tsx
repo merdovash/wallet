@@ -137,8 +137,9 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     if (editing) {
       setDate(editing.date)
       setNote(editing.note ?? '')
-      setIncome(editing.income ? String(editing.income) : '')
-      setExpense(editing.expense ? String(editing.expense) : '')
+      // Сохранённые доход/расход показываем серой подсказкой; пустое поле = без изменений.
+      setIncome('')
+      setExpense('')
       setIncomeManual(true)
     } else {
       setDate(todayIsoDate())
@@ -177,6 +178,11 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     }
     return next
   }, [formAccounts, date, editing, snapshots])
+
+  // При редактировании серым показываем сохранённые за этот день доход/расход,
+  // так же как текущие остатки в полях счетов.
+  const incomeHint = editing?.income ? formatHintAmount(editing.income) : '0'
+  const expenseHint = editing?.expense ? formatHintAmount(editing.expense) : '0'
 
   const effectiveLines = useMemo((): SnapshotLine[] => {
     return formAccounts.map((account) => {
@@ -236,8 +242,12 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   useEffect(() => {
     if (!open || locked || incomeManual) return
     if (!suggestedCashflow.hasPrevious) return
-    setIncome(suggestedCashflow.income > 0 ? String(suggestedCashflow.income) : '')
-  }, [open, locked, incomeManual, suggestedCashflow])
+    // При редактировании пустое поле означает «оставить сохранённое»,
+    // поэтому нулевую автоподстановку записываем явно.
+    setIncome(
+      suggestedCashflow.income > 0 ? String(suggestedCashflow.income) : editing ? '0' : '',
+    )
+  }, [open, locked, incomeManual, suggestedCashflow, editing])
 
   function typedLines(): SnapshotLine[] {
     return formAccounts
@@ -277,8 +287,9 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   async function handleSave() {
     if (!date || formAccounts.length === 0) return
 
-    const incomeValue = parseMoneyInput(income) ?? 0
-    const expenseValue = parseMoneyInput(expense) ?? 0
+    // Пустое поле при редактировании оставляет сохранённое значение (как у остатков).
+    const incomeValue = parseMoneyInput(income) ?? editing?.income ?? 0
+    const expenseValue = parseMoneyInput(expense) ?? editing?.expense ?? 0
     if (incomeValue < 0 || expenseValue < 0) return
 
     if (locked) {
@@ -406,7 +417,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           <div className="space-y-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
             <p>
               Доход и расход — внешние поступления и траты за день в базовой валюте. Они не
-              считаются приростом и нужны для корректных процентов.
+              считаются приростом и нужны для корректных процентов. При редактировании серым
+              показаны сохранённые значения; пустое поле оставляет их без изменений.
             </p>
             <p>
               Доход подставляется автоматически по дельте неинвестиционных счетов (оперативные /
@@ -464,7 +476,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
                   setIncome(value)
                 }}
                 allowNegative={false}
-                placeholder="0"
+                placeholder={incomeHint}
                 {...focusKeyProps('income')}
               />
             </label>
@@ -479,7 +491,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
                   setExpense(value)
                 }}
                 allowNegative={false}
-                placeholder="0"
+                placeholder={expenseHint}
                 {...focusKeyProps('expense')}
               />
             </label>
