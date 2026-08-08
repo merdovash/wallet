@@ -53,6 +53,31 @@ type PendingTransfer = {
   note: string
 }
 
+/** Возвращает данные перевода, если черновик корректно заполнен, иначе null. */
+function parsePendingTransfer(t: PendingTransfer): {
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  note?: string
+} | null {
+  const value = parseMoneyInput(t.amount)
+  if (
+    !t.fromAccountId ||
+    !t.toAccountId ||
+    t.fromAccountId === t.toAccountId ||
+    value == null ||
+    value <= 0
+  ) {
+    return null
+  }
+  return {
+    fromAccountId: t.fromAccountId,
+    toAccountId: t.toAccountId,
+    amount: value,
+    note: t.note.trim() || undefined,
+  }
+}
+
 export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
@@ -170,16 +195,9 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   }, [formAccounts, amounts, editing, date, snapshots])
 
   const transferInputsForSuggest = useMemo(() => {
-    const pending = pendingTransfers
-      .map((t) => {
-        const value = parseMoneyInput(t.amount)
-        if (value == null || value <= 0) return null
-        return {
-          fromAccountId: t.fromAccountId,
-          toAccountId: t.toAccountId,
-          amount: value,
-        }
-      })
+    const drafts = draftTransfer ? [...pendingTransfers, draftTransfer] : pendingTransfers
+    const pending = drafts
+      .map((t) => parsePendingTransfer(t))
       .filter((t): t is NonNullable<typeof t> => t != null)
     return [
       ...dateTransfers.map((t) => ({
@@ -189,7 +207,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       })),
       ...pending,
     ]
-  }, [dateTransfers, pendingTransfers])
+  }, [dateTransfers, pendingTransfers, draftTransfer])
 
   const suggestedCashflow = useMemo(
     () =>
@@ -245,25 +263,11 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
 
   async function commitDraftTransfer() {
     if (!draftTransfer || !date) return
-    const value = parseMoneyInput(draftTransfer.amount)
-    if (
-      !draftTransfer.fromAccountId ||
-      !draftTransfer.toAccountId ||
-      draftTransfer.fromAccountId === draftTransfer.toAccountId ||
-      value == null ||
-      value <= 0
-    ) {
-      return
-    }
+    const parsed = parsePendingTransfer(draftTransfer)
+    if (parsed == null) return
 
     if (editing) {
-      await addTransfer({
-        date,
-        fromAccountId: draftTransfer.fromAccountId,
-        toAccountId: draftTransfer.toAccountId,
-        amount: value,
-        note: draftTransfer.note.trim() || undefined,
-      })
+      await addTransfer({ date, ...parsed })
     } else {
       setPendingTransfers((prev) => [...prev, draftTransfer])
     }
@@ -299,15 +303,26 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         lines: merged,
         origin: 'manual',
       })
+      // Незакоммиченный черновик перевода сохраняем автоматически.
+      const draft = draftTransfer ? parsePendingTransfer(draftTransfer) : null
+      if (draft != null) {
+        await addTransfer({ date, ...draft })
+      }
       onClose()
       return
     }
 
-    if (typed.length === 0 && pendingTransfers.length === 0) return
+    // Незакоммиченный черновик перевода сохраняем вместе с чек-ином.
+    const allPending = draftTransfer ? [...pendingTransfers, draftTransfer] : pendingTransfers
+    const transfersToSave = allPending
+      .map((t) => parsePendingTransfer(t))
+      .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
+
+    if (typed.length === 0 && transfersToSave.length === 0) return
 
     // For create: need at least some lines — use typed or carry forward for pending-transfer-only
     let lines = typed
-    if (lines.length === 0 && pendingTransfers.length > 0) {
+    if (lines.length === 0 && transfersToSave.length > 0) {
       lines = formAccounts
         .map((account) => {
           const prev = balanceOnDate(account.id, date, snapshots)
@@ -327,24 +342,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       lines,
     })
 
-    for (const pt of pendingTransfers) {
-      const value = parseMoneyInput(pt.amount)
-      if (
-        value == null ||
-        value <= 0 ||
-        !pt.fromAccountId ||
-        !pt.toAccountId ||
-        pt.fromAccountId === pt.toAccountId
-      ) {
-        continue
-      }
-      await addTransfer({
-        date,
-        fromAccountId: pt.fromAccountId,
-        toAccountId: pt.toAccountId,
-        amount: value,
-        note: pt.note.trim() || undefined,
-      })
+    for (const transfer of transfersToSave) {
+      await addTransfer({ date, ...transfer })
     }
 
     onClose()
@@ -361,7 +360,9 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     ? true
     : editing
       ? true
-      : typedLines().length > 0 || pendingTransfers.length > 0
+      : typedLines().length > 0 ||
+        pendingTransfers.length > 0 ||
+        (draftTransfer != null && parsePendingTransfer(draftTransfer) != null)
 
   return (
     <StackPanel
