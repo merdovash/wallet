@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
@@ -8,7 +8,7 @@ import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
-import { Button, DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { Button, DateInput, Input, MoneyInput, Select } from '../ui/FormControls'
 import { StackPanel } from '../ui/StackPanel'
 
 interface CheckInPanelProps {
@@ -23,6 +23,26 @@ function formatHintAmount(amount: number): string {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   })
+}
+
+/** Компактная строка формы: подпись и контрол на одной линии. */
+function InlineRow({
+  label,
+  children,
+  className = '',
+}: {
+  label: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <label className={`flex min-w-0 max-w-full items-center gap-2 ${className}`}>
+      <span className="w-24 shrink-0 text-sm font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </span>
+      <span className="min-w-0 flex-1">{children}</span>
+    </label>
+  )
 }
 
 type PendingTransfer = {
@@ -83,6 +103,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
   const [draftTransfer, setDraftTransfer] = useState<PendingTransfer | null>(null)
   const [incomeManual, setIncomeManual] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
 
   useEffect(() => {
@@ -104,6 +125,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     setAmounts({})
     setPendingTransfers([])
     setDraftTransfer(null)
+    setShowHelp(false)
   }, [open, editing])
 
   const dateTransfers = useMemo(
@@ -353,16 +375,51 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       }
       onClose={onClose}
       headerActions={
-        <Button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={formAccounts.length === 0 || !canSave}
-        >
-          Сохранить
-        </Button>
+        <>
+          <button
+            type="button"
+            title="Справка"
+            aria-label="Справка"
+            aria-pressed={showHelp}
+            onClick={() => setShowHelp((v) => !v)}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
+              showHelp
+                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-400'
+                : 'border-slate-300 text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            ?
+          </button>
+          <Button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={formAccounts.length === 0 || !canSave}
+          >
+            Сохранить
+          </Button>
+        </>
       }
     >
       <div ref={rootRef} className="space-y-4">
+        {showHelp && (
+          <div className="space-y-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+            <p>
+              Доход и расход — внешние поступления и траты за день в базовой валюте. Они не
+              считаются приростом и нужны для корректных процентов.
+            </p>
+            <p>
+              Доход подставляется автоматически по дельте неинвестиционных счетов (оперативные /
+              наличка / кредитки, с учётом переводов), пока вы не введёте его вручную.
+            </p>
+            <p>
+              Серым в полях счетов — текущий остаток. Введите новое значение только для
+              изменившихся счетов; пустое поле оставляет остаток без изменений. Для кредитки —
+              доступный остаток лимита.
+            </p>
+            <p>Укажите переводы между счетами за день, чтобы они не считались приростом.</p>
+          </div>
+        )}
+
         {locked && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             <p className="font-medium">Чек-ин создан переводом</p>
@@ -377,56 +434,57 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           </div>
         )}
 
-        <Field label="Дата">
-          <DateInput
-            value={date}
-            onChange={setDate}
-            disabled={locked}
-            {...focusKeyProps('date')}
-          />
-        </Field>
-        <Field label="Комментарий">
-          <Input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Необязательно"
-            {...focusKeyProps('note')}
-          />
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Доход за день (базовая валюта)">
-            <MoneyInput
-              value={income}
-              onChange={(value) => {
-                setIncomeManual(true)
-                setIncome(value)
-              }}
-              allowNegative={false}
-              placeholder="0"
-              {...focusKeyProps('income')}
+        <div className="space-y-2">
+          <InlineRow label="Дата">
+            <DateInput
+              value={date}
+              onChange={setDate}
+              disabled={locked}
+              {...focusKeyProps('date')}
             />
-          </Field>
-          <Field label="Расход за день (базовая валюта)">
-            <MoneyInput
-              value={expense}
-              onChange={(value) => {
-                setIncomeManual(true)
-                setExpense(value)
-              }}
-              allowNegative={false}
-              placeholder="0"
-              {...focusKeyProps('expense')}
+          </InlineRow>
+          <InlineRow label="Комментарий">
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Необязательно"
+              {...focusKeyProps('note')}
             />
-          </Field>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Внешние доходы и расходы не считаются приростом — нужны для корректных процентов.
-          {!locked && suggestedCashflow.hasPrevious && !incomeManual
-            ? ' Доход подставляется автоматически по дельте неинвестиционных счетов (оперативные / наличка / кредитки, с учётом переводов).'
-            : null}
-          {!locked && incomeManual && suggestedCashflow.hasPrevious ? (
-            <>
-              {' '}
+          </InlineRow>
+          <div className="flex items-center gap-3">
+            <label className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0 text-sm font-medium text-slate-700 dark:text-slate-300">
+                Доход
+              </span>
+              <MoneyInput
+                value={income}
+                onChange={(value) => {
+                  setIncomeManual(true)
+                  setIncome(value)
+                }}
+                allowNegative={false}
+                placeholder="0"
+                {...focusKeyProps('income')}
+              />
+            </label>
+            <label className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0 text-sm font-medium text-slate-700 dark:text-slate-300">
+                Расход
+              </span>
+              <MoneyInput
+                value={expense}
+                onChange={(value) => {
+                  setIncomeManual(true)
+                  setExpense(value)
+                }}
+                allowNegative={false}
+                placeholder="0"
+                {...focusKeyProps('expense')}
+              />
+            </label>
+          </div>
+          {!locked && incomeManual && suggestedCashflow.hasPrevious && (
+            <p className="text-xs">
               <button
                 type="button"
                 className="text-blue-600 hover:underline"
@@ -434,53 +492,57 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
               >
                 Вернуть автозаполнение дохода
               </button>
-            </>
-          ) : null}
-        </p>
-
-        {!locked && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Серым — текущий остаток. Введите новое значение только для изменившихся счетов;
-            пустое поле оставляет остаток без изменений. Для кредитки — доступный остаток
-            лимита.
-          </p>
-        )}
+            </p>
+          )}
+        </div>
 
         {formAccounts.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">Сначала добавьте хотя бы один счёт.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {formAccounts.map((account) => {
               const typed = amounts[account.id] ?? ''
-              const creditHint =
+              const noteParts = [
+                account.kind === 'credit' ? 'остаток лимита' : null,
                 account.kind === 'credit' && account.creditLimit != null
-                  ? ` · лимит ${formatHintAmount(account.creditLimit)}`
-                  : ''
+                  ? `лимит ${formatHintAmount(account.creditLimit)}`
+                  : null,
+                account.archived ? 'архив' : null,
+              ].filter((p): p is string => p != null)
               return (
-                <Field
-                  key={account.id}
-                  label={`${account.name} (${account.currency})${
-                    account.kind === 'credit' ? ' · остаток лимита' : ''
-                  }${creditHint}${account.archived ? ' · архив' : ''}`}
-                >
-                  {locked ? (
-                    <Input
-                      value={hints[account.id] ?? '0'}
-                      disabled
-                      readOnly
-                      className="bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300"
-                    />
-                  ) : (
-                    <MoneyInput
-                      value={typed}
-                      onChange={(value) =>
-                        setAmounts((prev) => ({ ...prev, [account.id]: value }))
-                      }
-                      placeholder={hints[account.id] ?? '0'}
-                      {...focusKeyProps(`amount-${account.id}`)}
-                    />
+                <label key={account.id} className="block min-w-0 max-w-full">
+                  <span className="flex items-center gap-2">
+                    <span className="w-10 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                      {account.currency}
+                    </span>
+                    {locked ? (
+                      <Input
+                        value={hints[account.id] ?? '0'}
+                        disabled
+                        readOnly
+                        className="w-32 shrink-0 sm:w-40 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300"
+                      />
+                    ) : (
+                      <MoneyInput
+                        value={typed}
+                        onChange={(value) =>
+                          setAmounts((prev) => ({ ...prev, [account.id]: value }))
+                        }
+                        placeholder={hints[account.id] ?? '0'}
+                        className="w-32 shrink-0 sm:w-40"
+                        {...focusKeyProps(`amount-${account.id}`)}
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {account.name}
+                    </span>
+                  </span>
+                  {noteParts.length > 0 && (
+                    <span className="mt-0.5 block pl-12 text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+                      {noteParts.join(' · ')}
+                    </span>
                   )}
-                </Field>
+                </label>
               )
             })}
           </div>
@@ -488,7 +550,6 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
 
         {!locked && (
           <TransfersSection
-            date={date}
             accounts={activeAccounts}
             savedTransfers={dateTransfers}
             pendingTransfers={pendingTransfers}
@@ -516,7 +577,6 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
 }
 
 function TransfersSection({
-  date,
   accounts,
   savedTransfers,
   pendingTransfers,
@@ -529,7 +589,6 @@ function TransfersSection({
   onRemovePending,
   onDeleteSaved,
 }: {
-  date: string
   accounts: Account[]
   savedTransfers: Transfer[]
   pendingTransfers: PendingTransfer[]
@@ -554,10 +613,6 @@ function TransfersSection({
           </Button>
         )}
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
-        Укажите переводы между счетами на {date || '…'}, чтобы они не считались приростом.
-      </p>
-
       {savedTransfers.length === 0 && pendingTransfers.length === 0 && !draft && (
         <p className="text-sm text-slate-500 dark:text-slate-400">Переводов нет</p>
       )}
@@ -612,8 +667,8 @@ function TransfersSection({
       </ul>
 
       {draft && (
-        <div className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-          <Field label="Откуда">
+        <div className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+          <InlineRow label="Откуда">
             <Select
               value={draft.fromAccountId}
               onChange={(e) => onDraftChange({ ...draft, fromAccountId: e.target.value })}
@@ -624,8 +679,8 @@ function TransfersSection({
                 </option>
               ))}
             </Select>
-          </Field>
-          <Field label="Куда">
+          </InlineRow>
+          <InlineRow label="Куда">
             <Select
               value={draft.toAccountId}
               onChange={(e) => onDraftChange({ ...draft, toAccountId: e.target.value })}
@@ -636,9 +691,9 @@ function TransfersSection({
                 </option>
               ))}
             </Select>
-          </Field>
-          <Field
-            label={`Сумма (${accountMap.get(draft.fromAccountId)?.currency ?? ''})`}
+          </InlineRow>
+          <InlineRow
+            label={`Сумма, ${accountMap.get(draft.fromAccountId)?.currency ?? ''}`}
           >
             <MoneyInput
               value={draft.amount}
@@ -647,16 +702,16 @@ function TransfersSection({
               placeholder="0"
               {...focusKeyProps('transfer-amount')}
             />
-          </Field>
-          <Field label="Комментарий">
+          </InlineRow>
+          <InlineRow label="Комментарий">
             <Input
               value={draft.note}
               onChange={(e) => onDraftChange({ ...draft, note: e.target.value })}
               placeholder="Необязательно"
               {...focusKeyProps('transfer-note')}
             />
-          </Field>
-          <div className="flex gap-2">
+          </InlineRow>
+          <div className="flex gap-2 pt-1">
             <Button type="button" onClick={onCommitDraft}>
               Добавить перевод
             </Button>
