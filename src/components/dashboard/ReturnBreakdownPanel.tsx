@@ -137,6 +137,10 @@ function GrowthMovementsView({
         />
       </dl>
 
+      {periodReturn.growthFx ? (
+        <GrowthFxSection breakdown={periodReturn.growthFx} currency={currency} />
+      ) : null}
+
       <div>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           По счетам
@@ -192,6 +196,64 @@ function GrowthMovementsView({
         transfers={periodReturn.transferMovements}
         currency={currency}
       />
+    </div>
+  )
+}
+
+function GrowthFxSection({
+  breakdown,
+  currency,
+}: {
+  breakdown: NonNullable<PeriodReturnSummary['growthFx']>
+  currency: string
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        Заработано vs курс
+      </h3>
+      <dl className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+        <Row
+          label="Заработано в валютах счетов"
+          value={signedAmount(breakdown.quantityEffectBase, currency)}
+          valueClassName={tone(breakdown.quantityEffectBase)}
+          hint="прирост в валюте счёта × курс на конец периода"
+          emphasize
+        />
+        <Row
+          label="Курсовой эффект"
+          value={signedAmount(breakdown.fxEffectBase, currency)}
+          valueClassName={tone(breakdown.fxEffectBase)}
+          hint="начальный остаток × (курс_конец − курс_начало)"
+          emphasize
+        />
+        {Math.abs(breakdown.transferTimingBase) >= 0.01 ? (
+          <Row
+            label="Даты переводов"
+            value={signedAmount(breakdown.transferTimingBase, currency)}
+            valueClassName={tone(breakdown.transferTimingBase)}
+            hint="разница курсов переводов и конца периода"
+          />
+        ) : null}
+      </dl>
+      {breakdown.accounts.some((a) => a.currency !== currency && Math.abs(a.fxEffectBase) > 0.01) ? (
+        <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+          {breakdown.accounts
+            .filter((a) => Math.abs(a.growthBase) > 0.001 || Math.abs(a.fxEffectBase) > 0.001)
+            .map((acc) => (
+              <li key={acc.accountId} className="px-3 py-2 text-xs">
+                <div className="flex justify-between gap-3 font-medium text-slate-900 dark:text-slate-100">
+                  <span className="truncate">{acc.name}</span>
+                  <span className="shrink-0 tabular-nums">{signedAmount(acc.growthBase, currency)}</span>
+                </div>
+                <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>в валюте: {signedAmount(acc.quantityEffectBase, currency)}</span>
+                  <span>курс: {signedAmount(acc.fxEffectBase, currency)}</span>
+                </div>
+              </li>
+            ))}
+        </ul>
+      ) : null}
     </div>
   )
 }

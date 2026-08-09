@@ -22,8 +22,9 @@ import {
   isGrowthPortfolioAccount,
   normalizeAccountKind,
 } from './accountKinds'
-import { toBase } from './currency'
+import { buildGrowthFxBreakdown, type GrowthFxBreakdown } from './growthFxBreakdown'
 import { resolvePivotForDate } from './cbrRates'
+import { toBase } from './currency'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 export interface MonthlyReturnRow {
@@ -106,6 +107,8 @@ export interface PeriodReturnSummary {
   transferMovements: PeriodReturnTransferLine[]
   includedAccounts: PeriodReturnAccountLine[]
   excludedAccounts: PeriodReturnAccountLine[]
+  /** Growth split: native earnings vs FX on opening balances. */
+  growthFx: GrowthFxBreakdown | null
 }
 
 const MONTH_LABELS = [
@@ -416,6 +419,17 @@ export function buildPeriodReturn(
     (a, b) => a.date.localeCompare(b.date) || a.fromName.localeCompare(b.fromName),
   )
 
+  const growthFx = buildGrowthFxBreakdown(
+    includedAccounts,
+    accounts,
+    snapshots,
+    transfers,
+    settings,
+    startDate,
+    endDate,
+    rateBook,
+  )
+
   return {
     startDate,
     endDate,
@@ -436,6 +450,7 @@ export function buildPeriodReturn(
     transferMovements,
     includedAccounts,
     excludedAccounts,
+    growthFx,
   }
 }
 
