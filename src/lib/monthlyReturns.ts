@@ -22,6 +22,7 @@ import {
 import { buildGrowthFxBreakdown, type GrowthFxBreakdown } from './growthFxBreakdown'
 import { buildReturnBenchmarks, type ReturnBenchmarks } from './returnBenchmarks'
 import { realAnnualizedReturn } from './realReturn'
+import { buildTimeWeightedReturn, type TwrSubPeriod } from './twrReturn'
 import { resolvePivotForDate } from './cbrRates'
 import { toBase } from './currency'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
@@ -112,6 +113,10 @@ export interface PeriodReturnSummary {
   growthFx: GrowthFxBreakdown | null
   /** Comparison with key rate and USD change. */
   benchmarks: ReturnBenchmarks
+  /** Time-weighted return chained between check-ins. */
+  twrPct: number | null
+  twrAnnualizedPct: number | null
+  twrSubPeriods: TwrSubPeriod[]
 }
 
 const MONTH_LABELS = [
@@ -446,6 +451,18 @@ export function buildPeriodReturn(
     rateBook,
   )
 
+  const { twrPct, subPeriods: twrSubPeriods } = buildTimeWeightedReturn(
+    accounts,
+    snapshots,
+    settings,
+    rateBook,
+    transfers,
+    startDate,
+    endDate,
+  )
+  const twrAnnualizedPct =
+    twrPct == null || days <= 0 ? null : annualizePeriodReturn(twrPct, days)
+
   return {
     startDate,
     endDate,
@@ -468,6 +485,9 @@ export function buildPeriodReturn(
     excludedAccounts,
     growthFx,
     benchmarks,
+    twrPct,
+    twrAnnualizedPct,
+    twrSubPeriods,
   }
 }
 

@@ -375,7 +375,13 @@ function PercentBreakdownView({
         <Row
           label="Прирост %"
           value={formatPercent(periodReturn.growthPct)}
-          hint="прирост ÷ взвешенный капитал портфеля"
+          hint="прирост ÷ взвешенный капитал портфеля (Modified Dietz)"
+          emphasize={focus === 'growthPct'}
+        />
+        <Row
+          label="TWR"
+          value={formatPercent(periodReturn.twrPct)}
+          hint="∏(1+rᵢ)−1 по под-периодам между чек-инами"
           emphasize={focus === 'growthPct'}
         />
         <Row
@@ -384,6 +390,16 @@ function PercentBreakdownView({
           hint={
             periodReturn.days > 0
               ? `(1 + прирост%) ^ (365 ÷ ${periodReturn.days}) − 1`
+              : undefined
+          }
+          emphasize={focus === 'annualizedPct'}
+        />
+        <Row
+          label="TWR, в годовых"
+          value={formatPercent(periodReturn.twrAnnualizedPct)}
+          hint={
+            periodReturn.days > 0
+              ? `(1 + TWR) ^ (365 ÷ ${periodReturn.days}) − 1`
               : undefined
           }
           emphasize={focus === 'annualizedPct'}
@@ -425,6 +441,10 @@ function PercentBreakdownView({
           benchmarks={periodReturn.benchmarks}
           days={periodReturn.days}
         />
+      ) : null}
+
+      {focus === 'growthPct' && periodReturn.twrSubPeriods.length > 0 ? (
+        <TwrSubPeriodsSection subPeriods={periodReturn.twrSubPeriods} currency={currency} />
       ) : null}
 
       {periodReturn.flows.length > 0 ? (
@@ -631,6 +651,43 @@ function FormulaBlock({ title, lines }: { title: string; lines: string[] }) {
       <ul className="mt-2 space-y-1 font-mono text-xs text-slate-700 dark:text-slate-300">
         {lines.map((line) => (
           <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function TwrSubPeriodsSection({
+  subPeriods,
+  currency,
+}: {
+  subPeriods: PeriodReturnSummary['twrSubPeriods']
+  currency: string
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        TWR по чек-инам
+      </h3>
+      <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+        {subPeriods.map((sp) => (
+          <li key={`${sp.startDate}-${sp.endDate}`} className="px-3 py-2 text-xs">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block font-medium text-slate-900 dark:text-slate-100">
+                  {formatDateDisplay(sp.startDate)} → {formatDateDisplay(sp.endDate)}
+                </span>
+                {Math.abs(sp.netFlow) >= 0.01 ? (
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    поток {signedAmount(sp.netFlow, currency)}
+                  </span>
+                ) : null}
+              </span>
+              <span className={`shrink-0 font-medium tabular-nums ${tone(sp.subReturnPct ?? 0)}`}>
+                {formatPercent(sp.subReturnPct)}
+              </span>
+            </div>
+          </li>
         ))}
       </ul>
     </div>
