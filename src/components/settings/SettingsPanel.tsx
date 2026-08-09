@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { resolvePivotForDate } from '../../lib/cbrRates'
 import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
 import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
+import {
+  formatInflationPercentInput,
+  parseInflationPercentInput,
+} from '../../lib/realReturn'
 import { useTheme } from '../../lib/useTheme'
 import type { ThemeMode } from '../../lib/theme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { Button, Card, Field, Select } from '../ui/FormControls'
+import { Button, Card, Field, Input, Select } from '../ui/FormControls'
 import { RatesRegistryPanel } from './RatesRegistryPanel'
 
 export function SettingsPanel() {
@@ -22,6 +26,13 @@ export function SettingsPanel() {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const refreshDate = useRatesStore((s) => s.refreshDate)
   const [registryOpen, setRegistryOpen] = useState(false)
+  const [inflationText, setInflationText] = useState(() =>
+    formatInflationPercentInput(settings.annualInflationPct),
+  )
+
+  useEffect(() => {
+    setInflationText(formatInflationPercentInput(settings.annualInflationPct))
+  }, [settings.annualInflationPct])
 
   const today = todayIsoDate()
   const pivot = useMemo(() => resolvePivotForDate(today, byDate), [byDate, today])
@@ -83,6 +94,22 @@ export function SettingsPanel() {
               </option>
             ))}
           </Select>
+        </Field>
+        <Field label="Годовая инфляция, %">
+          <Input
+            type="text"
+            inputMode="decimal"
+            placeholder="например 8"
+            value={inflationText}
+            onChange={(e) => setInflationText(e.target.value)}
+            onBlur={() => {
+              const parsed = parseInflationPercentInput(inflationText)
+              void setSettings({ annualInflationPct: parsed })
+            }}
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Для виджета «Реальных годовых» на дашборде: (1 + номинал) / (1 + инфляция) − 1
+          </p>
         </Field>
       </Card>
 

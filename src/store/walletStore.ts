@@ -187,7 +187,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
       }
       set({
-        settings: withFallbackRates(bundle.settings.baseCurrency),
+        settings: withFallbackRates(bundle.settings),
         accounts: bundle.accounts.map(normalizeAccount),
         snapshots: bundle.snapshots.map(normalizeSnapshot),
         transfers: bundle.transfers,
@@ -204,10 +204,15 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   },
 
   setSettings: async (patch) => {
-    if (patch.baseCurrency) {
-      const settings = await patchSettings(patch.baseCurrency)
-      set({ settings })
-    }
+    const current = get().settings
+    const settings = await patchSettings({
+      baseCurrency: patch.baseCurrency ?? current.baseCurrency,
+      annualInflationPct:
+        patch.annualInflationPct !== undefined
+          ? patch.annualInflationPct
+          : current.annualInflationPct,
+    })
+    set({ settings })
   },
 
   addAccount: async (input) => {

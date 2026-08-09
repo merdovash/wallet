@@ -33,6 +33,7 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         : 'text-slate-800 dark:text-slate-200'
 
   const allMassAnnualized = periodReturn?.annualizedPctOfAllMass
+  const realAnnualized = periodReturn?.realAnnualizedPct
   const allMassColor =
     (allMassAnnualized ?? 0) > 0
       ? 'text-emerald-700'
@@ -40,9 +41,16 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
 
+  const realColor =
+    (realAnnualized ?? 0) > 0
+      ? 'text-emerald-700'
+      : (realAnnualized ?? 0) < 0
+        ? 'text-red-600'
+        : 'text-slate-800 dark:text-slate-200'
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
         <Card className="!p-2.5 sm:!p-3">
           <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Остаток</p>
           <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
@@ -120,6 +128,13 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
             <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">прирост ÷ вся масса</p>
           </Card>
         </button>
+        <Card className="!p-2.5 sm:!p-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Реальных годовых</p>
+          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${realColor}`}>
+            {formatPercent(realAnnualized)}
+          </p>
+          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">за вычетом инфляции</p>
+        </Card>
       </div>
 
       <ReturnBreakdownPanel

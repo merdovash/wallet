@@ -9,6 +9,7 @@ import {
   type RateBook,
 } from '../engine/growthEngine'
 import { annualizePeriodReturn, MIN_ANNUALIZE_DAYS } from './monthlyReturns'
+import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 export interface AccountPeriodReturn {
   startDate: string
@@ -52,10 +53,10 @@ function accountCapitalFlows(
       )
       byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) - amountBase)
     }
-    if (transfer.toAccountId === accountId && from) {
+    if (transfer.toAccountId === accountId && to) {
       const amountBase = convertAmount(
         transfer.amount,
-        from.currency,
+        to.currency,
         settings.baseCurrency,
         settings,
         transfer.date,
@@ -73,7 +74,7 @@ function accountCapitalFlows(
 function firstSnapshotDateForAccount(accountId: string, snapshots: BalanceSnapshot[]): string | null {
   const dates = snapshotDates(snapshots)
   for (const date of dates) {
-    if (snapshots.some((snap) => snap.date === date && snap.lines.some((l) => l.accountId === accountId))) {
+    if (snapshots.some((snap) => snap.date === date && snap.lines.some((l: { accountId: string }) => l.accountId === accountId))) {
       return date
     }
   }

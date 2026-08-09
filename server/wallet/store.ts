@@ -62,6 +62,18 @@ export interface DbTransfer {
 
 export interface DbSettings {
   baseCurrency: string
+  /** Decimal fraction, e.g. 0.08 for 8% annual inflation. */
+  annualInflationPct: number | null
+}
+
+function mapSettings(row: { base_currency: string; annual_inflation_pct: number | null }): DbSettings {
+  return {
+    baseCurrency: String(row.base_currency ?? 'RUB'),
+    annualInflationPct:
+      row.annual_inflation_pct == null || !Number.isFinite(Number(row.annual_inflation_pct))
+        ? null
+        : Number(row.annual_inflation_pct),
+  }
 }
 
 export interface WalletBundle {
@@ -142,26 +154,32 @@ export async function ensureUserSettings(userId: string): Promise<DbSettings> {
      ON CONFLICT (user_id) DO NOTHING`,
     [userId],
   )
-  const result = await pool.query<{ base_currency: string }>(
-    `SELECT base_currency FROM wallet_settings WHERE user_id = $1`,
+  const result = await pool.query<{ base_currency: string; annual_inflation_pct: number | null }>(
+    `SELECT base_currency, annual_inflation_pct FROM wallet_settings WHERE user_id = $1`,
     [userId],
   )
-  return { baseCurrency: String(result.rows[0]?.base_currency ?? 'RUB') }
+  return mapSettings(result.rows[0] ?? { base_currency: 'RUB', annual_inflation_pct: null })
 }
 
 export async function updateSettings(
   userId: string,
-  baseCurrency: string,
+  patch: { baseCurrency?: string; annualInflationPct?: number | null },
 ): Promise<DbSettings> {
+  const current = await ensureUserSettings(userId)
+  const baseCurrency = patch.baseCurrency?.toUpperCase() ?? current.baseCurrency
+  const annualInflationPct =
+    patch.annualInflationPct !== undefined ? patch.annualInflationPct : current.annualInflationPct
   const pool = getPool()
   await pool.query(
-    `INSERT INTO wallet_settings (user_id, base_currency, updated_at)
-     VALUES ($1, $2, now())
+    `INSERT INTO wallet_settings (user_id, base_currency, annual_inflation_pct, updated_at)
+     VALUES ($1, $2, $3, now())
      ON CONFLICT (user_id) DO UPDATE
-     SET base_currency = EXCLUDED.base_currency, updated_at = now()`,
-    [userId, baseCurrency],
+     SET base_currency = EXCLUDED.base_currency,
+         annual_inflation_pct = EXCLUDED.annual_inflation_pct,
+         updated_at = now()`,
+    [userId, baseCurrency, annualInflationPct],
   )
-  return { baseCurrency }
+  return { baseCurrency, annualInflationPct }
 }
 
 export async function listAccounts(userId: string): Promise<DbAccount[]> {

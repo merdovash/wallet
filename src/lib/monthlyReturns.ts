@@ -1,6 +1,5 @@
 import {
   accountGrowthBase,
-  balanceOnDate,
   convertAmount,
   effectiveBalanceOnDate,
   growthCapitalFlows,
@@ -16,13 +15,12 @@ import {
 } from '../engine/growthEngine'
 import {
   accountKindLabel,
-  growthAccounts,
   growthPortfolioAccounts,
-  isGrowthAccount,
   isGrowthPortfolioAccount,
   normalizeAccountKind,
 } from './accountKinds'
 import { buildGrowthFxBreakdown, type GrowthFxBreakdown } from './growthFxBreakdown'
+import { realAnnualizedReturn } from './realReturn'
 import { resolvePivotForDate } from './cbrRates'
 import { toBase } from './currency'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
@@ -94,6 +92,8 @@ export interface PeriodReturnSummary {
   growth: number
   growthPct: number | null
   annualizedPct: number | null
+  /** (1 + годовых) / (1 + инфляция) − 1 */
+  realAnnualizedPct: number | null
   /** All-accounts net worth at period start (base currency). */
   startTotalAllMass: number
   /** Growth ÷ all-money start total (period). */
@@ -312,6 +312,10 @@ export function buildPeriodReturn(
       ? null
       : annualizePeriodReturn(growthPctOfAllMass, days)
 
+  const annualizedPct =
+    growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
+  const realAnnualizedPct = realAnnualizedReturn(annualizedPct, settings.annualInflationPct)
+
   const startPivot =
     (rateBook ? resolvePivotForDate(startDate, rateBook) : null) ??
     (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
@@ -440,8 +444,8 @@ export function buildPeriodReturn(
     weightedCapital,
     growth,
     growthPct,
-    annualizedPct:
-      growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days),
+    annualizedPct,
+    realAnnualizedPct,
     startTotalAllMass,
     growthPctOfAllMass,
     annualizedPctOfAllMass,

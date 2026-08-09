@@ -81,6 +81,8 @@ export interface WalletSettings {
   baseCurrency: string
   /** Rates to base currency. Base itself is always 1. */
   exchangeRates: ExchangeRates
+  /** Expected annual inflation as decimal (0.08 = 8%). */
+  annualInflationPct?: number | null
 }
 
 export const ACCOUNT_COLORS = [

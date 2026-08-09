@@ -35,12 +35,26 @@ export async function handleWalletApi(
     }
 
     if (pathname === '/api/wallet/settings' && method === 'PATCH') {
-      const body = await readJsonBody<{ baseCurrency?: string }>(req)
-      if (!body.baseCurrency || !/^[A-Z]{3,8}$/i.test(body.baseCurrency)) {
-        sendJson(res, 400, { error: 'Укажите baseCurrency' })
+      const body = await readJsonBody<{ baseCurrency?: string; annualInflationPct?: number | null }>(req)
+      if (body.baseCurrency != null && !/^[A-Z]{3,8}$/i.test(body.baseCurrency)) {
+        sendJson(res, 400, { error: 'Некорректный baseCurrency' })
         return true
       }
-      const settings = await store.updateSettings(user.id, body.baseCurrency.toUpperCase())
+      if (body.baseCurrency == null && body.annualInflationPct === undefined) {
+        sendJson(res, 400, { error: 'Нечего обновлять' })
+        return true
+      }
+      let annualInflationPct: number | null | undefined = body.annualInflationPct
+      if (annualInflationPct !== undefined && annualInflationPct != null) {
+        if (!Number.isFinite(annualInflationPct) || annualInflationPct < -0.99 || annualInflationPct > 10) {
+          sendJson(res, 400, { error: 'annualInflationPct вне допустимого диапазона' })
+          return true
+        }
+      }
+      const settings = await store.updateSettings(user.id, {
+        baseCurrency: body.baseCurrency?.toUpperCase(),
+        annualInflationPct,
+      })
       sendJson(res, 200, { settings })
       return true
     }

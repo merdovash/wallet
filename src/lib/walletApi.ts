@@ -9,7 +9,7 @@ import type {
 import { DEFAULT_SETTINGS } from '../types/wallet'
 
 export interface WalletBundle {
-  settings: { baseCurrency: string }
+  settings: { baseCurrency: string; annualInflationPct?: number | null }
   accounts: Account[]
   snapshots: BalanceSnapshot[]
   transfers: Transfer[]
@@ -37,26 +37,34 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export function withFallbackRates(baseCurrency: string): WalletSettings {
+export function withFallbackRates(settings: {
+  baseCurrency: string
+  annualInflationPct?: number | null
+}): WalletSettings {
   return {
-    baseCurrency,
+    baseCurrency: settings.baseCurrency,
+    annualInflationPct: settings.annualInflationPct ?? null,
     exchangeRates: {
       ...DEFAULT_SETTINGS.exchangeRates,
-      [baseCurrency]: 1,
+      [settings.baseCurrency]: 1,
     },
   }
 }
 
+export async function patchSettings(patch: {
+  baseCurrency?: string
+  annualInflationPct?: number | null
+}): Promise<WalletSettings> {
+  const body = await api<{
+    settings: { baseCurrency: string; annualInflationPct?: number | null }
+  }>('/api/wallet/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return withFallbackRates(body.settings)
+}
 export async function fetchWallet(): Promise<WalletBundle> {
   return api<WalletBundle>('/api/wallet')
-}
-
-export async function patchSettings(baseCurrency: string): Promise<WalletSettings> {
-  const body = await api<{ settings: { baseCurrency: string } }>('/api/wallet/settings', {
-    method: 'PATCH',
-    body: JSON.stringify({ baseCurrency }),
-  })
-  return withFallbackRates(body.settings.baseCurrency)
 }
 
 export async function createAccountApi(
