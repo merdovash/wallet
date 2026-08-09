@@ -13,6 +13,7 @@ import {
 } from '../../lib/dashboardPeriod'
 import { formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { buildPeriodReturn } from '../../lib/monthlyReturns'
+import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
@@ -20,6 +21,7 @@ import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
 import { GrowthChart } from './GrowthChart'
+import { PersonalCoefficientsPanel } from './PersonalCoefficientsPanel'
 import { SummaryCards } from './SummaryCards'
 
 interface DashboardProps {
@@ -74,6 +76,19 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     return periodGrowth(accounts, snapshots, settings, rateBook, transfers)
   }, [periodReturn, range, series, accounts, snapshots, settings, rateBook, transfers])
 
+  const personalCoefficients = useMemo(() => {
+    if (!periodReturn) return null
+    return buildPersonalCoefficients(
+      accounts,
+      snapshots,
+      settings,
+      rateBook,
+      periodReturn.startDate,
+      periodReturn.endDate,
+      periodReturn.netFlow,
+    )
+  }, [accounts, snapshots, settings, rateBook, periodReturn])
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -118,6 +133,16 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         growth={growth}
         currency={settings.baseCurrency}
         periodReturn={periodReturn}
+      />
+
+      <PersonalCoefficientsPanel
+        coefficients={personalCoefficients}
+        currency={settings.baseCurrency}
+        periodLabel={
+          periodReturn
+            ? `${formatDateDisplay(periodReturn.startDate)} → ${formatDateDisplay(periodReturn.endDate)}`
+            : undefined
+        }
       />
 
       <CreditFloatSummary />
