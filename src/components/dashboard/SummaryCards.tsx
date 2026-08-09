@@ -26,6 +26,10 @@ type BreakdownFocus =
   | 'topUp'
   | null
 
+const cardClass = '!p-2'
+const labelClass = 'text-[10px] leading-tight text-slate-500 dark:text-slate-400'
+const valueClass = 'mt-0.5 text-sm font-semibold tabular-nums leading-tight'
+
 export function SummaryCards({
   total,
   growth,
@@ -65,98 +69,72 @@ export function SummaryCards({
   const allMassReason = explainAnnualizedPctOfAllMass(periodReturn)
   const realReason = explainRealAnnualizedPct(periodReturn, annualInflationPct)
 
+  const clickCardClass =
+    'rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400'
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
-        <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Остаток</p>
-          <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
+      <div className="grid grid-cols-2 gap-1.5">
+        <Card className={cardClass}>
+          <p className={labelClass}>Остаток</p>
+          <p className={`${valueClass} text-slate-900 dark:text-slate-100`}>
             {formatCurrency(total, currency)}
           </p>
-          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">все счета · чистая стоимость</p>
         </Card>
-        <button
-          type="button"
-          onClick={() => setBreakdownFocus('growth')}
-          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Показать расшифровку прироста"
-        >
-          <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост</p>
-            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${growthColor}`}>
-              {signedAmount(growth, currency)}
-            </p>
-            <p className="mt-1 text-[10px] text-blue-600">портфель роста · как считается</p>
+        <button type="button" onClick={() => setBreakdownFocus('growth')} className={clickCardClass}>
+          <Card className={cardClass}>
+            <p className={labelClass}>Прирост</p>
+            <p className={`${valueClass} ${growthColor}`}>{signedAmount(growth, currency)}</p>
           </Card>
         </button>
-        <button
-          type="button"
-          onClick={() => setBreakdownFocus('topUp')}
-          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Показать расшифровку чистого потока"
-        >
-          <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Чистый поток</p>
-            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${topUpColor}`}>
+        <button type="button" onClick={() => setBreakdownFocus('topUp')} className={clickCardClass}>
+          <Card className={cardClass}>
+            <p className={labelClass}>Чистый поток</p>
+            <p className={`${valueClass} ${topUpColor}`}>
               {periodReturn ? signedAmount(topUp, currency) : '—'}
             </p>
-            <p className="mt-1 text-[10px] text-blue-600">как считается</p>
           </Card>
         </button>
-        <button
-          type="button"
-          onClick={() => setBreakdownFocus('growthPct')}
-          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Прирост % только по фондам, вкладам и инвестициям"
-        >
-          <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост %</p>
-            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
-              {formatPercent(periodReturn?.growthPct)}
-            </p>
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонды · вклады · инвестиции</p>
+        <button type="button" onClick={() => setBreakdownFocus('growthPct')} className={clickCardClass}>
+          <Card className={cardClass}>
+            <p className={labelClass}>Прирост %</p>
+            <p className={`${valueClass} ${pctColor}`}>{formatPercent(periodReturn?.growthPct)}</p>
           </Card>
         </button>
-        <button
-          type="button"
-          onClick={() => setBreakdownFocus('annualizedPct')}
-          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Годовые % только по фондам, вкладам и инвестициям"
-        >
-          <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
+        <button type="button" onClick={() => setBreakdownFocus('annualizedPct')} className={clickCardClass}>
+          <Card className={cardClass}>
+            <p className={labelClass}>В годовых</p>
             <AnnualizedMetric
               value={periodReturn?.annualizedPct}
               unavailableReason={annualizedReason}
               valueClassName={pctColor}
+              compact
             />
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонды · вклады · инвестиции</p>
           </Card>
         </button>
         <button
           type="button"
           onClick={() => setBreakdownFocus('annualizedPctOfAllMass')}
-          className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          title="Годовой прирост % от всей массы денег"
+          className={clickCardClass}
         >
-          <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Годовых от массы</p>
+          <Card className={cardClass}>
+            <p className={labelClass}>Годовых от массы</p>
             <AnnualizedMetric
               value={allMassAnnualized}
               unavailableReason={allMassReason}
               valueClassName={allMassColor}
+              compact
             />
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">прирост ÷ вся масса</p>
           </Card>
         </button>
-        <Card className="!p-2.5 sm:!p-3">
-          <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Реальных годовых</p>
+        <Card className={cardClass}>
+          <p className={labelClass}>Реальных годовых</p>
           <AnnualizedMetric
             value={realAnnualized}
             unavailableReason={realReason}
             valueClassName={realColor}
+            compact
           />
-          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">за вычетом инфляции</p>
         </Card>
       </div>
 

@@ -26,6 +26,8 @@ interface GrowthChartProps {
   /** Dashboard total chart: growth portfolio vs full net worth. */
   seriesKind?: GrowthChartSeriesKind
   onSeriesKindChange?: (kind: GrowthChartSeriesKind) => void
+  /** Hide in-chart toggle when rendered in the page header. */
+  hideSeriesToggle?: boolean
   accounts?: Account[]
   snapshots?: BalanceSnapshot[]
   settings?: WalletSettings
@@ -39,6 +41,7 @@ export function GrowthChart({
   mode,
   seriesKind = 'growth',
   onSeriesKindChange,
+  hideSeriesToggle = false,
   accounts = [],
   snapshots = [],
   settings,
@@ -79,7 +82,7 @@ export function GrowthChart({
         ? 'Изменение с начала'
         : 'Прирост (фонды/вклады/инвест.)'
       : 'Прирост (без переводов)'
-  const canToggleSeries = mode === 'total' && onSeriesKindChange != null
+  const canToggleSeries = mode === 'total' && onSeriesKindChange != null && !hideSeriesToggle
   const canOpenDay = Boolean(settings)
 
   function selectDate(date: string | undefined) {

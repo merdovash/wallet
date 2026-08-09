@@ -22,6 +22,7 @@ import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
 import { GrowthChart } from './GrowthChart'
+import { ChartSeriesToggle } from './ChartSeriesToggle'
 import { PersonalCoefficientsPanel } from './PersonalCoefficientsPanel'
 import { SummaryCards } from './SummaryCards'
 
@@ -97,42 +98,40 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   }, [accounts, snapshots, settings, rateBook, periodReturn])
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Дашборд</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Остаток — все счета. «В годовых» — портфель роста. «Годовых от массы» — прирост ÷ вся
-            масса
-          </p>
+    <div className="mx-auto max-w-5xl space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h1 className="shrink-0 text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
+            Дашборд
+          </h1>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
+            {DASHBOARD_PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setPeriodKey(option.key)}
+                className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition sm:px-2.5 sm:py-1 sm:text-xs ${
+                  periodKey === option.key
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {periodReturn ? (
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 sm:text-xs">
+              {formatDateDisplay(periodReturn.startDate)} → {formatDateDisplay(periodReturn.endDate)}
+            </span>
+          ) : null}
         </div>
-        <Button type="button" onClick={() => setCheckInOpen(true)}>
-          Чек-ин
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
-          {DASHBOARD_PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => setPeriodKey(option.key)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition sm:text-sm ${
-                periodKey === option.key
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <ChartSeriesToggle value={chartSeries} onChange={setChartSeries} />
+          <Button type="button" onClick={() => setCheckInOpen(true)}>
+            Чек-ин
+          </Button>
         </div>
-        {periodReturn && (
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {formatDateDisplay(periodReturn.startDate)} → {formatDateDisplay(periodReturn.endDate)}
-          </span>
-        )}
       </div>
 
       <SummaryCards
@@ -143,15 +142,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         annualInflationPct={settings.annualInflationPct}
       />
 
-      <PersonalCoefficientsPanel
-        coefficients={personalCoefficients}
-        currency={settings.baseCurrency}
-        periodLabel={
-          periodReturn
-            ? `${formatDateDisplay(periodReturn.startDate)} → ${formatDateDisplay(periodReturn.endDate)}`
-            : undefined
-        }
-      />
+      <PersonalCoefficientsPanel coefficients={personalCoefficients} />
 
       <CreditFloatSummary />
 
@@ -161,6 +152,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         mode="total"
         seriesKind={chartSeries}
         onSeriesKindChange={setChartSeries}
+        hideSeriesToggle
         accounts={accounts}
         snapshots={snapshots}
         settings={settings}
