@@ -139,8 +139,12 @@ export function annualizeMonthlyReturn(monthlyPct: number): number {
   return (1 + monthlyPct) ** 12 - 1
 }
 
+/** Do not annualize very short periods — noise would explode in annual terms. */
+export const MIN_ANNUALIZE_DAYS = 30
+
 /** Annualize a return observed over `days` calendar days. */
 export function annualizePeriodReturn(periodPct: number, days: number): number | null {
+  if (days < MIN_ANNUALIZE_DAYS) return null
   if (!(days > 0) || !Number.isFinite(periodPct) || periodPct <= -1) return null
   return (1 + periodPct) ** (365 / days) - 1
 }

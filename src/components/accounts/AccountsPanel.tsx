@@ -11,8 +11,10 @@ import {
 import { creditDebt } from '../../engine/creditFloatEngine'
 import { balanceOnDate, buildAccountSeries, snapshotDates } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
+import type { AccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '../../lib/accountKinds'
+import { buildAccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
@@ -22,7 +24,7 @@ import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { StackPanel } from '../ui/StackPanel'
 import { GrowthChart } from '../dashboard/GrowthChart'
-import { formatCurrency, todayIsoDate } from '../../lib/format'
+import { formatCurrency, formatPercent, todayIsoDate } from '../../lib/format'
 
 interface AccountsPanelProps {
   focusAccountId?: string | null
@@ -96,7 +98,25 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     [accounts, snapshots],
   )
 
+  const returnById = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof buildAccountPeriodReturn>>()
+    for (const account of visible) {
+      map.set(
+        account.id,
+        buildAccountPeriodReturn(account.id, accounts, snapshots, transfers, settings, rateBook),
+      )
+    }
+    return map
+  }, [visible, accounts, snapshots, transfers, settings, rateBook])
+
   const detailAccount = accounts.find((a) => a.id === detailId) ?? null
+  const detailReturn = useMemo(
+    () =>
+      detailId
+        ? buildAccountPeriodReturn(detailId, accounts, snapshots, transfers, settings, rateBook)
+        : null,
+    [detailId, accounts, snapshots, transfers, settings, rateBook],
+  )
   const detailSeries = useMemo(
     () =>
       detailId
@@ -264,6 +284,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 account={account}
                 balance={balancesById.get(account.id) ?? null}
                 stale={staleById.get(account.id)}
+                periodReturn={returnById.get(account.id) ?? null}
                 isDragging={dragId === account.id}
                 isOver={overId === account.id && dragId !== account.id}
                 swipeOpen={swipeOpenId === account.id}
@@ -418,6 +439,21 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 ? ' На графике — доступный остаток лимита; прирост без переводов.'
                 : ' Зелёная линия — прирост без переводов.'}
             </p>
+            {detailReturn?.growthPct != null && (
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                Доходность (Modified Dietz):{' '}
+                <span className="font-medium">{formatPercent(detailReturn.growthPct)}</span>
+                {detailReturn.annualizedPct != null ? (
+                  <>
+                    {' '}
+                    · в годовых{' '}
+                    <span className="font-medium">{formatPercent(detailReturn.annualizedPct)}</span>
+                  </>
+                ) : detailReturn.days < 30 ? (
+                  <span className="text-slate-500 dark:text-slate-400"> · годовые не считаются (&lt; 30 дней)</span>
+                ) : null}
+              </p>
+            )}
             {detailAccount.kind === 'credit' && detailAccount.creditLimit != null && (
               <CreditDetailStats
                 limit={detailAccount.creditLimit}
@@ -507,6 +543,7 @@ interface AccountListItemProps {
   account: Account
   balance: number | null
   stale?: AccountStaleStatus
+  periodReturn?: AccountPeriodReturn | null
   isDragging: boolean
   isOver: boolean
   swipeOpen: boolean
@@ -524,6 +561,7 @@ function AccountListItem({
   account,
   balance,
   stale,
+  periodReturn,
   isDragging,
   isOver,
   swipeOpen,
@@ -703,6 +741,13 @@ function AccountListItem({
                 {account.kind === 'credit' && account.creditLimit != null ? (
                   <span className="text-[11px] text-slate-400 dark:text-slate-500">
                     долг {formatCurrency(creditDebt(account.creditLimit, balance), account.currency)}
+                  </span>
+                ) : periodReturn?.growthPct != null ? (
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {formatPercent(periodReturn.growthPct)}
+                    {periodReturn.annualizedPct != null
+                      ? ` · ${formatPercent(periodReturn.annualizedPct)} год.`
+                      : ''}
                   </span>
                 ) : null}
               </>
