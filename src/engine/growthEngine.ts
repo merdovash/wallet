@@ -152,7 +152,7 @@ function accountClosureFlows(
       }
     }
 
-    if (balLast > 0 && lastIdx < dates.length - 1) {
+    if (account.archived && balLast > 0 && lastIdx < dates.length - 1) {
       const firstAfter = dates[lastIdx + 1]!
       if (compareDate(firstAfter, t0) > 0 && compareDate(firstAfter, t1) <= 0) {
         const explained = netTransfersIn(

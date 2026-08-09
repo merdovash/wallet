@@ -9,8 +9,10 @@ import {
   buildNetWorthSeries,
   buildTotalSeries,
   growthCapitalFlows,
+  growthPortfolioTotalOnDate,
   modifiedDietzReturn,
   netTransfersIn,
+  netGrowthCapitalFlow,
   periodGrowth,
   totalOnDate,
 } from './growthEngine'
@@ -465,6 +467,66 @@ describe('growthEngine', () => {
     expect(series[2]?.total).toBe(1000)
     expect(totalOnDate('2026-01-02', accounts, snapshots, settings)).toBe(1600)
     expect(totalOnDate('2026-01-03', accounts, snapshots, settings)).toBe(1700)
+  })
+
+  it('does not treat omitted active growth accounts as closure outflows', () => {
+    const accounts = [
+      account({ id: 'fund', name: 'Fund' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 100_000 },
+          { accountId: 'op', amount: 50_000 },
+        ],
+      },
+      { id: 's2', date: '2026-01-02', lines: [{ accountId: 'op', amount: 60_000 }] },
+      { id: 's3', date: '2026-01-03', lines: [{ accountId: 'op', amount: 70_000 }] },
+    ]
+    const netFlow = netGrowthCapitalFlow(
+      '2026-01-01',
+      '2026-01-03',
+      snapshots,
+      [],
+      accounts,
+      settings,
+    )
+    expect(netFlow).toBe(0)
+    const growth =
+      growthPortfolioTotalOnDate('2026-01-03', accounts, snapshots, settings) -
+      growthPortfolioTotalOnDate('2026-01-01', accounts, snapshots, settings) -
+      netFlow
+    expect(growth).toBe(0)
+  })
+
+  it('records closure outflow when archived account is omitted after last positive balance', () => {
+    const accounts = [
+      account({ id: 'dep', name: 'Closed', kind: 'deposit', archived: true }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'dep', amount: 50_000 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+      { id: 's2', date: '2026-02-01', lines: [{ accountId: 'op', amount: 1_000 }] },
+    ]
+    const netFlow = netGrowthCapitalFlow(
+      '2026-01-01',
+      '2026-02-01',
+      snapshots,
+      [],
+      accounts,
+      settings,
+    )
+    expect(netFlow).toBe(-50_000)
   })
 
   it('includes archived growth accounts in historical portfolio totals', () => {
