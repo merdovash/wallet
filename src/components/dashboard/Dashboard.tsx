@@ -140,6 +140,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         growth={growth}
         currency={settings.baseCurrency}
         periodReturn={periodReturn}
+        annualInflationPct={settings.annualInflationPct}
       />
 
       <PersonalCoefficientsPanel

@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
-import type { PeriodReturnSummary } from '../../lib/monthlyReturns'
+import {
+  explainAnnualizedPct,
+  explainAnnualizedPctOfAllMass,
+  explainRealAnnualizedPct,
+  type PeriodReturnSummary,
+} from '../../lib/monthlyReturns'
 import { Card } from '../ui/FormControls'
+import { AnnualizedMetric } from './AnnualizedMetric'
 import { ReturnBreakdownPanel } from './ReturnBreakdownPanel'
 
 interface SummaryCardsProps {
@@ -9,6 +15,7 @@ interface SummaryCardsProps {
   growth: number
   currency: string
   periodReturn?: PeriodReturnSummary | null
+  annualInflationPct?: number | null
 }
 
 type BreakdownFocus =
@@ -19,7 +26,13 @@ type BreakdownFocus =
   | 'topUp'
   | null
 
-export function SummaryCards({ total, growth, currency, periodReturn }: SummaryCardsProps) {
+export function SummaryCards({
+  total,
+  growth,
+  currency,
+  periodReturn,
+  annualInflationPct,
+}: SummaryCardsProps) {
   const [breakdownFocus, setBreakdownFocus] = useState<BreakdownFocus>(null)
 
   const growthColor = growth > 0 ? 'text-emerald-700' : growth < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
@@ -47,6 +60,10 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
       : (realAnnualized ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
+
+  const annualizedReason = explainAnnualizedPct(periodReturn)
+  const allMassReason = explainAnnualizedPctOfAllMass(periodReturn)
+  const realReason = explainRealAnnualizedPct(periodReturn, annualInflationPct)
 
   return (
     <>
@@ -108,9 +125,11 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         >
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
-            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctColor}`}>
-              {formatPercent(periodReturn?.annualizedPct)}
-            </p>
+            <AnnualizedMetric
+              value={periodReturn?.annualizedPct}
+              unavailableReason={annualizedReason}
+              valueClassName={pctColor}
+            />
             <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонды · вклады · инвестиции</p>
           </Card>
         </button>
@@ -122,17 +141,21 @@ export function SummaryCards({ total, growth, currency, periodReturn }: SummaryC
         >
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Годовых от массы</p>
-            <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${allMassColor}`}>
-              {formatPercent(allMassAnnualized)}
-            </p>
+            <AnnualizedMetric
+              value={allMassAnnualized}
+              unavailableReason={allMassReason}
+              valueClassName={allMassColor}
+            />
             <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">прирост ÷ вся масса</p>
           </Card>
         </button>
         <Card className="!p-2.5 sm:!p-3">
           <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Реальных годовых</p>
-          <p className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${realColor}`}>
-            {formatPercent(realAnnualized)}
-          </p>
+          <AnnualizedMetric
+            value={realAnnualized}
+            unavailableReason={realReason}
+            valueClassName={realColor}
+          />
           <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">за вычетом инфляции</p>
         </Card>
       </div>

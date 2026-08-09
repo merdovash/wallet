@@ -5,6 +5,10 @@ import {
   buildMonthlyReturns,
   buildPeriodReturn,
   dailyGrowthInterval,
+  explainAnnualizedPct,
+  explainAnnualizedPctOfAllMass,
+  explainRealAnnualizedPct,
+  MIN_ANNUALIZE_DAYS,
 } from './monthlyReturns'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
@@ -370,5 +374,35 @@ describe('monthlyReturns', () => {
     expect(summary?.growth).toBe(80)
     expect(summary?.growthPct).toBeCloseTo(0.08, 8)
     expect(summary?.includedAccounts[0]?.growthBase).toBe(80)
+  })
+
+  it('explains unavailable annualized metrics', () => {
+    const accounts = [account({ id: 'a', name: 'A' })]
+    const shortSnapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 100 }] },
+      { id: 's2', date: '2026-01-10', lines: [{ accountId: 'a', amount: 110 }] },
+    ]
+    const short = buildPeriodReturn(accounts, shortSnapshots, settings)
+    expect(short?.days).toBeLessThan(MIN_ANNUALIZE_DAYS)
+    expect(explainAnnualizedPct(short)).toContain(`${short!.days} дн.`)
+    expect(explainAnnualizedPctOfAllMass(short)).toContain(`${short!.days} дн.`)
+    expect(explainRealAnnualizedPct(short, 0.08)).toContain(`${short!.days} дн.`)
+
+    expect(explainRealAnnualizedPct(short, null)).toContain(`${short!.days} дн.`)
+
+    const longSnapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 100 }] },
+      { id: 's2', date: '2026-01-31', lines: [{ accountId: 'a', amount: 110 }] },
+    ]
+    const long = buildPeriodReturn(accounts, longSnapshots, {
+      ...settings,
+      annualInflationPct: 0.08,
+    })
+    expect(explainAnnualizedPct(long)).toBeNull()
+    expect(explainRealAnnualizedPct(long, 0.08)).toBeNull()
+    expect(long?.realAnnualizedPct).not.toBeNull()
+
+    const longNoInflation = buildPeriodReturn(accounts, longSnapshots, settings)
+    expect(explainRealAnnualizedPct(longNoInflation, null)).toMatch(/инфляц/i)
   })
 })

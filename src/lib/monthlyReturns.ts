@@ -160,6 +160,45 @@ export function annualizePeriodReturn(periodPct: number, days: number): number |
   return (1 + periodPct) ** (365 / days) - 1
 }
 
+/** Why «В годовых» is unavailable — null when the metric can be shown. */
+export function explainAnnualizedPct(period: PeriodReturnSummary | null | undefined): string | null {
+  if (!period) return 'Нужны минимум два чек-ина'
+  if (period.annualizedPct != null) return null
+  if (period.growthPct == null) return 'Нет прирост % за период'
+  if (period.days < MIN_ANNUALIZE_DAYS) {
+    return `Период ${period.days} дн. — годовые от ${MIN_ANNUALIZE_DAYS} дн.`
+  }
+  return 'Не удалось аннуализировать'
+}
+
+/** Why «Годовых от массы» is unavailable. */
+export function explainAnnualizedPctOfAllMass(
+  period: PeriodReturnSummary | null | undefined,
+): string | null {
+  if (!period) return 'Нужны минимум два чек-ина'
+  if (period.annualizedPctOfAllMass != null) return null
+  if (period.growthPctOfAllMass == null) return 'Масса на начало периода = 0'
+  if (period.days < MIN_ANNUALIZE_DAYS) {
+    return `Период ${period.days} дн. — годовые от ${MIN_ANNUALIZE_DAYS} дн.`
+  }
+  return 'Не удалось аннуализировать'
+}
+
+/** Why «Реальных годовых» is unavailable. */
+export function explainRealAnnualizedPct(
+  period: PeriodReturnSummary | null | undefined,
+  annualInflationPct: number | null | undefined,
+): string | null {
+  if (!period) return 'Нужны минимум два чек-ина'
+  if (period.realAnnualizedPct != null) return null
+  const nominalReason = explainAnnualizedPct(period)
+  if (nominalReason) return nominalReason
+  if (annualInflationPct == null || !Number.isFinite(annualInflationPct)) {
+    return 'Укажите инфляцию в настройках'
+  }
+  return 'Не удалось посчитать'
+}
+
 function daysBetween(startDate: string, endDate: string): number {
   const start = Date.parse(`${startDate}T00:00:00Z`)
   const end = Date.parse(`${endDate}T00:00:00Z`)
