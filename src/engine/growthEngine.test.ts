@@ -392,4 +392,77 @@ describe('growthEngine', () => {
     )
     expect(flows).toEqual([{ date: '2026-01-15', amount: 100 }])
   })
+
+  it('includes archived growth accounts in historical portfolio totals', () => {
+    const accounts = [
+      account({ id: 'dep', name: 'Closed deposit', kind: 'deposit', archived: true }),
+      account({ id: 'fund', name: 'Fund', kind: 'fund' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'dep', amount: 100_000 },
+          { accountId: 'fund', amount: 10_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'dep', amount: 0 },
+          { accountId: 'fund', amount: 10_500 },
+        ],
+      },
+      {
+        id: 's3',
+        date: '2026-03-01',
+        lines: [{ accountId: 'fund', amount: 11_000 }],
+      },
+    ]
+    const series = buildTotalSeries(accounts, snapshots, settings)
+    expect(series[0]?.total).toBe(110_000)
+    expect(series[1]?.total).toBe(10_500)
+    expect(series[1]?.growth).toBe(500)
+    expect(series[2]?.total).toBe(11_000)
+    expect(series[2]?.growth).toBe(1000)
+  })
+
+  it('counts transfers from archived growth accounts as portfolio outflows', () => {
+    const accounts = [
+      account({ id: 'dep', name: 'Closed deposit', kind: 'deposit', archived: true }),
+      account({ id: 'op', name: 'Card', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'dep', amount: 50_000 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'dep', amount: 0 },
+          { accountId: 'op', amount: 50_000 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-20',
+        fromAccountId: 'dep',
+        toAccountId: 'op',
+        amount: 50_000,
+      },
+    ]
+    const series = buildTotalSeries(accounts, snapshots, settings, undefined, transfers)
+    expect(series[1]?.total).toBe(0)
+    expect(series[1]?.growth).toBe(0)
+  })
 })

@@ -60,6 +60,16 @@ export function isGrowthKind(kind: AccountKind): boolean {
   return GROWTH_KINDS.has(kind)
 }
 
+/** Growth portfolio membership by account kind only (archived accounts keep historical role). */
+export function isGrowthPortfolioAccount(account: Pick<Account, 'kind'>): boolean {
+  return isGrowthKind(normalizeAccountKind(account.kind))
+}
+
+export function growthPortfolioAccounts<T extends Pick<Account, 'kind'>>(accounts: T[]): T[] {
+  return accounts.filter(isGrowthPortfolioAccount)
+}
+
+/** Active (non-archived) growth account — for UI and check-in lists. */
 export function isGrowthAccount(account: Pick<Account, 'kind' | 'archived'>): boolean {
   if (account.archived) return false
   return isGrowthKind(normalizeAccountKind(account.kind))

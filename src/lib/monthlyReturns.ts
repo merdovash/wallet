@@ -2,7 +2,9 @@ import {
   accountGrowthBase,
   balanceOnDate,
   convertAmount,
+  effectiveBalanceOnDate,
   growthCapitalFlows,
+  growthPortfolioTotalOnDate,
   modifiedDietzReturn,
   netGrowthCapitalFlow,
   netTransfersInBase,
@@ -15,7 +17,9 @@ import {
 import {
   accountKindLabel,
   growthAccounts,
+  growthPortfolioAccounts,
   isGrowthAccount,
+  isGrowthPortfolioAccount,
   normalizeAccountKind,
 } from './accountKinds'
 import { toBase } from './currency'
@@ -181,7 +185,7 @@ export function buildMonthlyReturns(
   rateBook?: RateBook,
   transfers: Transfer[] = [],
 ): MonthlyReturnRow[] {
-  const eligible = growthAccounts(accounts)
+  const eligible = growthPortfolioAccounts(accounts)
   const dates = snapshotDates(snapshots)
   if (dates.length < 2 || eligible.length === 0) return []
 
@@ -204,8 +208,8 @@ export function buildMonthlyReturns(
     }
     if (startDate === endDate) continue
 
-    const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
-    const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
+    const startTotal = growthPortfolioTotalOnDate(startDate, accounts, snapshots, settings, rateBook)
+    const endTotal = growthPortfolioTotalOnDate(endDate, accounts, snapshots, settings, rateBook)
     const flows = growthCapitalFlows(
       startDate,
       endDate,
@@ -256,14 +260,14 @@ export function buildPeriodReturn(
   transfers: Transfer[] = [],
   range?: { startDate: string; endDate: string },
 ): PeriodReturnSummary | null {
-  const eligible = growthAccounts(accounts)
+  const eligible = growthPortfolioAccounts(accounts)
   const dates = snapshotDates(snapshots)
   if (dates.length < 2 || eligible.length === 0) return null
   const startDate = range?.startDate ?? dates[0]!
   const endDate = range?.endDate ?? dates[dates.length - 1]!
   if (startDate.localeCompare(endDate) >= 0) return null
-  const startTotal = totalOnDate(startDate, eligible, snapshots, settings, { rateBook })
-  const endTotal = totalOnDate(endDate, eligible, snapshots, settings, { rateBook })
+  const startTotal = growthPortfolioTotalOnDate(startDate, accounts, snapshots, settings, rateBook)
+  const endTotal = growthPortfolioTotalOnDate(endDate, accounts, snapshots, settings, rateBook)
   const flows = growthCapitalFlows(
     startDate,
     endDate,
@@ -314,8 +318,8 @@ export function buildPeriodReturn(
 
   function lineFor(account: Account): PeriodReturnAccountLine {
     const kind = normalizeAccountKind(account.kind)
-    const startRec = balanceOnDate(account.id, startDate, snapshots)
-    const endRec = balanceOnDate(account.id, endDate, snapshots)
+    const startRec = effectiveBalanceOnDate(account.id, startDate, snapshots)
+    const endRec = effectiveBalanceOnDate(account.id, endDate, snapshots)
     const startBal = startRec == null ? 0 : netWorthAmount(account, startRec)
     const endBal = endRec == null ? 0 : netWorthAmount(account, endRec)
     const startBase = toBase(
@@ -332,7 +336,7 @@ export function buildPeriodReturn(
       settings.exchangeRates,
       endPivot,
     )
-    const transfersBase = isGrowthAccount(account)
+    const transfersBase = isGrowthPortfolioAccount(account)
       ? netTransfersInBase(
           account.id,
           startDate,
@@ -343,7 +347,7 @@ export function buildPeriodReturn(
           rateBook,
         )
       : 0
-    const growthBase = isGrowthAccount(account)
+    const growthBase = isGrowthPortfolioAccount(account)
       ? (accountGrowthBase(
           account.id,
           startDate,
@@ -371,8 +375,8 @@ export function buildPeriodReturn(
     }
   }
 
-  const includedAccounts = eligible.map(lineFor)
-  const excludedAccounts = active.filter((a) => !isGrowthAccount(a)).map(lineFor)
+  const includedAccounts = growthPortfolioAccounts(accounts).map(lineFor)
+  const excludedAccounts = active.filter((a) => !isGrowthPortfolioAccount(a)).map(lineFor)
 
   const nameById = new Map(accounts.map((a) => [a.id, a.name]))
   const transferMovements: PeriodReturnTransferLine[] = []
@@ -382,8 +386,8 @@ export function buildPeriodReturn(
     const from = accounts.find((a) => a.id === t.fromAccountId)
     const to = accounts.find((a) => a.id === t.toAccountId)
     if (!from || !to) continue
-    const fromGrowth = isGrowthAccount(from)
-    const toGrowth = isGrowthAccount(to)
+    const fromGrowth = isGrowthPortfolioAccount(from)
+    const toGrowth = isGrowthPortfolioAccount(to)
     if (!fromGrowth && !toGrowth) continue
     const amountBase = convertAmount(
       t.amount,

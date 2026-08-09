@@ -1,5 +1,5 @@
 import { toBase } from '../lib/currency'
-import { growthAccounts, isGrowthAccount } from '../lib/accountKinds'
+import { growthPortfolioAccounts, isGrowthPortfolioAccount } from '../lib/accountKinds'
 import { resolvePivotForDate } from '../lib/cbrRates'
 import type {
   Account,
@@ -43,6 +43,141 @@ function sortTransfers(transfers: Transfer[]): Transfer[] {
 export function snapshotDates(snapshots: BalanceSnapshot[]): string[] {
   const set = new Set(snapshots.map((s) => s.date))
   return [...set].sort(compareDate)
+}
+
+/** Last snapshot date that mentions `accountId`. */
+export function lastSnapshotDateForAccount(
+  accountId: string,
+  snapshots: BalanceSnapshot[],
+): string | null {
+  let last: string | null = null
+  for (const snap of sortSnapshots(snapshots)) {
+    if (snap.lines.some((line) => line.accountId === accountId)) {
+      last = snap.date
+    }
+  }
+  return last
+}
+
+/**
+ * Balance for growth/history: forward-fill until the last mention, then zero.
+ * Returns null if the account was never recorded.
+ */
+export function effectiveBalanceOnDate(
+  accountId: string,
+  date: string,
+  snapshots: BalanceSnapshot[],
+): number | null {
+  const lastDate = lastSnapshotDateForAccount(accountId, snapshots)
+  if (lastDate == null) return null
+  if (compareDate(date, lastDate) > 0) return 0
+  return balanceOnDate(accountId, date, snapshots)
+}
+
+export function growthPortfolioTotalOnDate(
+  date: string,
+  accounts: Account[],
+  snapshots: BalanceSnapshot[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  const pivot = pivotFor(date, settings, rateBook)
+  let total = 0
+  for (const account of growthPortfolioAccounts(accounts)) {
+    const bal = effectiveBalanceOnDate(account.id, date, snapshots)
+    if (bal == null) continue
+    const nw = netWorthAmount(account, bal)
+    total += toBase(nw, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
+  }
+  return total
+}
+
+function accountClosureFlows(
+  t0: string,
+  t1: string,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const dates = snapshotDates(snapshots)
+  const byDate = new Map<string, number>()
+
+  for (const account of growthPortfolioAccounts(accounts)) {
+    const lastDate = lastSnapshotDateForAccount(account.id, snapshots)
+    if (!lastDate) continue
+
+    const lastIdx = dates.indexOf(lastDate)
+    if (lastIdx < 0) continue
+
+    const balLast = balanceOnDate(account.id, lastDate, snapshots) ?? 0
+
+    if (balLast === 0 && lastIdx > 0) {
+      const prevDate = dates[lastIdx - 1]!
+      const balPrev = effectiveBalanceOnDate(account.id, prevDate, snapshots) ?? 0
+      if (
+        balPrev > 0 &&
+        compareDate(lastDate, t0) > 0 &&
+        compareDate(lastDate, t1) <= 0
+      ) {
+        const explained = netTransfersIn(
+          account.id,
+          prevDate,
+          lastDate,
+          transfers,
+          accounts,
+          settings,
+          rateBook,
+        )
+        const drop = balPrev - balLast
+        const unexplained = Math.max(0, drop + Math.min(0, explained))
+        if (unexplained > 0) {
+          const amountBase = convertAmount(
+            unexplained,
+            account.currency,
+            settings.baseCurrency,
+            settings,
+            lastDate,
+            rateBook,
+          )
+          byDate.set(lastDate, (byDate.get(lastDate) ?? 0) - amountBase)
+        }
+      }
+    }
+
+    if (balLast > 0 && lastIdx < dates.length - 1) {
+      const firstAfter = dates[lastIdx + 1]!
+      if (compareDate(firstAfter, t0) > 0 && compareDate(firstAfter, t1) <= 0) {
+        const explained = netTransfersIn(
+          account.id,
+          lastDate,
+          firstAfter,
+          transfers,
+          accounts,
+          settings,
+          rateBook,
+        )
+        const unexplained = Math.max(0, balLast + Math.min(0, explained))
+        if (unexplained > 0) {
+          const amountBase = convertAmount(
+            unexplained,
+            account.currency,
+            settings.baseCurrency,
+            settings,
+            firstAfter,
+            rateBook,
+          )
+          byDate.set(firstAfter, (byDate.get(firstAfter) ?? 0) - amountBase)
+        }
+      }
+    }
+  }
+
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => compareDate(a, b))
+    .map(([date, amount]) => ({ date, amount }))
 }
 
 /**
@@ -323,8 +458,8 @@ export function growthCapitalFlows(
     const from = map.get(t.fromAccountId)
     const to = map.get(t.toAccountId)
     if (!from || !to) continue
-    const fromGrowth = isGrowthAccount(from)
-    const toGrowth = isGrowthAccount(to)
+    const fromGrowth = isGrowthPortfolioAccount(from)
+    const toGrowth = isGrowthPortfolioAccount(to)
     if (fromGrowth === toGrowth) continue
 
     const amountBase = convertAmount(
@@ -343,8 +478,8 @@ export function growthCapitalFlows(
   // represents contributed capital, not investment return. Infer that flow only
   // when no recorded transfer already explains the account's opening balance.
   const orderedSnapshots = sortSnapshots(snapshots)
-  for (const account of accounts.filter((a) => !a.archived && isGrowthAccount(a))) {
-    if (balanceOnDate(account.id, t0, snapshots) != null) continue
+  for (const account of growthPortfolioAccounts(accounts)) {
+    if (effectiveBalanceOnDate(account.id, t0, snapshots) != null) continue
     const first = orderedSnapshots.find(
       (snapshot) =>
         compareDate(snapshot.date, t0) > 0 &&
@@ -369,6 +504,10 @@ export function growthCapitalFlows(
       rateBook,
     )
     byDate.set(first.date, (byDate.get(first.date) ?? 0) + amountBase)
+  }
+
+  for (const flow of accountClosureFlows(t0, t1, snapshots, transfers, accounts, settings, rateBook)) {
+    byDate.set(flow.date, (byDate.get(flow.date) ?? 0) + flow.amount)
   }
 
   return [...byDate.entries()]
@@ -435,7 +574,7 @@ export function buildTotalSeries(
   const dates = snapshotDates(snapshots)
   if (dates.length === 0) return []
 
-  const eligible = growthAccounts(accounts)
+  const eligible = growthPortfolioAccounts(accounts)
   const startDate = dates[0]!
 
   const cashflowByDate = new Map<string, number>()
@@ -456,7 +595,7 @@ export function buildTotalSeries(
   let cumCashflow = 0
   let prevDate: string | null = null
   for (const date of dates) {
-    const total = totalOnDate(date, eligible, snapshots, settings, { rateBook })
+    const total = growthPortfolioTotalOnDate(date, eligible, snapshots, settings, rateBook)
     if (baseline == null || prevDate == null) {
       baseline = total
       prevDate = date
