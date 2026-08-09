@@ -17,10 +17,15 @@ import type { Account, AccountPoint, BalanceSnapshot, TotalPoint, WalletSettings
 import { Card } from '../ui/FormControls'
 import { DayTotalsPanel } from './DayTotalsPanel'
 
+export type GrowthChartSeriesKind = 'growth' | 'netWorth'
+
 interface GrowthChartProps {
   data: TotalPoint[] | AccountPoint[]
   currency: string
   mode: 'total' | 'account'
+  /** Dashboard total chart: growth portfolio vs full net worth. */
+  seriesKind?: GrowthChartSeriesKind
+  onSeriesKindChange?: (kind: GrowthChartSeriesKind) => void
   accounts?: Account[]
   snapshots?: BalanceSnapshot[]
   settings?: WalletSettings
@@ -32,6 +37,8 @@ export function GrowthChart({
   data,
   currency,
   mode,
+  seriesKind = 'growth',
+  onSeriesKindChange,
   accounts = [],
   snapshots = [],
   settings,
@@ -60,9 +67,19 @@ export function GrowthChart({
     )
   }
 
-  const primaryLabel = mode === 'total' ? 'Капитал роста' : 'Остаток'
+  const primaryLabel =
+    mode === 'total'
+      ? seriesKind === 'netWorth'
+        ? 'Чистая стоимость'
+        : 'Капитал роста'
+      : 'Остаток'
   const growthLabel =
-    mode === 'total' ? 'Прирост (фонды/вклады/инвест.)' : 'Прирост (без переводов)'
+    mode === 'total'
+      ? seriesKind === 'netWorth'
+        ? 'Изменение с начала'
+        : 'Прирост (фонды/вклады/инвест.)'
+      : 'Прирост (без переводов)'
+  const canToggleSeries = mode === 'total' && onSeriesKindChange != null
   const canOpenDay = Boolean(settings)
 
   function selectDate(date: string | undefined) {
@@ -73,6 +90,34 @@ export function GrowthChart({
   return (
     <>
       <Card className="!p-3 sm:!p-4">
+        {canToggleSeries && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => onSeriesKindChange?.('growth')}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  seriesKind === 'growth'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                Портфель роста
+              </button>
+              <button
+                type="button"
+                onClick={() => onSeriesKindChange?.('netWorth')}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  seriesKind === 'netWorth'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                Вся чистая стоимость
+              </button>
+            </div>
+          </div>
+        )}
         {canOpenDay && (
           <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">Нажмите на точку или дату, чтобы открыть итоги.</p>
         )}

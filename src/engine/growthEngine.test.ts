@@ -4,6 +4,7 @@ import {
   balanceOnDate,
   buildAccountSeries,
   buildDailyGrowthSeries,
+  buildNetWorthSeries,
   buildTotalSeries,
   growthCapitalFlows,
   modifiedDietzReturn,
@@ -235,6 +236,39 @@ describe('growthEngine', () => {
     ]
     const series = buildTotalSeries(accounts, snapshots, settings)
     expect(series[1]?.total).toBe(1100)
+    expect(series[1]?.growth).toBe(100)
+  })
+
+  it('builds net worth series including operational and credit debt', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'f', name: 'Fund', kind: 'fund' }),
+      account({ id: 'cc', name: 'Card', kind: 'credit', creditLimit: 1000 }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 500 },
+          { accountId: 'f', amount: 1000 },
+          { accountId: 'cc', amount: 800 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'op', amount: 600 },
+          { accountId: 'f', amount: 1100 },
+          { accountId: 'cc', amount: 700 },
+        ],
+      },
+    ]
+    const series = buildNetWorthSeries(accounts, snapshots, settings)
+    // NW: 600 + 1100 - (1000-700) = 1400; start: 500 + 1000 - 200 = 1300
+    expect(series[0]?.total).toBe(1300)
+    expect(series[1]?.total).toBe(1400)
     expect(series[1]?.growth).toBe(100)
   })
 

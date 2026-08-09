@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  buildNetWorthSeries,
   buildTotalSeries,
   periodGrowth,
   snapshotDates,
@@ -37,6 +38,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [periodKey, setPeriodKey] = useState<DashboardPeriodKey>('all')
+  const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
 
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
@@ -62,9 +64,14 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     () => buildTotalSeries(accounts, snapshots, settings, rateBook, transfers),
     [accounts, snapshots, settings, rateBook, transfers],
   )
+  const fullNetWorthSeries = useMemo(
+    () => buildNetWorthSeries(accounts, snapshots, settings, rateBook),
+    [accounts, snapshots, settings, rateBook],
+  )
+  const activeFullSeries = chartSeries === 'netWorth' ? fullNetWorthSeries : fullSeries
   const series = useMemo(
-    () => (range ? slicePeriodSeries(fullSeries, range) : fullSeries),
-    [fullSeries, range],
+    () => (range ? slicePeriodSeries(activeFullSeries, range) : activeFullSeries),
+    [activeFullSeries, range],
   )
   const periodReturn = useMemo(
     () => buildPeriodReturn(accounts, snapshots, settings, rateBook, transfers, range),
@@ -151,6 +158,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         data={series}
         currency={settings.baseCurrency}
         mode="total"
+        seriesKind={chartSeries}
+        onSeriesKindChange={setChartSeries}
         accounts={accounts}
         snapshots={snapshots}
         settings={settings}

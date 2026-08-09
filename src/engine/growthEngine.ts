@@ -618,6 +618,30 @@ export function buildTotalSeries(
   return points
 }
 
+/** Net worth on each check-in date (all accounts, credit debt included). */
+export function buildNetWorthSeries(
+  accounts: Account[],
+  snapshots: BalanceSnapshot[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): TotalPoint[] {
+  const dates = snapshotDates(snapshots)
+  if (dates.length === 0) return []
+
+  const points: TotalPoint[] = []
+  let baseline: number | null = null
+  for (const date of dates) {
+    const total = totalOnDate(date, accounts, snapshots, settings, { rateBook })
+    if (baseline == null) {
+      baseline = total
+      points.push({ date, total, growth: 0 })
+      continue
+    }
+    points.push({ date, total, growth: total - baseline })
+  }
+  return points
+}
+
 export function buildDailyGrowthSeries(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
