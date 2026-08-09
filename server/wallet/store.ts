@@ -64,15 +64,25 @@ export interface DbSettings {
   baseCurrency: string
   /** Decimal fraction, e.g. 0.08 for 8% annual inflation. */
   annualInflationPct: number | null
+  /** Decimal fraction, e.g. 0.16 for 16% key rate. */
+  keyRatePct: number | null
 }
 
-function mapSettings(row: { base_currency: string; annual_inflation_pct: number | null }): DbSettings {
+function mapSettings(row: {
+  base_currency: string
+  annual_inflation_pct: number | null
+  key_rate_pct: number | null
+}): DbSettings {
   return {
     baseCurrency: String(row.base_currency ?? 'RUB'),
     annualInflationPct:
       row.annual_inflation_pct == null || !Number.isFinite(Number(row.annual_inflation_pct))
         ? null
         : Number(row.annual_inflation_pct),
+    keyRatePct:
+      row.key_rate_pct == null || !Number.isFinite(Number(row.key_rate_pct))
+        ? null
+        : Number(row.key_rate_pct),
   }
 }
 
@@ -154,32 +164,40 @@ export async function ensureUserSettings(userId: string): Promise<DbSettings> {
      ON CONFLICT (user_id) DO NOTHING`,
     [userId],
   )
-  const result = await pool.query<{ base_currency: string; annual_inflation_pct: number | null }>(
-    `SELECT base_currency, annual_inflation_pct FROM wallet_settings WHERE user_id = $1`,
+  const result = await pool.query<{
+    base_currency: string
+    annual_inflation_pct: number | null
+    key_rate_pct: number | null
+  }>(
+    `SELECT base_currency, annual_inflation_pct, key_rate_pct FROM wallet_settings WHERE user_id = $1`,
     [userId],
   )
-  return mapSettings(result.rows[0] ?? { base_currency: 'RUB', annual_inflation_pct: null })
+  return mapSettings(
+    result.rows[0] ?? { base_currency: 'RUB', annual_inflation_pct: null, key_rate_pct: null },
+  )
 }
 
 export async function updateSettings(
   userId: string,
-  patch: { baseCurrency?: string; annualInflationPct?: number | null },
+  patch: { baseCurrency?: string; annualInflationPct?: number | null; keyRatePct?: number | null },
 ): Promise<DbSettings> {
   const current = await ensureUserSettings(userId)
   const baseCurrency = patch.baseCurrency?.toUpperCase() ?? current.baseCurrency
   const annualInflationPct =
     patch.annualInflationPct !== undefined ? patch.annualInflationPct : current.annualInflationPct
+  const keyRatePct = patch.keyRatePct !== undefined ? patch.keyRatePct : current.keyRatePct
   const pool = getPool()
   await pool.query(
-    `INSERT INTO wallet_settings (user_id, base_currency, annual_inflation_pct, updated_at)
-     VALUES ($1, $2, $3, now())
+    `INSERT INTO wallet_settings (user_id, base_currency, annual_inflation_pct, key_rate_pct, updated_at)
+     VALUES ($1, $2, $3, $4, now())
      ON CONFLICT (user_id) DO UPDATE
      SET base_currency = EXCLUDED.base_currency,
          annual_inflation_pct = EXCLUDED.annual_inflation_pct,
+         key_rate_pct = EXCLUDED.key_rate_pct,
          updated_at = now()`,
-    [userId, baseCurrency, annualInflationPct],
+    [userId, baseCurrency, annualInflationPct, keyRatePct],
   )
-  return { baseCurrency, annualInflationPct }
+  return { baseCurrency, annualInflationPct, keyRatePct }
 }
 
 export async function listAccounts(userId: string): Promise<DbAccount[]> {

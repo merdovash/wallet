@@ -414,6 +414,19 @@ function PercentBreakdownView({
         ) : null}
       </dl>
 
+      {(focus === 'annualizedPct' || focus === 'annualizedPctOfAllMass') &&
+      periodReturn.benchmarks ? (
+        <BenchmarksSection
+          portfolioAnnualizedPct={
+            focus === 'annualizedPctOfAllMass'
+              ? periodReturn.annualizedPctOfAllMass
+              : periodReturn.annualizedPct
+          }
+          benchmarks={periodReturn.benchmarks}
+          days={periodReturn.days}
+        />
+      ) : null}
+
       {periodReturn.flows.length > 0 ? (
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -620,6 +633,87 @@ function FormulaBlock({ title, lines }: { title: string; lines: string[] }) {
           <li key={line}>{line}</li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function BenchmarksSection({
+  portfolioAnnualizedPct,
+  benchmarks,
+  days,
+}: {
+  portfolioAnnualizedPct: number | null
+  benchmarks: NonNullable<PeriodReturnSummary['benchmarks']>
+  days: number
+}) {
+  const hasKeyRate = benchmarks.keyRateAnnualizedPct != null
+  const hasUsd =
+    benchmarks.usdPeriodPct != null ||
+    benchmarks.usdAnnualizedPct != null ||
+    benchmarks.usdStartRate != null
+  if (!hasKeyRate && !hasUsd) return null
+
+  const portfolioLabel = formatPercent(portfolioAnnualizedPct)
+  const vsKeyRate =
+    portfolioAnnualizedPct != null && benchmarks.vsKeyRatePct != null
+      ? benchmarks.vsKeyRatePct
+      : null
+  const vsUsd =
+    portfolioAnnualizedPct != null && benchmarks.vsUsdPct != null ? benchmarks.vsUsdPct : null
+
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        Бенчмарки
+      </h3>
+      <dl className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+        <Row label="Портфель, в годовых" value={portfolioLabel} emphasize />
+        {hasKeyRate ? (
+          <>
+            <Row
+              label="Ключевая ставка"
+              value={formatPercent(benchmarks.keyRateAnnualizedPct)}
+              hint="из настроек"
+            />
+            <Row
+              label="Портфель − ключевая"
+              value={formatPercent(vsKeyRate)}
+              valueClassName={tone(vsKeyRate ?? 0)}
+              hint="положительное — выше ставки"
+              emphasize
+            />
+          </>
+        ) : null}
+        {hasUsd ? (
+          <>
+            <Row
+              label="USD за период"
+              value={formatPercent(benchmarks.usdPeriodPct)}
+              hint={
+                benchmarks.usdStartRate != null && benchmarks.usdEndRate != null
+                  ? `${benchmarks.usdStartRate.toFixed(2)} → ${benchmarks.usdEndRate.toFixed(2)} ₽`
+                  : undefined
+              }
+            />
+            <Row
+              label="USD, в годовых"
+              value={formatPercent(benchmarks.usdAnnualizedPct)}
+              hint={
+                days >= 30
+                  ? `(1 + USD%) ^ (365 ÷ ${days}) − 1`
+                  : 'период короче 30 дней — не аннуализируем'
+              }
+            />
+            <Row
+              label="Портфель − USD"
+              value={formatPercent(vsUsd)}
+              valueClassName={tone(vsUsd ?? 0)}
+              hint="положительное — обогнали рост доллара"
+              emphasize
+            />
+          </>
+        ) : null}
+      </dl>
     </div>
   )
 }

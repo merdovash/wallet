@@ -83,6 +83,8 @@ export interface WalletSettings {
   exchangeRates: ExchangeRates
   /** Expected annual inflation as decimal (0.08 = 8%). */
   annualInflationPct?: number | null
+  /** Key rate benchmark as decimal (0.16 = 16%). */
+  keyRatePct?: number | null
 }
 
 export const ACCOUNT_COLORS = [

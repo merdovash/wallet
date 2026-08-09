@@ -29,10 +29,17 @@ export function SettingsPanel() {
   const [inflationText, setInflationText] = useState(() =>
     formatInflationPercentInput(settings.annualInflationPct),
   )
+  const [keyRateText, setKeyRateText] = useState(() =>
+    formatInflationPercentInput(settings.keyRatePct),
+  )
 
   useEffect(() => {
     setInflationText(formatInflationPercentInput(settings.annualInflationPct))
   }, [settings.annualInflationPct])
+
+  useEffect(() => {
+    setKeyRateText(formatInflationPercentInput(settings.keyRatePct))
+  }, [settings.keyRatePct])
 
   const today = todayIsoDate()
   const pivot = useMemo(() => resolvePivotForDate(today, byDate), [byDate, today])
@@ -109,6 +116,22 @@ export function SettingsPanel() {
           />
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Для виджета «Реальных годовых» на дашборде: (1 + номинал) / (1 + инфляция) − 1
+          </p>
+        </Field>
+        <Field label="Ключевая ставка, %">
+          <Input
+            type="text"
+            inputMode="decimal"
+            placeholder="например 16"
+            value={keyRateText}
+            onChange={(e) => setKeyRateText(e.target.value)}
+            onBlur={() => {
+              const parsed = parseInflationPercentInput(keyRateText)
+              void setSettings({ keyRatePct: parsed })
+            }}
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Бенчмарк в расшифровке доходности — сравнение «в годовых» портфеля с ключевой ставкой
           </p>
         </Field>
       </Card>

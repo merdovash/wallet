@@ -20,6 +20,7 @@ import {
   normalizeAccountKind,
 } from './accountKinds'
 import { buildGrowthFxBreakdown, type GrowthFxBreakdown } from './growthFxBreakdown'
+import { buildReturnBenchmarks, type ReturnBenchmarks } from './returnBenchmarks'
 import { realAnnualizedReturn } from './realReturn'
 import { resolvePivotForDate } from './cbrRates'
 import { toBase } from './currency'
@@ -109,6 +110,8 @@ export interface PeriodReturnSummary {
   excludedAccounts: PeriodReturnAccountLine[]
   /** Growth split: native earnings vs FX on opening balances. */
   growthFx: GrowthFxBreakdown | null
+  /** Comparison with key rate and USD change. */
+  benchmarks: ReturnBenchmarks
 }
 
 const MONTH_LABELS = [
@@ -434,6 +437,15 @@ export function buildPeriodReturn(
     rateBook,
   )
 
+  const benchmarks = buildReturnBenchmarks(
+    annualizedPct,
+    days,
+    startDate,
+    endDate,
+    settings.keyRatePct,
+    rateBook,
+  )
+
   return {
     startDate,
     endDate,
@@ -455,6 +467,7 @@ export function buildPeriodReturn(
     includedAccounts,
     excludedAccounts,
     growthFx,
+    benchmarks,
   }
 }
 

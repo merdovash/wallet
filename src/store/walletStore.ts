@@ -211,6 +211,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         patch.annualInflationPct !== undefined
           ? patch.annualInflationPct
           : current.annualInflationPct,
+      keyRatePct:
+        patch.keyRatePct !== undefined ? patch.keyRatePct : current.keyRatePct,
     })
     set({ settings })
   },

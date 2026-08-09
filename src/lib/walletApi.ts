@@ -9,7 +9,7 @@ import type {
 import { DEFAULT_SETTINGS } from '../types/wallet'
 
 export interface WalletBundle {
-  settings: { baseCurrency: string; annualInflationPct?: number | null }
+  settings: { baseCurrency: string; annualInflationPct?: number | null; keyRatePct?: number | null }
   accounts: Account[]
   snapshots: BalanceSnapshot[]
   transfers: Transfer[]
@@ -40,10 +40,12 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export function withFallbackRates(settings: {
   baseCurrency: string
   annualInflationPct?: number | null
+  keyRatePct?: number | null
 }): WalletSettings {
   return {
     baseCurrency: settings.baseCurrency,
     annualInflationPct: settings.annualInflationPct ?? null,
+    keyRatePct: settings.keyRatePct ?? null,
     exchangeRates: {
       ...DEFAULT_SETTINGS.exchangeRates,
       [settings.baseCurrency]: 1,
@@ -54,9 +56,10 @@ export function withFallbackRates(settings: {
 export async function patchSettings(patch: {
   baseCurrency?: string
   annualInflationPct?: number | null
+  keyRatePct?: number | null
 }): Promise<WalletSettings> {
   const body = await api<{
-    settings: { baseCurrency: string; annualInflationPct?: number | null }
+    settings: { baseCurrency: string; annualInflationPct?: number | null; keyRatePct?: number | null }
   }>('/api/wallet/settings', {
     method: 'PATCH',
     body: JSON.stringify(patch),
