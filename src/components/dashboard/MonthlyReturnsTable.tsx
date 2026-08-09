@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import { buildMonthlyReturns } from '../../lib/monthlyReturns'
+import { buildMonthlyRiskMetrics } from '../../lib/monthlyRiskMetrics'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -16,8 +17,44 @@ export function MonthlyReturnsTable() {
     () => buildMonthlyReturns(accounts, snapshots, settings, rateBook, transfers),
     [accounts, snapshots, settings, rateBook, transfers],
   )
+  const risk = useMemo(() => buildMonthlyRiskMetrics(rows), [rows])
 
   return (
+    <div className="space-y-4">
+      {rows.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card className="px-4 py-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Волатильность месяцев</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+              {formatPercent(risk.volatilityPct)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+              σ помесячных доходностей
+            </p>
+          </Card>
+          <Card className="px-4 py-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Макс. просадка</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-red-600">
+              {risk.maxDrawdownPct == null ? '—' : `−${formatPercent(risk.maxDrawdownPct)}`}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+              по кумулятивному индексу
+            </p>
+          </Card>
+          <Card className="px-4 py-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Плюсовые месяцы</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+              {risk.positiveMonthsRatio == null
+                ? '—'
+                : `${Math.round(risk.positiveMonthsRatio * 100)}%`}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+              {risk.positiveMonths} из {risk.monthCount}
+            </p>
+          </Card>
+        </div>
+      ) : null}
+
     <Card className="!p-0">
       <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Помесячный прирост</h2>
@@ -81,5 +118,6 @@ export function MonthlyReturnsTable() {
         </table>
       )}
     </Card>
+    </div>
   )
 }
