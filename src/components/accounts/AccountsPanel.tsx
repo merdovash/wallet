@@ -11,7 +11,9 @@ import {
 import { creditDebt } from '../../engine/creditFloatEngine'
 import { balanceOnDate, buildAccountSeries, snapshotDates } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
+import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '../../lib/accountKinds'
+import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { parseMoneyInput } from '../../lib/moneyInput'
@@ -88,6 +90,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     }
     return map
   }, [visible, snapshots])
+
+  const staleById = useMemo(
+    () => buildAccountStaleStatuses(accounts, snapshots),
+    [accounts, snapshots],
+  )
 
   const detailAccount = accounts.find((a) => a.id === detailId) ?? null
   const detailSeries = useMemo(
@@ -256,6 +263,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 key={account.id}
                 account={account}
                 balance={balancesById.get(account.id) ?? null}
+                stale={staleById.get(account.id)}
                 isDragging={dragId === account.id}
                 isOver={overId === account.id && dragId !== account.id}
                 swipeOpen={swipeOpenId === account.id}
@@ -498,6 +506,7 @@ const SWIPE_ACTIONS_WIDTH = 96
 interface AccountListItemProps {
   account: Account
   balance: number | null
+  stale?: AccountStaleStatus
   isDragging: boolean
   isOver: boolean
   swipeOpen: boolean
@@ -514,6 +523,7 @@ interface AccountListItemProps {
 function AccountListItem({
   account,
   balance,
+  stale,
   isDragging,
   isOver,
   swipeOpen,
@@ -600,7 +610,9 @@ function AccountListItem({
       onDrop={onDrop}
       className={`relative overflow-hidden sm:flex sm:items-center sm:gap-2 sm:overflow-visible sm:px-4 sm:py-3 ${
         isDragging ? 'opacity-40' : ''
-      } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''}`}
+      } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''} ${
+        stale?.missingFromLatestCheckIn ? 'bg-amber-50/80 dark:bg-amber-950/20' : ''
+      }`}
     >
       <div className="absolute inset-y-0 right-0 flex items-center gap-1 px-2 sm:static sm:order-last sm:inset-auto sm:shrink-0 sm:px-0">
         <AccountIconButton
@@ -666,6 +678,19 @@ function AccountListItem({
               ) : null}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">{account.currency}</span>
+            {!account.archived && stale ? (
+              <span
+                className={`mt-0.5 block text-[11px] ${
+                  stale.missingFromLatestCheckIn
+                    ? 'font-medium text-amber-700 dark:text-amber-400'
+                    : 'text-slate-400 dark:text-slate-500'
+                }`}
+              >
+                {stale.missingFromLatestCheckIn
+                  ? `нет в последнем чек-ине · ${formatStaleDays(stale.daysSinceRecorded)}`
+                  : formatStaleDays(stale.daysSinceRecorded)}
+              </span>
+            ) : null}
           </span>
           <span className="shrink-0 text-right tabular-nums">
             {balance == null ? (
