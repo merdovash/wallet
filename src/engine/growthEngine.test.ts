@@ -442,6 +442,31 @@ describe('growthEngine', () => {
     expect(flows).toEqual([{ date: '2026-01-15', amount: 100 }])
   })
 
+  it('forward-fills active growth accounts omitted from later check-ins', () => {
+    const accounts = [
+      account({ id: 'fund', name: 'Fund' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 1000 },
+          { accountId: 'op', amount: 500 },
+        ],
+      },
+      { id: 's2', date: '2026-01-02', lines: [{ accountId: 'op', amount: 600 }] },
+      { id: 's3', date: '2026-01-03', lines: [{ accountId: 'op', amount: 700 }] },
+    ]
+    const series = buildTotalSeries(accounts, snapshots, settings)
+    expect(series[0]?.total).toBe(1000)
+    expect(series[1]?.total).toBe(1000)
+    expect(series[2]?.total).toBe(1000)
+    expect(totalOnDate('2026-01-02', accounts, snapshots, settings)).toBe(1600)
+    expect(totalOnDate('2026-01-03', accounts, snapshots, settings)).toBe(1700)
+  })
+
   it('includes archived growth accounts in historical portfolio totals', () => {
     const accounts = [
       account({ id: 'dep', name: 'Closed deposit', kind: 'deposit', archived: true }),

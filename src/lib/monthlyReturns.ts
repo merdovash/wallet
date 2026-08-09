@@ -337,8 +337,8 @@ export function buildPeriodReturn(
 
   function lineFor(account: Account): PeriodReturnAccountLine {
     const kind = normalizeAccountKind(account.kind)
-    const startRec = effectiveBalanceOnDate(account.id, startDate, snapshots)
-    const endRec = effectiveBalanceOnDate(account.id, endDate, snapshots)
+    const startRec = effectiveBalanceOnDate(account.id, startDate, snapshots, undefined, account)
+    const endRec = effectiveBalanceOnDate(account.id, endDate, snapshots, undefined, account)
     const startBal = startRec == null ? 0 : netWorthAmount(account, startRec)
     const endBal = endRec == null ? 0 : netWorthAmount(account, endRec)
     const startBase = toBase(

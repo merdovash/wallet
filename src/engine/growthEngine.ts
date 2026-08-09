@@ -62,18 +62,19 @@ export function lastSnapshotDateForAccount(
 }
 
 /**
- * Balance for growth/history: forward-fill until the last mention, then zero.
- * Returns null if the account was never recorded.
+ * Balance for growth/history: forward-fill like balanceOnDate for active accounts.
+ * Archived accounts become zero after their last recorded check-in date.
  */
 export function effectiveBalanceOnDate(
   accountId: string,
   date: string,
   snapshots: BalanceSnapshot[],
   index?: BalanceIndex,
+  account?: Pick<Account, 'archived'>,
 ): number | null {
   const lastDate = lastSnapshotDateForAccount(accountId, snapshots, index)
   if (lastDate == null) return null
-  if (compareDate(date, lastDate) > 0) return 0
+  if (account?.archived && compareDate(date, lastDate) > 0) return 0
   return balanceOnDate(accountId, date, snapshots, index)
 }
 
@@ -89,7 +90,7 @@ export function growthPortfolioTotalOnDate(
   const pivot = pivotFor(date, settings, rateBook)
   let total = 0
   for (const account of growthPortfolioAccounts(accounts)) {
-    const bal = effectiveBalanceOnDate(account.id, date, snapshots, index)
+    const bal = effectiveBalanceOnDate(account.id, date, snapshots, index, account)
     if (bal == null) continue
     const nw = netWorthAmount(account, bal)
     total += toBase(nw, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
@@ -120,7 +121,7 @@ function accountClosureFlows(
 
     if (balLast === 0 && lastIdx > 0) {
       const prevDate = dates[lastIdx - 1]!
-      const balPrev = effectiveBalanceOnDate(account.id, prevDate, snapshots) ?? 0
+      const balPrev = effectiveBalanceOnDate(account.id, prevDate, snapshots, undefined, account) ?? 0
       if (
         balPrev > 0 &&
         compareDate(lastDate, t0) > 0 &&
@@ -529,7 +530,7 @@ export function growthCapitalFlows(
   // when no recorded transfer already explains the account's opening balance.
   const orderedSnapshots = sortSnapshots(snapshots)
   for (const account of growthPortfolioAccounts(accounts)) {
-    if (effectiveBalanceOnDate(account.id, t0, snapshots) != null) continue
+    if (effectiveBalanceOnDate(account.id, t0, snapshots, undefined, account) != null) continue
     const first = orderedSnapshots.find(
       (snapshot) =>
         compareDate(snapshot.date, t0) > 0 &&
