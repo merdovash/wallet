@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   accountGrowth,
+  balanceFromIndex,
   balanceOnDate,
   buildAccountSeries,
+  buildBalanceIndex,
   buildDailyGrowthSeries,
   buildNetWorthSeries,
   buildTotalSeries,
@@ -39,6 +41,19 @@ describe('growthEngine', () => {
     expect(balanceOnDate('a', '2026-01-05', snapshots)).toBe(100)
     expect(balanceOnDate('a', '2026-01-10', snapshots)).toBe(100)
     expect(balanceOnDate('a', '2025-12-31', snapshots)).toBeNull()
+  })
+
+  it('buildBalanceIndex matches balanceOnDate lookups', () => {
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 100 }] },
+      { id: 's2', date: '2026-01-10', lines: [{ accountId: 'a', amount: 120 }] },
+      { id: 's3', date: '2026-01-20', lines: [{ accountId: 'b', amount: 50 }] },
+    ]
+    const index = buildBalanceIndex(snapshots)
+    expect(balanceFromIndex(index, 'a', '2026-01-05')).toBe(100)
+    expect(balanceFromIndex(index, 'a', '2026-01-15')).toBe(120)
+    expect(balanceFromIndex(index, 'b', '2026-01-15')).toBeNull()
+    expect(balanceOnDate('a', '2026-01-15', snapshots, index)).toBe(120)
   })
 
   it('computes growth from balance changes without transfers', () => {

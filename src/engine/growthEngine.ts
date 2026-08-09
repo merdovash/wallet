@@ -49,7 +49,9 @@ export function snapshotDates(snapshots: BalanceSnapshot[]): string[] {
 export function lastSnapshotDateForAccount(
   accountId: string,
   snapshots: BalanceSnapshot[],
+  index?: BalanceIndex,
 ): string | null {
+  if (index) return index.lastDate.get(accountId) ?? null
   let last: string | null = null
   for (const snap of sortSnapshots(snapshots)) {
     if (snap.lines.some((line) => line.accountId === accountId)) {
@@ -67,11 +69,12 @@ export function effectiveBalanceOnDate(
   accountId: string,
   date: string,
   snapshots: BalanceSnapshot[],
+  index?: BalanceIndex,
 ): number | null {
-  const lastDate = lastSnapshotDateForAccount(accountId, snapshots)
+  const lastDate = lastSnapshotDateForAccount(accountId, snapshots, index)
   if (lastDate == null) return null
   if (compareDate(date, lastDate) > 0) return 0
-  return balanceOnDate(accountId, date, snapshots)
+  return balanceOnDate(accountId, date, snapshots, index)
 }
 
 export function growthPortfolioTotalOnDate(
@@ -80,11 +83,13 @@ export function growthPortfolioTotalOnDate(
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  balanceIndex?: BalanceIndex,
 ): number {
+  const index = balanceIndex ?? buildBalanceIndex(snapshots)
   const pivot = pivotFor(date, settings, rateBook)
   let total = 0
   for (const account of growthPortfolioAccounts(accounts)) {
-    const bal = effectiveBalanceOnDate(account.id, date, snapshots)
+    const bal = effectiveBalanceOnDate(account.id, date, snapshots, index)
     if (bal == null) continue
     const nw = netWorthAmount(account, bal)
     total += toBase(nw, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
@@ -180,6 +185,55 @@ function accountClosureFlows(
     .map(([date, amount]) => ({ date, amount }))
 }
 
+/** Forward-fill balance lookup built once per snapshot series. */
+export interface BalanceIndex {
+  /** accountId → ascending balance updates on snapshot dates. */
+  series: Map<string, Array<{ date: string; amount: number }>>
+  /** accountId → last snapshot date that mentions the account. */
+  lastDate: Map<string, string>
+}
+
+export function buildBalanceIndex(snapshots: BalanceSnapshot[]): BalanceIndex {
+  const series = new Map<string, Array<{ date: string; amount: number }>>()
+  const lastDate = new Map<string, string>()
+  for (const snap of sortSnapshots(snapshots)) {
+    for (const line of snap.lines) {
+      let updates = series.get(line.accountId)
+      if (!updates) {
+        updates = []
+        series.set(line.accountId, updates)
+      }
+      updates.push({ date: snap.date, amount: line.amount })
+      lastDate.set(line.accountId, snap.date)
+    }
+  }
+  return { series, lastDate }
+}
+
+export function balanceFromIndex(
+  index: BalanceIndex,
+  accountId: string,
+  date: string,
+): number | null {
+  const updates = index.series.get(accountId)
+  if (!updates || updates.length === 0) return null
+
+  let lo = 0
+  let hi = updates.length - 1
+  let best = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (compareDate(updates[mid]!.date, date) <= 0) {
+      best = mid
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  if (best < 0) return null
+  return updates[best]!.amount
+}
+
 /**
  * Balance of an account on `date` via forward-fill:
  * last snapshot line on or before `date`. Returns null if never recorded.
@@ -188,14 +242,9 @@ export function balanceOnDate(
   accountId: string,
   date: string,
   snapshots: BalanceSnapshot[],
+  index?: BalanceIndex,
 ): number | null {
-  let latest: number | null = null
-  for (const snap of sortSnapshots(snapshots)) {
-    if (compareDate(snap.date, date) > 0) break
-    const line = snap.lines.find((l) => l.accountId === accountId)
-    if (line) latest = line.amount
-  }
-  return latest
+  return balanceFromIndex(index ?? buildBalanceIndex(snapshots), accountId, date)
 }
 
 function pivotFor(
@@ -418,14 +467,15 @@ export function totalOnDate(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
-  opts?: { includeArchived?: boolean; rateBook?: RateBook },
+  opts?: { includeArchived?: boolean; rateBook?: RateBook; balanceIndex?: BalanceIndex },
 ): number {
   const includeArchived = opts?.includeArchived ?? false
+  const index = opts?.balanceIndex ?? buildBalanceIndex(snapshots)
   const pivot = pivotFor(date, settings, opts?.rateBook)
   let total = 0
   for (const account of accounts) {
     if (!includeArchived && account.archived) continue
-    const bal = balanceOnDate(account.id, date, snapshots)
+    const bal = balanceOnDate(account.id, date, snapshots, index)
     if (bal == null) continue
     const nw = netWorthAmount(account, bal)
     total += toBase(nw, account.currency, settings.baseCurrency, settings.exchangeRates, pivot)
@@ -576,6 +626,7 @@ export function buildTotalSeries(
 
   const eligible = growthPortfolioAccounts(accounts)
   const startDate = dates[0]!
+  const balanceIndex = buildBalanceIndex(snapshots)
 
   const cashflowByDate = new Map<string, number>()
   for (const flow of growthCapitalFlows(
@@ -595,7 +646,14 @@ export function buildTotalSeries(
   let cumCashflow = 0
   let prevDate: string | null = null
   for (const date of dates) {
-    const total = growthPortfolioTotalOnDate(date, eligible, snapshots, settings, rateBook)
+    const total = growthPortfolioTotalOnDate(
+      date,
+      eligible,
+      snapshots,
+      settings,
+      rateBook,
+      balanceIndex,
+    )
     if (baseline == null || prevDate == null) {
       baseline = total
       prevDate = date
@@ -628,10 +686,14 @@ export function buildNetWorthSeries(
   const dates = snapshotDates(snapshots)
   if (dates.length === 0) return []
 
+  const balanceIndex = buildBalanceIndex(snapshots)
   const points: TotalPoint[] = []
   let baseline: number | null = null
   for (const date of dates) {
-    const total = totalOnDate(date, accounts, snapshots, settings, { rateBook })
+    const total = totalOnDate(date, accounts, snapshots, settings, {
+      rateBook,
+      balanceIndex,
+    })
     if (baseline == null) {
       baseline = total
       points.push({ date, total, growth: 0 })
