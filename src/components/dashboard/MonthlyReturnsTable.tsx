@@ -35,7 +35,7 @@ export function MonthlyReturnsTable() {
           <Card className="px-4 py-3">
             <p className="text-xs text-slate-500 dark:text-slate-400">Макс. просадка</p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-red-600">
-              {risk.maxDrawdownPct == null ? '—' : `−${formatPercent(risk.maxDrawdownPct)}`}
+              {formatPercent(risk.maxDrawdownPct == null ? null : -risk.maxDrawdownPct)}
             </p>
             <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
               по кумулятивному индексу
