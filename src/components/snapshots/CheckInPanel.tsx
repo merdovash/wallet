@@ -287,77 +287,81 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   async function handleSave() {
     if (!date || formAccounts.length === 0) return
 
-    // Пустое поле при редактировании оставляет сохранённое значение (как у остатков).
-    const incomeValue = parseMoneyInput(income) ?? editing?.income ?? 0
-    const expenseValue = parseMoneyInput(expense) ?? editing?.expense ?? 0
-    if (incomeValue < 0 || expenseValue < 0) return
+    try {
+      // Пустое поле при редактировании оставляет сохранённое значение (как у остатков).
+      const incomeValue = parseMoneyInput(income) ?? editing?.income ?? 0
+      const expenseValue = parseMoneyInput(expense) ?? editing?.expense ?? 0
+      if (incomeValue < 0 || expenseValue < 0) return
 
-    if (locked) {
-      await updateSnapshot(editing!.id, {
-        note: note.trim() || undefined,
-        income: incomeValue,
-        expense: expenseValue,
-      })
-      onClose()
-      return
-    }
+      if (locked) {
+        await updateSnapshot(editing!.id, {
+          note: note.trim() || undefined,
+          income: incomeValue,
+          expense: expenseValue,
+        })
+        onClose()
+        return
+      }
 
-    const typed = typedLines()
+      const typed = typedLines()
 
-    if (editing) {
-      const merged = mergeSnapshotLines(editing.lines, typed)
-      await updateSnapshot(editing.id, {
+      if (editing) {
+        const merged = mergeSnapshotLines(editing.lines, typed)
+        await updateSnapshot(editing.id, {
+          date,
+          note: note.trim() || undefined,
+          income: incomeValue,
+          expense: expenseValue,
+          lines: merged,
+          origin: 'manual',
+        })
+        // Незакоммиченный черновик перевода сохраняем автоматически.
+        const draft = draftTransfer ? parsePendingTransfer(draftTransfer) : null
+        if (draft != null) {
+          await addTransfer({ date, ...draft })
+        }
+        onClose()
+        return
+      }
+
+      // Незакоммиченный черновик перевода сохраняем вместе с чек-ином.
+      const allPending = draftTransfer ? [...pendingTransfers, draftTransfer] : pendingTransfers
+      const transfersToSave = allPending
+        .map((t) => parsePendingTransfer(t))
+        .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
+
+      if (typed.length === 0 && transfersToSave.length === 0) return
+
+      // For create: need at least some lines — use typed or carry forward for pending-transfer-only
+      let lines = typed
+      if (lines.length === 0 && transfersToSave.length > 0) {
+        lines = formAccounts
+          .map((account) => {
+            const prev = balanceOnDate(account.id, date, snapshots)
+            if (prev == null) return null
+            return { accountId: account.id, amount: prev }
+          })
+          .filter((l): l is SnapshotLine => l != null)
+        if (lines.length === 0) return
+      }
+
+      await addSnapshot({
         date,
         note: note.trim() || undefined,
         income: incomeValue,
         expense: expenseValue,
-        lines: merged,
         origin: 'manual',
+        lines,
       })
-      // Незакоммиченный черновик перевода сохраняем автоматически.
-      const draft = draftTransfer ? parsePendingTransfer(draftTransfer) : null
-      if (draft != null) {
-        await addTransfer({ date, ...draft })
+
+      for (const transfer of transfersToSave) {
+        await addTransfer({ date, ...transfer })
       }
+
       onClose()
-      return
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось сохранить чек-ин')
     }
-
-    // Незакоммиченный черновик перевода сохраняем вместе с чек-ином.
-    const allPending = draftTransfer ? [...pendingTransfers, draftTransfer] : pendingTransfers
-    const transfersToSave = allPending
-      .map((t) => parsePendingTransfer(t))
-      .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
-
-    if (typed.length === 0 && transfersToSave.length === 0) return
-
-    // For create: need at least some lines — use typed or carry forward for pending-transfer-only
-    let lines = typed
-    if (lines.length === 0 && transfersToSave.length > 0) {
-      lines = formAccounts
-        .map((account) => {
-          const prev = balanceOnDate(account.id, date, snapshots)
-          if (prev == null) return null
-          return { accountId: account.id, amount: prev }
-        })
-        .filter((l): l is SnapshotLine => l != null)
-      if (lines.length === 0) return
-    }
-
-    await addSnapshot({
-      date,
-      note: note.trim() || undefined,
-      income: incomeValue,
-      expense: expenseValue,
-      origin: 'manual',
-      lines,
-    })
-
-    for (const transfer of transfersToSave) {
-      await addTransfer({ date, ...transfer })
-    }
-
-    onClose()
   }
 
   async function handleDelete() {
