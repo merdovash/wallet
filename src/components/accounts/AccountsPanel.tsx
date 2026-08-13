@@ -13,7 +13,7 @@ import { balanceOnDate, buildAccountSeries, snapshotDates } from '../../engine/g
 import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
 import type { AccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
-import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '../../lib/accountKinds'
+import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, normalizeAccountKind } from '../../lib/accountKinds'
 import { buildAccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
@@ -483,6 +483,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               data={detailSeries}
               currency={detailAccount.currency}
               mode="account"
+              showGrowthLine={normalizeAccountKind(detailAccount.kind) !== 'operational'}
               accounts={accounts}
               snapshots={snapshots}
               settings={settings}

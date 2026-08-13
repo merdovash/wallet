@@ -28,6 +28,8 @@ interface GrowthChartProps {
   onSeriesKindChange?: (kind: GrowthChartSeriesKind) => void
   /** Hide in-chart toggle when rendered in the page header. */
   hideSeriesToggle?: boolean
+  /** Account detail: hide growth/delta line (e.g. operational accounts). */
+  showGrowthLine?: boolean
   accounts?: Account[]
   snapshots?: BalanceSnapshot[]
   settings?: WalletSettings
@@ -42,6 +44,7 @@ export function GrowthChart({
   seriesKind = 'growth',
   onSeriesKindChange,
   hideSeriesToggle = false,
+  showGrowthLine = true,
   accounts = [],
   snapshots = [],
   settings,
@@ -143,23 +146,25 @@ export function GrowthChart({
                 tickFormatter={formatCompactAxisValue}
                 width={48}
               />
-              <YAxis
-                yAxisId="growth"
-                orientation="right"
-                tick={{ fontSize: 11, fill: chartTheme.growthTick }}
-                tickFormatter={formatCompactAxisValue}
-                width={48}
-                domain={([dataMin, dataMax]) => {
-                  const min = Number.isFinite(dataMin) ? dataMin : 0
-                  const max = Number.isFinite(dataMax) ? dataMax : 0
-                  if (min === max) {
-                    const pad = Math.max(Math.abs(min) * 0.15, 1)
+              {showGrowthLine ? (
+                <YAxis
+                  yAxisId="growth"
+                  orientation="right"
+                  tick={{ fontSize: 11, fill: chartTheme.growthTick }}
+                  tickFormatter={formatCompactAxisValue}
+                  width={48}
+                  domain={([dataMin, dataMax]) => {
+                    const min = Number.isFinite(dataMin) ? dataMin : 0
+                    const max = Number.isFinite(dataMax) ? dataMax : 0
+                    if (min === max) {
+                      const pad = Math.max(Math.abs(min) * 0.15, 1)
+                      return [min - pad, max + pad]
+                    }
+                    const pad = (max - min) * 0.12
                     return [min - pad, max + pad]
-                  }
-                  const pad = (max - min) * 0.12
-                  return [min - pad, max + pad]
-                }}
-              />
+                  }}
+                />
+              ) : null}
               <Tooltip
                 formatter={(value: number, name: string) => [
                   formatCurrency(value, currency),
@@ -183,17 +188,19 @@ export function GrowthChart({
                 dot={{ r: 3 }}
                 activeDot={{ r: 6 }}
               />
-              <Line
-                yAxisId="growth"
-                type="monotone"
-                dataKey="growth"
-                name="growth"
-                stroke={chartTheme.growthLine}
-                strokeWidth={2}
-                strokeDasharray="4 4"
-                dot={{ r: 3 }}
-                activeDot={{ r: 6 }}
-              />
+              {showGrowthLine ? (
+                <Line
+                  yAxisId="growth"
+                  type="monotone"
+                  dataKey="growth"
+                  name="growth"
+                  stroke={chartTheme.growthLine}
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 6 }}
+                />
+              ) : null}
             </LineChart>
           </ResponsiveContainer>
         </div>
