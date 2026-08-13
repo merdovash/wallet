@@ -146,7 +146,7 @@ export function GrowthChart({
                 tick={{ fontSize: 11, fill: chartTheme.tick }}
                 tickFormatter={formatCompactAxisValue}
                 width={48}
-                domain={mode === 'total' ? paddedDataDomain : undefined}
+                domain={paddedDataDomain}
               />
               {showGrowthLine ? (
                 <YAxis
