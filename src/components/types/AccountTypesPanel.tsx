@@ -101,24 +101,32 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-sm">
+          <div className="overflow-x-hidden">
+            <table className="w-full table-fixed text-xs sm:text-sm">
+              <colgroup>
+                <col className="w-[34%] sm:w-[26%]" />
+                <col className="hidden md:table-column md:w-[10%]" />
+                <col className="w-[33%] sm:w-[22%]" />
+                <col className="hidden lg:table-column lg:w-[12%]" />
+                <col className="w-[33%] sm:w-[20%]" />
+                <col className="hidden md:table-column md:w-[14%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
-                  <th className="min-w-[8rem] px-3 py-3 font-medium sm:px-4">Тип</th>
-                  <th className="hidden min-w-[4.5rem] whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
+                  <th className="px-2 py-2 font-medium sm:px-4 sm:py-3">Тип</th>
+                  <th className="hidden whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
                     Счетов
                   </th>
-                  <th className="min-w-[6.5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                  <th className="whitespace-nowrap px-2 py-2 font-medium tabular-nums sm:px-4 sm:py-3">
                     В {report.baseCurrency}
                   </th>
-                  <th className="hidden min-w-[4rem] whitespace-nowrap px-4 py-3 font-medium tabular-nums lg:table-cell">
+                  <th className="hidden whitespace-nowrap px-4 py-3 font-medium tabular-nums lg:table-cell">
                     Доля
                   </th>
-                  <th className="min-w-[6rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                  <th className="whitespace-nowrap px-2 py-2 font-medium tabular-nums sm:px-4 sm:py-3">
                     Прирост
                   </th>
-                  <th className="min-w-[5.5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                  <th className="hidden whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
                     %
                   </th>
                 </tr>
@@ -159,21 +167,24 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
             </tbody>
             <tfoot>
               <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-100">
-                <td className="px-3 py-3 sm:px-4">
+                <td className="px-2 py-2 sm:px-4 sm:py-3">
                   <div>Итого</div>
-                  <div className="text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
+                  <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
                     {accountCountLabel(totalAccounts)}
                   </div>
                 </td>
                 <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">{totalAccounts}</td>
-                <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
+                <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
                   {formatCurrency(report.grandTotalBase, report.baseCurrency)}
                 </td>
                 <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums lg:table-cell">—</td>
-                <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
-                  {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+                <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
+                  <div>{signedAmount(report.grandGrowthBase, report.baseCurrency)}</div>
+                  <div className={`text-[11px] font-normal md:hidden ${pctTone(report.growthPct)}`}>
+                    {formatPercent(report.growthPct)}
+                  </div>
                 </td>
-                <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
+                <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">
                   <div className={pctTone(report.growthPct)}>{formatPercent(report.growthPct)}</div>
                   <div className={`text-xs font-normal ${pctTone(report.annualizedPct)}`}>
                     {formatPercent(report.annualizedPct)} год.
@@ -231,7 +242,7 @@ function TypeGroup({
   return (
     <>
       <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60">
-        <td className="px-3 py-3 sm:px-4">
+        <td className="px-2 py-2 sm:px-4 sm:py-3">
           <button
             type="button"
             onClick={onToggle}
@@ -240,7 +251,7 @@ function TypeGroup({
             <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
             <span className="min-w-0">
               <span className="block truncate">{label}</span>
-              <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
+              <span className="mt-0.5 block text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
                 {accountCountLabel(accountCount)} · {formatShare(Math.abs(share))}
               </span>
             </span>
@@ -249,16 +260,25 @@ function TypeGroup({
         <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
           {accountCount}
         </td>
-        <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${balanceColor}`}>
+        <td className={`truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3 ${balanceColor}`}>
           {formatCurrency(balanceBase, baseCurrency)}
         </td>
         <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 lg:table-cell">
           {formatShare(Math.abs(share))}
         </td>
-        <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${growthColor}`}>
-          {signedAmount(growthBase, baseCurrency)}
+        <td className={`truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3 ${growthColor}`}>
+          <div>{signedAmount(growthBase, baseCurrency)}</div>
+          <div className={`text-[11px] md:hidden ${pctTone(growthPct)}`}>
+            {formatPercent(growthPct)}
+            {growthPct != null ? (
+              <span className="text-slate-400 dark:text-slate-500">
+                {' '}
+                · {formatPercent(annualizedPct)} год.
+              </span>
+            ) : null}
+          </div>
         </td>
-        <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
+        <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">
           <div className={pctTone(growthPct)}>{formatPercent(growthPct)}</div>
           {growthPct != null ? (
             <div className={`text-xs ${pctTone(annualizedPct)}`}>
@@ -285,35 +305,35 @@ function TypeGroup({
                 : 'text-slate-600 dark:text-slate-400'
           return (
             <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/60/70">
-              <td className="px-3 py-2 pl-9 sm:px-4 sm:pl-10">
+              <td className="px-2 py-2 pl-7 sm:px-4 sm:py-2 sm:pl-10">
                 <button
                   type="button"
                   onClick={() => onOpenAccount(acc.accountId)}
                   className="text-left text-slate-700 dark:text-slate-300 hover:text-blue-700 hover:underline"
                 >
                   {acc.name}
-                  <span className="ml-1.5 text-xs text-slate-400 dark:text-slate-500">{acc.currency}</span>
+                  <span className="ml-1.5 text-[11px] text-slate-400 dark:text-slate-500">{acc.currency}</span>
                 </button>
               </td>
               <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
-              <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4">
+              <td className="truncate px-2 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4 sm:py-2">
                 <div>{formatCurrency(acc.balance, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
-                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                     ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
                   </div>
                 )}
               </td>
               <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 lg:table-cell">—</td>
-              <td className="whitespace-nowrap px-3 py-2 tabular-nums sm:px-4">
+              <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-2">
                 <div className={nativeTone}>{signedAmount(acc.growth, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
-                  <div className={`mt-0.5 text-xs ${baseTone}`}>
+                  <div className={`mt-0.5 text-[11px] ${baseTone}`}>
                     ≈ {signedAmount(acc.growthBase, baseCurrency)}
                   </div>
                 )}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-slate-400 dark:text-slate-500 sm:px-4">—</td>
+              <td className="hidden whitespace-nowrap px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
             </tr>
           )
         })}

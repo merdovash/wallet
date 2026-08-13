@@ -86,43 +86,80 @@ export function CashbackPanel() {
             {report.rows.length === 0 ? (
               <p className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">Пока нет чек-инов.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[32rem] text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      <th className="px-4 py-2 font-medium">Дата</th>
-                      <th className="px-4 py-2 font-medium text-right">Расход</th>
-                      <th className="px-4 py-2 font-medium text-right">Кэшбек</th>
-                      <th className="px-4 py-2 font-medium text-right">Скидка</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.rows.map((row) => (
-                      <tr
-                        key={row.date}
-                        className="border-b border-slate-100 dark:border-slate-800 last:border-0"
-                      >
-                        <td className="px-4 py-2.5">{formatDateDisplay(row.date)}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {row.expense > 0
-                            ? formatCurrency(row.expense, settings.baseCurrency)
-                            : '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
-                          {row.cashbackEarned > 0
-                            ? formatCurrency(row.cashbackEarned, settings.baseCurrency)
-                            : '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {row.discountPct != null && row.expense > 0
-                            ? formatPercent(row.discountPct, 2)
-                            : '—'}
-                        </td>
+              <>
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">
+                  {report.rows.map((row) => (
+                    <li key={row.date} className="px-3 py-2.5">
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {formatDateDisplay(row.date)}
+                      </p>
+                      <dl className="mt-1.5 grid grid-cols-3 gap-1 text-[11px]">
+                        <div>
+                          <dt className="text-slate-400 dark:text-slate-500">Расход</dt>
+                          <dd className="mt-0.5 truncate tabular-nums text-slate-800 dark:text-slate-200">
+                            {row.expense > 0
+                              ? formatCurrency(row.expense, settings.baseCurrency)
+                              : '—'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-400 dark:text-slate-500">Кэшбек</dt>
+                          <dd className="mt-0.5 truncate tabular-nums text-emerald-700 dark:text-emerald-400">
+                            {row.cashbackEarned > 0
+                              ? formatCurrency(row.cashbackEarned, settings.baseCurrency)
+                              : '—'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-400 dark:text-slate-500">Скидка</dt>
+                          <dd className="mt-0.5 truncate tabular-nums text-slate-800 dark:text-slate-200">
+                            {row.discountPct != null && row.expense > 0
+                              ? formatPercent(row.discountPct, 2)
+                              : '—'}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+                <div className="hidden overflow-x-hidden md:block">
+                  <table className="w-full table-fixed text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <th className="px-4 py-2 font-medium">Дата</th>
+                        <th className="px-4 py-2 font-medium text-right">Расход</th>
+                        <th className="px-4 py-2 font-medium text-right">Кэшбек</th>
+                        <th className="px-4 py-2 font-medium text-right">Скидка</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {report.rows.map((row) => (
+                        <tr
+                          key={row.date}
+                          className="border-b border-slate-100 dark:border-slate-800 last:border-0"
+                        >
+                          <td className="px-4 py-2.5">{formatDateDisplay(row.date)}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {row.expense > 0
+                              ? formatCurrency(row.expense, settings.baseCurrency)
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+                            {row.cashbackEarned > 0
+                              ? formatCurrency(row.cashbackEarned, settings.baseCurrency)
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {row.discountPct != null && row.expense > 0
+                              ? formatPercent(row.discountPct, 2)
+                              : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </Card>
         </>

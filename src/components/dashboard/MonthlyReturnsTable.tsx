@@ -70,18 +70,24 @@ export function MonthlyReturnsTable() {
           />
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[36rem] text-sm">
+        <div className="overflow-x-hidden">
+          <table className="w-full table-fixed text-xs sm:text-sm">
+            <colgroup>
+              <col className="w-[38%] sm:w-[34%]" />
+              <col className="hidden md:table-column md:w-[22%]" />
+              <col className="w-[31%] sm:w-[22%]" />
+              <col className="w-[31%] sm:w-[22%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
-                <th className="min-w-[7rem] px-3 py-3 font-medium sm:px-4">Месяц</th>
-                <th className="hidden min-w-[6.5rem] whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
+                <th className="px-2 py-2 font-medium sm:px-4 sm:py-3">Месяц</th>
+                <th className="hidden whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
                   Прирост
                 </th>
-                <th className="min-w-[5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                <th className="whitespace-nowrap px-2 py-2 font-medium tabular-nums sm:px-4 sm:py-3">
                   За месяц
                 </th>
-                <th className="min-w-[8.5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                <th className="whitespace-nowrap px-2 py-2 font-medium tabular-nums sm:px-4 sm:py-3">
                   В годовых
                 </th>
               </tr>
@@ -96,21 +102,21 @@ export function MonthlyReturnsTable() {
                       : 'text-slate-700 dark:text-slate-300'
                 return (
                   <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100 sm:px-4">
-                      <div>{row.label}</div>
-                      <div className="mt-0.5 text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
+                    <td className="px-2 py-2 font-medium text-slate-900 dark:text-slate-100 sm:px-4 sm:py-3">
+                      <div className="truncate">{row.label}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
                         {signedAmount(row.growth, settings.baseCurrency)}
                       </div>
                     </td>
                     <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-800 dark:text-slate-200 md:table-cell">
                       {signedAmount(row.growth, settings.baseCurrency)}
                     </td>
-                    <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${pctColor}`}>
+                    <td className={`truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3 ${pctColor}`}>
                       {formatPercent(row.growthPct)}
                     </td>
-                    <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${pctColor}`}>
+                    <td className={`truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3 ${pctColor}`}>
                       {formatPercent(row.annualizedPct)}
-                      <div className="mt-0.5 hidden text-xs text-slate-400 dark:text-slate-500 sm:block">
+                      <div className="mt-0.5 hidden truncate text-xs text-slate-400 dark:text-slate-500 sm:block">
                         от {formatCurrency(row.startTotal, settings.baseCurrency)}
                       </div>
                     </td>

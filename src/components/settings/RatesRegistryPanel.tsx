@@ -83,7 +83,41 @@ export function RatesRegistryPanel({
           <p className="text-xs text-slate-500 dark:text-slate-400">
             1 единица валюты → {baseCurrency}. Показаны валюты счетов и основные котировки ЦБ.
           </p>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+          <ul className="space-y-2 md:hidden">
+            {dates.map((date) => {
+              const pivot = byDate[date] ?? {}
+              return (
+                <li
+                  key={date}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {formatDateDisplay(date)}
+                  </p>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                    {columns.map((code) => {
+                      const value = rateInBase(pivot, code, baseCurrency)
+                      return (
+                        <div key={code} className="min-w-0">
+                          <dt className="text-slate-400 dark:text-slate-500" title={currencyLabel(code)}>
+                            {code}
+                          </dt>
+                          <dd className="truncate tabular-nums text-slate-800 dark:text-slate-200">
+                            {value == null ? (
+                              <span className="text-slate-300">—</span>
+                            ) : (
+                              formatCurrency(value, baseCurrency)
+                            )}
+                          </dd>
+                        </div>
+                      )
+                    })}
+                  </dl>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 md:block">
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400">
