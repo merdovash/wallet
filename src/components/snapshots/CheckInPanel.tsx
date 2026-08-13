@@ -285,13 +285,27 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   }
 
   async function handleSave() {
-    if (!date || formAccounts.length === 0) return
+    if (!date) {
+      alert('Укажите дату чек-ина')
+      return
+    }
+    if (formAccounts.length === 0) {
+      alert('Сначала добавьте хотя бы один счёт')
+      return
+    }
+
+    const rawAccountEntries = formAccounts.filter(
+      (account) => (amounts[account.id]?.trim() ?? '') !== '',
+    ).length
 
     try {
       // Пустое поле при редактировании оставляет сохранённое значение (как у остатков).
       const incomeValue = parseMoneyInput(income) ?? editing?.income ?? 0
       const expenseValue = parseMoneyInput(expense) ?? editing?.expense ?? 0
-      if (incomeValue < 0 || expenseValue < 0) return
+      if (incomeValue < 0 || expenseValue < 0) {
+        alert('Доход и расход не могут быть отрицательными')
+        return
+      }
 
       if (locked) {
         await updateSnapshot(editing!.id, {
@@ -304,6 +318,10 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       }
 
       const typed = typedLines()
+      if (rawAccountEntries > 0 && typed.length === 0) {
+        alert('Не удалось разобрать сумму в одном из полей счетов')
+        return
+      }
 
       if (editing) {
         const merged = mergeSnapshotLines(editing.lines, typed)
@@ -330,7 +348,12 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
         .map((t) => parsePendingTransfer(t))
         .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
 
-      if (typed.length === 0 && transfersToSave.length === 0) return
+      if (typed.length === 0 && transfersToSave.length === 0) {
+        alert(
+          'Введите новый остаток хотя бы для одного счёта. Серый текст в поле — только подсказка, его нужно ввести вручную.',
+        )
+        return
+      }
 
       // For create: need at least some lines — use typed or carry forward for pending-transfer-only
       let lines = typed
@@ -342,7 +365,10 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             return { accountId: account.id, amount: prev }
           })
           .filter((l): l is SnapshotLine => l != null)
-        if (lines.length === 0) return
+        if (lines.length === 0) {
+          alert('Не удалось подставить остатки для перевода')
+          return
+        }
       }
 
       await addSnapshot({
@@ -371,13 +397,10 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     onClose()
   }
 
-  const canSave = locked
-    ? true
-    : editing
-      ? true
-      : typedLines().length > 0 ||
-        pendingTransfers.length > 0 ||
-        (draftTransfer != null && parsePendingTransfer(draftTransfer) != null)
+  const canSaveHint =
+    !locked && !editing && typedLines().length === 0 && pendingTransfers.length === 0
+      ? 'Введите остаток хотя бы для одного счёта'
+      : null
 
   return (
     <StackPanel
@@ -407,16 +430,25 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             ?
           </button>
           <Button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={formAccounts.length === 0 || !canSave}
+            type="submit"
+            form="check-in-panel-form"
+            disabled={formAccounts.length === 0}
+            title={canSaveHint ?? undefined}
           >
             Сохранить
           </Button>
         </>
       }
     >
-      <div ref={rootRef} className="space-y-4">
+      <form
+        id="check-in-panel-form"
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void handleSave()
+        }}
+      >
+        <div ref={rootRef} className="space-y-4">
         {showHelp && (
           <div className="space-y-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
             <p>
@@ -588,7 +620,8 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
             {locked ? 'Удалить перевод' : 'Удалить чек-ин'}
           </Button>
         )}
-      </div>
+        </div>
+      </form>
     </StackPanel>
   )
 }
