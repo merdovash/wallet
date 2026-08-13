@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { RateBook } from '../../engine/growthEngine'
+import { paddedDataDomain } from '../../lib/chartAxisDomain'
 import { getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { useTheme } from '../../lib/useTheme'
@@ -145,6 +146,7 @@ export function GrowthChart({
                 tick={{ fontSize: 11, fill: chartTheme.tick }}
                 tickFormatter={formatCompactAxisValue}
                 width={48}
+                domain={mode === 'total' ? paddedDataDomain : undefined}
               />
               {showGrowthLine ? (
                 <YAxis
@@ -153,16 +155,7 @@ export function GrowthChart({
                   tick={{ fontSize: 11, fill: chartTheme.growthTick }}
                   tickFormatter={formatCompactAxisValue}
                   width={48}
-                  domain={([dataMin, dataMax]) => {
-                    const min = Number.isFinite(dataMin) ? dataMin : 0
-                    const max = Number.isFinite(dataMax) ? dataMax : 0
-                    if (min === max) {
-                      const pad = Math.max(Math.abs(min) * 0.15, 1)
-                      return [min - pad, max + pad]
-                    }
-                    const pad = (max - min) * 0.12
-                    return [min - pad, max + pad]
-                  }}
+                  domain={paddedDataDomain}
                 />
               ) : null}
               <Tooltip
