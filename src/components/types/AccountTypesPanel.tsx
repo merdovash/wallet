@@ -101,24 +101,29 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
             />
           </div>
         ) : (
-          <table className="w-full table-fixed text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
-                <th className="w-[34%] px-3 py-3 font-medium sm:px-4">Тип</th>
-                <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Счетов</th>
-                <th className="w-[28%] px-3 py-3 font-medium tabular-nums sm:px-4">
-                  В {report.baseCurrency}
-                </th>
-                <th className="hidden px-4 py-3 font-medium tabular-nums lg:table-cell">Доля</th>
-                <th className="w-[20%] px-3 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
-                  Прирост
-                </th>
-                <th className="w-[18%] px-2 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
-                  %
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[44rem] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
+                  <th className="min-w-[8rem] px-3 py-3 font-medium sm:px-4">Тип</th>
+                  <th className="hidden min-w-[4.5rem] whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
+                    Счетов
+                  </th>
+                  <th className="min-w-[6.5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                    В {report.baseCurrency}
+                  </th>
+                  <th className="hidden min-w-[4rem] whitespace-nowrap px-4 py-3 font-medium tabular-nums lg:table-cell">
+                    Доля
+                  </th>
+                  <th className="min-w-[6rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                    Прирост
+                  </th>
+                  <th className="min-w-[5.5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                    %
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
               {report.rows.map((row) => {
                 const open = !!expanded[row.kind]
                 const growthColor =
@@ -160,15 +165,15 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                     {accountCountLabel(totalAccounts)}
                   </div>
                 </td>
-                <td className="hidden px-4 py-3 tabular-nums md:table-cell">{totalAccounts}</td>
-                <td className="px-3 py-3 tabular-nums sm:px-4">
+                <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">{totalAccounts}</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
                   {formatCurrency(report.grandTotalBase, report.baseCurrency)}
                 </td>
-                <td className="hidden px-4 py-3 tabular-nums lg:table-cell">—</td>
-                <td className="px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left">
+                <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums lg:table-cell">—</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
                   {signedAmount(report.grandGrowthBase, report.baseCurrency)}
                 </td>
-                <td className="px-2 py-3 text-right tabular-nums sm:px-4 sm:text-left">
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
                   <div className={pctTone(report.growthPct)}>{formatPercent(report.growthPct)}</div>
                   <div className={`text-xs font-normal ${pctTone(report.annualizedPct)}`}>
                     {formatPercent(report.annualizedPct)} год.
@@ -176,7 +181,8 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                 </td>
               </tr>
             </tfoot>
-          </table>
+            </table>
+          </div>
         )}
       </Card>
     </div>
@@ -240,19 +246,19 @@ function TypeGroup({
             </span>
           </button>
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
+        <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
           {accountCount}
         </td>
-        <td className={`px-3 py-3 tabular-nums sm:px-4 ${balanceColor}`}>
+        <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${balanceColor}`}>
           {formatCurrency(balanceBase, baseCurrency)}
         </td>
-        <td className="hidden px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 lg:table-cell">
+        <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 lg:table-cell">
           {formatShare(Math.abs(share))}
         </td>
-        <td className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${growthColor}`}>
+        <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${growthColor}`}>
           {signedAmount(growthBase, baseCurrency)}
         </td>
-        <td className="px-2 py-3 text-right tabular-nums sm:px-4 sm:text-left">
+        <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
           <div className={pctTone(growthPct)}>{formatPercent(growthPct)}</div>
           {growthPct != null ? (
             <div className={`text-xs ${pctTone(annualizedPct)}`}>
@@ -290,7 +296,7 @@ function TypeGroup({
                 </button>
               </td>
               <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
-              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4">
+              <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4">
                 <div>{formatCurrency(acc.balance, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
                   <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -299,7 +305,7 @@ function TypeGroup({
                 )}
               </td>
               <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 lg:table-cell">—</td>
-              <td className="px-3 py-2 text-right tabular-nums sm:px-4 sm:text-left">
+              <td className="whitespace-nowrap px-3 py-2 tabular-nums sm:px-4">
                 <div className={nativeTone}>{signedAmount(acc.growth, acc.currency)}</div>
                 {acc.currency !== baseCurrency && (
                   <div className={`mt-0.5 text-xs ${baseTone}`}>
@@ -307,7 +313,7 @@ function TypeGroup({
                   </div>
                 )}
               </td>
-              <td className="px-2 py-2 text-slate-400 dark:text-slate-500 sm:px-4">—</td>
+              <td className="whitespace-nowrap px-3 py-2 text-slate-400 dark:text-slate-500 sm:px-4">—</td>
             </tr>
           )
         })}

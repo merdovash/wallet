@@ -70,52 +70,56 @@ export function MonthlyReturnsTable() {
           />
         </div>
       ) : (
-        <table className="w-full table-fixed text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
-              <th className="w-[28%] px-3 py-3 font-medium sm:px-4">Месяц</th>
-              <th className="hidden px-4 py-3 font-medium tabular-nums md:table-cell">Прирост</th>
-              <th className="w-[36%] px-3 py-3 font-medium tabular-nums sm:px-4">За месяц</th>
-              <th className="w-[36%] px-3 py-3 text-right font-medium tabular-nums sm:px-4 sm:text-left">
-                В годовых
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...rows].reverse().map((row) => {
-              const pctColor =
-                (row.growthPct ?? 0) > 0
-                  ? 'text-emerald-700'
-                  : (row.growthPct ?? 0) < 0
-                    ? 'text-red-600'
-                    : 'text-slate-700 dark:text-slate-300'
-              return (
-                <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100 sm:px-4">
-                    <div>{row.label}</div>
-                    <div className="mt-0.5 text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-slate-500 dark:text-slate-400">
+                <th className="min-w-[7rem] px-3 py-3 font-medium sm:px-4">Месяц</th>
+                <th className="hidden min-w-[6.5rem] whitespace-nowrap px-4 py-3 font-medium tabular-nums md:table-cell">
+                  Прирост
+                </th>
+                <th className="min-w-[5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                  За месяц
+                </th>
+                <th className="min-w-[8.5rem] whitespace-nowrap px-3 py-3 font-medium tabular-nums sm:px-4">
+                  В годовых
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...rows].reverse().map((row) => {
+                const pctColor =
+                  (row.growthPct ?? 0) > 0
+                    ? 'text-emerald-700'
+                    : (row.growthPct ?? 0) < 0
+                      ? 'text-red-600'
+                      : 'text-slate-700 dark:text-slate-300'
+                return (
+                  <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100 sm:px-4">
+                      <div>{row.label}</div>
+                      <div className="mt-0.5 text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
+                        {signedAmount(row.growth, settings.baseCurrency)}
+                      </div>
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-800 dark:text-slate-200 md:table-cell">
                       {signedAmount(row.growth, settings.baseCurrency)}
-                    </div>
-                  </td>
-                  <td className="hidden px-4 py-3 tabular-nums text-slate-800 dark:text-slate-200 md:table-cell">
-                    {signedAmount(row.growth, settings.baseCurrency)}
-                  </td>
-                  <td className={`px-3 py-3 tabular-nums sm:px-4 ${pctColor}`}>
-                    {formatPercent(row.growthPct)}
-                  </td>
-                  <td
-                    className={`px-3 py-3 text-right tabular-nums sm:px-4 sm:text-left ${pctColor}`}
-                  >
-                    {formatPercent(row.annualizedPct)}
-                    <div className="mt-0.5 hidden text-xs text-slate-400 dark:text-slate-500 sm:block">
-                      от {formatCurrency(row.startTotal, settings.baseCurrency)}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${pctColor}`}>
+                      {formatPercent(row.growthPct)}
+                    </td>
+                    <td className={`whitespace-nowrap px-3 py-3 tabular-nums sm:px-4 ${pctColor}`}>
+                      {formatPercent(row.annualizedPct)}
+                      <div className="mt-0.5 hidden text-xs text-slate-400 dark:text-slate-500 sm:block">
+                        от {formatCurrency(row.startTotal, settings.baseCurrency)}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </Card>
     </div>
