@@ -24,7 +24,7 @@ import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { ReturnBreakdownPanel } from '../dashboard/ReturnBreakdownPanel'
+import { DailyBreakdownPanel } from './DailyBreakdownPanel'
 import { Card, DateInput, EmptyState, Field } from '../ui/FormControls'
 
 type DayRow = {
@@ -392,17 +392,12 @@ export function DailyGrowthPanel() {
         </>
       )}
 
-      <ReturnBreakdownPanel
+      <DailyBreakdownPanel
         open={selectedEndDate != null}
         onClose={() => setSelectedEndDate(null)}
-        focus="growth"
         periodReturn={dayBreakdown}
+        endDate={selectedEndDate}
         currency={settings.baseCurrency}
-        title={
-          selectedEndDate
-            ? `Расшифровка: прирост за ${formatDateDisplay(selectedEndDate)}`
-            : undefined
-        }
       />
     </div>
   )
