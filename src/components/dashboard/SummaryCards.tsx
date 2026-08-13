@@ -136,6 +136,39 @@ export function SummaryCards({
             compact
           />
         </Card>
+        <button type="button" onClick={() => setBreakdownFocus('growth')} className={clickCardClass}>
+          <Card className={cardClass}>
+            <p className={labelClass}>Без курса</p>
+            {periodReturn?.quantityEffectBase != null ? (
+              <>
+                <p
+                  className={`${valueClass} ${
+                    periodReturn.quantityEffectBase > 0
+                      ? 'text-emerald-700'
+                      : periodReturn.quantityEffectBase < 0
+                        ? 'text-red-600'
+                        : 'text-slate-800 dark:text-slate-200'
+                  }`}
+                >
+                  {signedAmount(periodReturn.quantityEffectBase, currency)}
+                </p>
+                <p
+                  className={`mt-0.5 text-[10px] font-semibold tabular-nums leading-tight ${
+                    (periodReturn.quantityEffectPct ?? 0) > 0
+                      ? 'text-emerald-700'
+                      : (periodReturn.quantityEffectPct ?? 0) < 0
+                        ? 'text-red-600'
+                        : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {formatPercent(periodReturn.quantityEffectPct)}
+                </p>
+              </>
+            ) : (
+              <p className={`${valueClass} text-slate-800 dark:text-slate-200`}>—</p>
+            )}
+          </Card>
+        </button>
       </div>
 
       <ReturnBreakdownPanel

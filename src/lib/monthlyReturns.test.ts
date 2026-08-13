@@ -373,6 +373,8 @@ describe('monthlyReturns', () => {
     expect(summary?.endTotal).toBe(1080)
     expect(summary?.growth).toBe(80)
     expect(summary?.growthPct).toBeCloseTo(0.08, 8)
+    expect(summary?.quantityEffectBase).toBeCloseTo(-120, 8)
+    expect(summary?.quantityEffectPct).toBeCloseTo(-0.12, 8)
     expect(summary?.includedAccounts[0]?.growthBase).toBe(80)
   })
 

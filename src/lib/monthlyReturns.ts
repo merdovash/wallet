@@ -111,6 +111,10 @@ export interface PeriodReturnSummary {
   excludedAccounts: PeriodReturnAccountLine[]
   /** Growth split: native earnings vs FX on opening balances. */
   growthFx: GrowthFxBreakdown | null
+  /** Earnings in account currencies (× end FX), excluding FX revaluation. */
+  quantityEffectBase: number | null
+  /** Modified Dietz % for quantityEffectBase. */
+  quantityEffectPct: number | null
   /** Comparison with key rate and USD change. */
   benchmarks: ReturnBenchmarks
   /** Time-weighted return chained between check-ins. */
@@ -481,6 +485,12 @@ export function buildPeriodReturn(
     rateBook,
   )
 
+  const quantityEffectBase = growthFx?.quantityEffectBase ?? null
+  const quantityEffectPct =
+    quantityEffectBase == null
+      ? null
+      : modifiedDietzReturn(startTotal, quantityEffectBase, startDate, endDate, flows).growthPct
+
   const benchmarks = buildReturnBenchmarks(
     annualizedPct,
     days,
@@ -523,6 +533,8 @@ export function buildPeriodReturn(
     includedAccounts,
     excludedAccounts,
     growthFx,
+    quantityEffectBase,
+    quantityEffectPct,
     benchmarks,
     twrPct,
     twrAnnualizedPct,
