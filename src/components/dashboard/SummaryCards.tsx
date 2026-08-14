@@ -6,6 +6,7 @@ import {
   explainRealAnnualizedPct,
   type PeriodReturnSummary,
 } from '../../lib/monthlyReturns'
+import { useFxModeStore } from '../../store/fxModeStore'
 import { Card } from '../ui/FormControls'
 import { AnnualizedMetric } from './AnnualizedMetric'
 import { ReturnBreakdownPanel } from './ReturnBreakdownPanel'
@@ -38,14 +39,33 @@ export function SummaryCards({
   annualInflationPct,
 }: SummaryCardsProps) {
   const [breakdownFocus, setBreakdownFocus] = useState<BreakdownFocus>(null)
+  const fxMode = useFxModeStore((s) => s.fxMode)
+  const withoutFx = fxMode === 'withoutFx'
 
-  const growthColor = growth > 0 ? 'text-emerald-700 dark:text-emerald-400' : growth < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
-  const topUp = periodReturn?.netFlow ?? 0
-  const topUpColor = topUp > 0 ? 'text-emerald-700 dark:text-emerald-400' : topUp < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
-  const pctColor =
-    (periodReturn?.growthPct ?? 0) > 0
+  const displayGrowth = withoutFx
+    ? (periodReturn?.quantityEffectBase ?? growth)
+    : growth
+  const displayGrowthPct = withoutFx
+    ? (periodReturn?.quantityEffectPct ?? null)
+    : (periodReturn?.growthPct ?? null)
+
+  const growthColor =
+    displayGrowth > 0
       ? 'text-emerald-700 dark:text-emerald-400'
-      : (periodReturn?.growthPct ?? 0) < 0
+      : displayGrowth < 0
+        ? 'text-red-600'
+        : 'text-slate-800 dark:text-slate-200'
+  const topUp = periodReturn?.netFlow ?? 0
+  const topUpColor =
+    topUp > 0
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : topUp < 0
+        ? 'text-red-600'
+        : 'text-slate-800 dark:text-slate-200'
+  const pctColor =
+    (displayGrowthPct ?? 0) > 0
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : (displayGrowthPct ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
 
@@ -83,8 +103,13 @@ export function SummaryCards({
         </Card>
         <button type="button" onClick={() => setBreakdownFocus('growth')} className={clickCardClass}>
           <Card className={cardClass}>
-            <p className={labelClass}>Прирост</p>
-            <p className={`${valueClass} ${growthColor}`}>{signedAmount(growth, currency)}</p>
+            <p className={labelClass}>
+              Прирост{withoutFx ? ' · без курса' : ''}
+            </p>
+            <p className={`${valueClass} ${growthColor}`}>{signedAmount(displayGrowth, currency)}</p>
+            <p className={`mt-0.5 text-[10px] font-semibold tabular-nums leading-tight ${pctColor}`}>
+              {formatPercent(displayGrowthPct)}
+            </p>
           </Card>
         </button>
         <button type="button" onClick={() => setBreakdownFocus('topUp')} className={clickCardClass}>
@@ -93,12 +118,6 @@ export function SummaryCards({
             <p className={`${valueClass} ${topUpColor}`}>
               {periodReturn ? signedAmount(topUp, currency) : '—'}
             </p>
-          </Card>
-        </button>
-        <button type="button" onClick={() => setBreakdownFocus('growthPct')} className={clickCardClass}>
-          <Card className={cardClass}>
-            <p className={labelClass}>Прирост %</p>
-            <p className={`${valueClass} ${pctColor}`}>{formatPercent(periodReturn?.growthPct)}</p>
           </Card>
         </button>
         <button type="button" onClick={() => setBreakdownFocus('annualizedPct')} className={clickCardClass}>
@@ -136,39 +155,6 @@ export function SummaryCards({
             compact
           />
         </Card>
-        <button type="button" onClick={() => setBreakdownFocus('growth')} className={clickCardClass}>
-          <Card className={cardClass}>
-            <p className={labelClass}>Без курса</p>
-            {periodReturn?.quantityEffectBase != null ? (
-              <>
-                <p
-                  className={`${valueClass} ${
-                    periodReturn.quantityEffectBase > 0
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : periodReturn.quantityEffectBase < 0
-                        ? 'text-red-600'
-                        : 'text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  {signedAmount(periodReturn.quantityEffectBase, currency)}
-                </p>
-                <p
-                  className={`mt-0.5 text-[10px] font-semibold tabular-nums leading-tight ${
-                    (periodReturn.quantityEffectPct ?? 0) > 0
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : (periodReturn.quantityEffectPct ?? 0) < 0
-                        ? 'text-red-600'
-                        : 'text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {formatPercent(periodReturn.quantityEffectPct)}
-                </p>
-              </>
-            ) : (
-              <p className={`${valueClass} text-slate-800 dark:text-slate-200`}>—</p>
-            )}
-          </Card>
-        </button>
       </div>
 
       <ReturnBreakdownPanel
@@ -177,6 +163,7 @@ export function SummaryCards({
         focus={breakdownFocus}
         periodReturn={periodReturn ?? null}
         currency={currency}
+        fxMode={fxMode}
       />
     </>
   )

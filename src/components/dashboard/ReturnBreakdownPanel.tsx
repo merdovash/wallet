@@ -4,12 +4,14 @@
   formatPercent,
   signedAmount,
 } from '../../lib/format'
+import type { GrowthFxMode } from '../../engine/growthEngine'
 import type {
   PeriodReturnAccountLine,
   PeriodReturnSummary,
   PeriodReturnTransferLine,
 } from '../../lib/monthlyReturns'
 import { StackPanel } from '../ui/StackPanel'
+import { fxModeLabel } from '../ui/FxModeToggle'
 
 export type ReturnBreakdownFocus =
   | 'growth'
@@ -27,6 +29,7 @@ interface ReturnBreakdownPanelProps {
   currency: string
   /** Override panel title (e.g. daily breakdown). */
   title?: string
+  fxMode?: GrowthFxMode
 }
 
 function tone(value: number): string {
@@ -42,7 +45,9 @@ export function ReturnBreakdownPanel({
   periodReturn,
   currency,
   title: titleOverride,
+  fxMode = 'withFx',
 }: ReturnBreakdownPanelProps) {
+  const withoutFx = fxMode === 'withoutFx'
   const title =
     titleOverride ??
     (focus === 'annualizedPctOfAllMass'
@@ -50,18 +55,27 @@ export function ReturnBreakdownPanel({
       : focus === 'annualizedPct'
         ? 'Расчёт: в годовых'
         : focus === 'growth'
-          ? 'Расшифровка: прирост'
+          ? withoutFx
+            ? 'Расшифровка: прирост без курса'
+            : 'Расшифровка: прирост'
           : focus === 'topUp'
             ? 'Расшифровка: чистый поток'
             : 'Расчёт: прирост %')
 
   const includedSorted = periodReturn
-    ? [...periodReturn.includedAccounts].sort(
-        (a, b) =>
-          (focus === 'topUp'
-            ? Math.abs(b.transfersBase) - Math.abs(a.transfersBase)
-            : b.growthBase - a.growthBase) || a.name.localeCompare(b.name),
-      )
+    ? [...periodReturn.includedAccounts].sort((a, b) => {
+        if (focus === 'topUp') {
+          return Math.abs(b.transfersBase) - Math.abs(a.transfersBase) || a.name.localeCompare(b.name)
+        }
+        if (withoutFx && periodReturn.growthFx) {
+          const qa = periodReturn.growthFx.accounts.find((x) => x.accountId === a.accountId)
+          const qb = periodReturn.growthFx.accounts.find((x) => x.accountId === b.accountId)
+          const ga = qa?.quantityEffectBase ?? a.growthBase
+          const gb = qb?.quantityEffectBase ?? b.growthBase
+          return gb - ga || a.name.localeCompare(b.name)
+        }
+        return b.growthBase - a.growthBase || a.name.localeCompare(b.name)
+      })
     : []
 
   return (
@@ -72,13 +86,19 @@ export function ReturnBreakdownPanel({
           или инвестиции.
         </p>
       ) : focus === 'growth' ? (
-        <GrowthMovementsView periodReturn={periodReturn} accounts={includedSorted} currency={currency} />
+        <GrowthMovementsView
+          periodReturn={periodReturn}
+          accounts={includedSorted}
+          currency={currency}
+          fxMode={fxMode}
+        />
       ) : (
         <PercentBreakdownView
           focus={focus}
           periodReturn={periodReturn}
           includedSorted={includedSorted}
           currency={currency}
+          fxMode={fxMode}
         />
       )}
     </StackPanel>
@@ -90,40 +110,104 @@ function GrowthMovementsView({
   periodReturn,
   accounts,
   currency,
+  fxMode,
 }: {
   periodReturn: PeriodReturnSummary
   accounts: PeriodReturnAccountLine[]
   currency: string
+  fxMode: GrowthFxMode
 }) {
-  const totalGrowth = accounts.reduce((s, a) => s + a.growthBase, 0)
+  const withoutFx = fxMode === 'withoutFx'
+  const qtyByAccount = new Map(
+    (periodReturn.growthFx?.accounts ?? []).map((a) => [a.accountId, a]),
+  )
+  const displayGrowth = withoutFx
+    ? (periodReturn.quantityEffectBase ?? periodReturn.growth)
+    : periodReturn.growth
+  const displayPct = withoutFx
+    ? (periodReturn.quantityEffectPct ?? periodReturn.growthPct)
+    : periodReturn.growthPct
+  const totalGrowth = accounts.reduce((s, a) => {
+    if (withoutFx) {
+      return s + (qtyByAccount.get(a.accountId)?.quantityEffectBase ?? a.growthBase)
+    }
+    return s + a.growthBase
+  }, 0)
   const totalTransfers = accounts.reduce((s, a) => s + a.transfersBase, 0)
+  const fxEffect = periodReturn.growthFx?.fxEffectBase ?? 0
 
   return (
     <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-        <p className="font-semibold">Движения по учитываемым счетам</p>
+      <div
+        className={`rounded-lg border px-3 py-2 text-xs ${
+          withoutFx
+            ? 'border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200'
+        }`}
+      >
+        <p className="font-semibold">
+          Режим: {fxModeLabel(fxMode)}
+        </p>
+        <p className="mt-1">
+          {withoutFx
+            ? 'Курсовой эффект на начальный остаток не входит в прирост: считается только дельта в валюте счёта × курс на конец периода.'
+            : 'Курсовой эффект входит в прирост: переоценка начального остатка из‑за изменения курса учитывается.'}
+        </p>
         <p className="mt-1">
           Фонд, вклад и инвестиции за период{' '}
           {formatDateDisplay(periodReturn.startDate)} → {formatDateDisplay(periodReturn.endDate)}.
-          Изменение остатка = прирост + переводы.
         </p>
       </div>
 
       <dl className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         <Row
           label="Прирост"
-          value={signedAmount(periodReturn.growth, currency)}
-          valueClassName={tone(periodReturn.growth)}
-          hint="сумма роста по учитываемым счетам"
+          value={signedAmount(displayGrowth, currency)}
+          valueClassName={tone(displayGrowth)}
+          hint={
+            withoutFx
+              ? 'Σ (дельта в валюте × курс дня)'
+              : 'сумма роста по учитываемым счетам'
+          }
+          emphasize
+        />
+        <Row
+          label="Прирост %"
+          value={formatPercent(displayPct)}
+          valueClassName={tone(displayPct ?? 0)}
+          hint="Modified Dietz"
           emphasize
         />
         <Row
           label="Относительный к общей массе"
-          value={formatPercent(periodReturn.growthPctOfAllMass, 3)}
-          valueClassName={tone(periodReturn.growthPctOfAllMass ?? 0)}
+          value={formatPercent(
+            withoutFx && periodReturn.startTotalAllMass
+              ? displayGrowth / periodReturn.startTotalAllMass
+              : periodReturn.growthPctOfAllMass,
+            3,
+          )}
+          valueClassName={tone(
+            (withoutFx && periodReturn.startTotalAllMass
+              ? displayGrowth / periodReturn.startTotalAllMass
+              : periodReturn.growthPctOfAllMass) ?? 0,
+          )}
           hint={`прирост ÷ вся масса на начало (${formatCurrency(periodReturn.startTotalAllMass, currency)})`}
-          emphasize
         />
+        {!withoutFx ? (
+          <Row
+            label="Курсовой эффект"
+            value={signedAmount(fxEffect, currency)}
+            valueClassName={tone(fxEffect)}
+            hint="входит в прирост выше"
+          />
+        ) : (
+          <Row
+            label="Курсовой эффект"
+            value={signedAmount(fxEffect, currency)}
+            valueClassName="text-slate-500 dark:text-slate-400"
+            hint="не входит в прирост в этом режиме"
+          />
+        )}
         <Row
           label="Переводы (чистые)"
           value={signedAmount(totalTransfers, currency)}
@@ -133,11 +217,11 @@ function GrowthMovementsView({
         <Row
           label="Изменение остатков"
           value={signedAmount(periodReturn.endTotal - periodReturn.startTotal, currency)}
-          hint="прирост + переводы"
+          hint="прирост + переводы (+ курс при полном режиме)"
         />
       </dl>
 
-      {periodReturn.growthFx ? (
+      {periodReturn.growthFx && !withoutFx ? (
         <GrowthFxSection breakdown={periodReturn.growthFx} currency={currency} />
       ) : null}
 
@@ -149,40 +233,48 @@ function GrowthMovementsView({
           <p className="text-xs text-slate-400 dark:text-slate-500">Нет учитываемых счетов</p>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            {accounts.map((acc) => (
-              <li key={acc.accountId} className="space-y-1.5 px-3 py-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{acc.name}</span>
-                    <span className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                      {acc.kindLabel}
-                      {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
+            {accounts.map((acc) => {
+              const qty = qtyByAccount.get(acc.accountId)
+              const growthShown = withoutFx
+                ? (qty?.quantityEffectBase ?? acc.growthBase)
+                : acc.growthBase
+              return (
+                <li key={acc.accountId} className="space-y-1.5 px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-slate-900 dark:text-slate-200">
+                        {acc.name}
+                      </span>
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                        {acc.kindLabel}
+                        {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                    {formatCurrency(acc.startBalance, acc.currency)} →{' '}
-                    {formatCurrency(acc.endBalance, acc.currency)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-                  <MovementChip
-                    label="Прирост"
-                    value={signedAmount(acc.growthBase, currency)}
-                    className={tone(acc.growthBase)}
-                  />
-                  <MovementChip
-                    label="Переводы"
-                    value={signedAmount(acc.transfersBase, currency)}
-                    className={tone(acc.transfersBase)}
-                  />
-                  <MovementChip
-                    label="Δ остатка"
-                    value={signedAmount(acc.balanceChangeBase, currency)}
-                    className="text-slate-700 dark:text-slate-300"
-                  />
-                </div>
-              </li>
-            ))}
+                    <span className="shrink-0 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                      {formatCurrency(acc.startBalance, acc.currency)} →{' '}
+                      {formatCurrency(acc.endBalance, acc.currency)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                    <MovementChip
+                      label={withoutFx ? 'Δ×курс' : 'Прирост'}
+                      value={signedAmount(growthShown, currency)}
+                      className={tone(growthShown)}
+                    />
+                    <MovementChip
+                      label="Переводы"
+                      value={signedAmount(acc.transfersBase, currency)}
+                      className={tone(acc.transfersBase)}
+                    />
+                    <MovementChip
+                      label="Δ остатка"
+                      value={signedAmount(acc.balanceChangeBase, currency)}
+                      className="text-slate-700 dark:text-slate-300"
+                    />
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
         {accounts.length > 0 ? (
@@ -321,23 +413,45 @@ function PercentBreakdownView({
   periodReturn,
   includedSorted,
   currency,
+  fxMode,
 }: {
   focus: Exclude<ReturnBreakdownFocus, 'growth'>
   periodReturn: PeriodReturnSummary
   includedSorted: PeriodReturnAccountLine[]
   currency: string
+  fxMode: GrowthFxMode
 }) {
+  const withoutFx = fxMode === 'withoutFx'
+  const displayGrowth = withoutFx
+    ? (periodReturn.quantityEffectBase ?? periodReturn.growth)
+    : periodReturn.growth
+  const displayPct = withoutFx
+    ? (periodReturn.quantityEffectPct ?? periodReturn.growthPct)
+    : periodReturn.growthPct
   const showAllMass = focus === 'annualizedPctOfAllMass'
   return (
     <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+      <div
+        className={`rounded-lg border px-3 py-2 text-xs ${
+          withoutFx
+            ? 'border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200'
+        }`}
+      >
         <p className="font-semibold">
           {showAllMass ? 'Годовых от всей массы' : 'Обычный процент прироста'}
+          {' · '}
+          {fxModeLabel(fxMode)}
         </p>
         <p className="mt-1">
           {showAllMass
             ? `Числитель — прирост портфеля роста (фонды, вклады, инвестиции; ${periodReturn.accountCount} сч.). Знаменатель — вся масса денег на начало периода.`
             : `Считается только от фондов, вкладов и инвестиций — ${periodReturn.accountCount} счёт(а). Наличка, оперативные и кредитки в капитал и процент не входят.`}
+        </p>
+        <p className="mt-1">
+          {withoutFx
+            ? 'Курсовой эффект на начальный остаток не влияет на прирост и % в этом режиме.'
+            : 'Курсовой эффект влияет на прирост и % (переоценка остатка из‑за курса входит в расчёт).'}
         </p>
       </div>
 
@@ -369,12 +483,12 @@ function PercentBreakdownView({
         />
         <Row
           label="Прирост"
-          value={signedAmount(periodReturn.growth, currency)}
-          hint="конец − начало − поток"
+          value={signedAmount(displayGrowth, currency)}
+          hint={withoutFx ? 'Σ (дельта × курс дня)' : 'конец − начало − поток'}
         />
         <Row
           label="Прирост %"
-          value={formatPercent(periodReturn.growthPct)}
+          value={formatPercent(displayPct)}
           hint="прирост ÷ взвешенный капитал портфеля (Modified Dietz)"
           emphasize={focus === 'growthPct'}
         />

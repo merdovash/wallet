@@ -709,7 +709,11 @@ export function buildNetWorthSeries(
  * withFx — full base growth including FX revaluation of opening balances.
  * withoutFx — native balance delta (minus transfers) × FX rate on the end day only.
  */
-export type DailyGrowthFxMode = 'withFx' | 'withoutFx'
+export type GrowthFxMode = 'withFx' | 'withoutFx'
+
+/** @deprecated Use GrowthFxMode */
+export type DailyGrowthFxMode = GrowthFxMode
+
 
 /**
  * Quantity-only growth for one check-in interval: Σ (Δ_native × rate_end).

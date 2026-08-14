@@ -8,6 +8,7 @@ import {
   netWorthAmount,
   snapshotDates,
   type DatedCapitalFlow,
+  type GrowthFxMode,
   type RateBook,
 } from '../engine/growthEngine'
 import { resolvePivotForDate } from './cbrRates'
@@ -138,6 +139,7 @@ export function buildAccountTypeReport(
   transfers: Transfer[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  fxMode: GrowthFxMode = 'withFx',
 ): AccountTypeReport {
   const dates = snapshotDates(snapshots)
   const t0 = dates[0] ?? null
@@ -209,16 +211,25 @@ export function buildAccountTypeReport(
         : 0
     const growthBase =
       t0 != null && isGrowthAccount(account)
-        ? (accountGrowthBase(
-            account.id,
-            t0,
-            t1,
-            snapshots,
-            transfers,
-            accounts,
-            settings,
-            rateBook,
-          ) ?? 0)
+        ? fxMode === 'withoutFx'
+          ? convertAmount(
+              growth,
+              account.currency,
+              settings.baseCurrency,
+              settings,
+              t1,
+              rateBook,
+            )
+          : (accountGrowthBase(
+              account.id,
+              t0,
+              t1,
+              snapshots,
+              transfers,
+              accounts,
+              settings,
+              rateBook,
+            ) ?? 0)
         : 0
 
     const bucket = byKind.get(kind) ?? {

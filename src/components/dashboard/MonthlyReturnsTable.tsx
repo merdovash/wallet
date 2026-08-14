@@ -1,7 +1,8 @@
 ﻿import { useMemo } from 'react'
-import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import { buildMonthlyReturns } from '../../lib/monthlyReturns'
 import { buildMonthlyRiskMetrics } from '../../lib/monthlyRiskMetrics'
+import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
+import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -12,10 +13,11 @@ export function MonthlyReturnsTable() {
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
+  const fxMode = useFxModeStore((s) => s.fxMode)
 
   const rows = useMemo(
-    () => buildMonthlyReturns(accounts, snapshots, settings, rateBook, transfers),
-    [accounts, snapshots, settings, rateBook, transfers],
+    () => buildMonthlyReturns(accounts, snapshots, settings, rateBook, transfers, fxMode),
+    [accounts, snapshots, settings, rateBook, transfers, fxMode],
   )
   const risk = useMemo(() => buildMonthlyRiskMetrics(rows), [rows])
 
@@ -60,6 +62,7 @@ export function MonthlyReturnsTable() {
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Помесячный прирост</h2>
         <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
           Без учёта доходов/расходов; пополнения — только переводы; % — Modified Dietz
+          {fxMode === 'withoutFx' ? ' · без курсового эффекта' : ''}
         </p>
       </div>
       {rows.length === 0 ? (

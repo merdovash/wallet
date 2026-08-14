@@ -18,6 +18,7 @@ import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
+import { FxModeToggle } from '../ui/FxModeToggle'
 import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
@@ -127,6 +128,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
           ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <FxModeToggle showLabel={false} />
           <ChartSeriesToggle value={chartSeries} onChange={setChartSeries} />
           <Button type="button" onClick={() => setCheckInOpen(true)}>
             Чек-ин

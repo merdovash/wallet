@@ -8,9 +8,11 @@ import {
   netGrowthCapitalFlow,
   netTransfersInBase,
   netWorthAmount,
+  quantityGrowthForInterval,
   snapshotDates,
   totalOnDate,
   type DatedCapitalFlow,
+  type GrowthFxMode,
   type RateBook,
 } from '../engine/growthEngine'
 import {
@@ -242,6 +244,7 @@ export function buildMonthlyReturns(
   settings: WalletSettings,
   rateBook?: RateBook,
   transfers: Transfer[] = [],
+  fxMode: GrowthFxMode = 'withFx',
 ): MonthlyReturnRow[] {
   const eligible = growthPortfolioAccounts(accounts)
   const dates = snapshotDates(snapshots)
@@ -278,7 +281,18 @@ export function buildMonthlyReturns(
       rateBook,
     )
     const netFlow = flows.reduce((sum, f) => sum + f.amount, 0)
-    const growth = endTotal - startTotal - netFlow
+    const growth =
+      fxMode === 'withoutFx'
+        ? quantityGrowthForInterval(
+            startDate,
+            endDate,
+            accounts,
+            snapshots,
+            transfers,
+            settings,
+            rateBook,
+          )
+        : endTotal - startTotal - netFlow
     const { growthPct, weightedCapital } = modifiedDietzReturn(
       startTotal,
       growth,
