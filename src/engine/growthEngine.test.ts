@@ -341,6 +341,35 @@ describe('growthEngine', () => {
     expect(daily[1]).toMatchObject({ date: '2026-01-20', growth: -50 })
   })
 
+  it('withoutFx mode uses native delta × end-day rate (ignores FX on opening)', () => {
+    const accounts = [
+      account({ id: 'usd', name: 'USD', currency: 'USD', kind: 'fund' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'usd', amount: 10 }] },
+      { id: 's2', date: '2026-02-01', lines: [{ accountId: 'usd', amount: 11 }] },
+    ]
+    const rateBook = {
+      '2026-01-01': { RUB: 1, USD: 90 },
+      '2026-02-01': { RUB: 1, USD: 100 },
+    }
+    const withFx = buildDailyGrowthSeries(accounts, snapshots, settings, rateBook, [])
+    // end 1100 − start 900 − 0 flow = 200 (includes FX on opening 10×10)
+    expect(withFx[0]?.growth).toBeCloseTo(200)
+
+    const withoutFx = buildDailyGrowthSeries(
+      accounts,
+      snapshots,
+      settings,
+      rateBook,
+      [],
+      'withoutFx',
+    )
+    // native +1 USD × end rate 100 = 100
+    expect(withoutFx[0]?.growth).toBeCloseTo(100)
+    expect(withoutFx[0]?.cumulativeGrowth).toBeCloseTo(100)
+  })
+
   it('gives +6 growth when balance falls after a 16 withdrawal (100→105→90)', () => {
     const accounts = [
       account({ id: 'a', name: 'Fund' }),

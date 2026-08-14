@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { buildDailyGrowthSeries, snapshotDates, totalOnDate, type RateBook } from '../../engine/growthEngine'
+import { buildDailyGrowthSeries, snapshotDates, totalOnDate, type DailyGrowthFxMode, type RateBook } from '../../engine/growthEngine'
 import {
   formatCompactAxisValue,
   formatCurrency,
@@ -121,6 +121,7 @@ export function DailyGrowthPanel() {
   const [fromDate, setFromDate] = useState(firstDate)
   const [toDate, setToDate] = useState(lastDate)
   const [selectedEndDate, setSelectedEndDate] = useState<string | null>(null)
+  const [fxMode, setFxMode] = useState<DailyGrowthFxMode>('withFx')
 
   useEffect(() => {
     if (!firstDate || !lastDate) {
@@ -137,8 +138,8 @@ export function DailyGrowthPanel() {
   }, [checkInDates, ensureRates])
 
   const allPoints = useMemo(
-    () => buildDailyGrowthSeries(accounts, snapshots, settings, rateBook, transfers),
-    [accounts, snapshots, settings, rateBook, transfers],
+    () => buildDailyGrowthSeries(accounts, snapshots, settings, rateBook, transfers, fxMode),
+    [accounts, snapshots, settings, rateBook, transfers, fxMode],
   )
 
   const filtered = useMemo(() => {
@@ -218,6 +219,33 @@ export function DailyGrowthPanel() {
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Курс</p>
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setFxMode('withFx')}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  fxMode === 'withFx'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                С учётом курса
+              </button>
+              <button
+                type="button"
+                onClick={() => setFxMode('withoutFx')}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  fxMode === 'withoutFx'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                Без учёта курса
+              </button>
+            </div>
+          </div>
           <Field label="С даты" className="w-40">
             <DateInput
               value={fromDate}
@@ -280,8 +308,9 @@ export function DailyGrowthPanel() {
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Прирост по дням чек-инов</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Столбец — прирост за интервал до этой даты · слева старые дни · нажмите день для
-                расшифровки
+                {fxMode === 'withoutFx'
+                  ? 'Столбец — дельта в валюте × курс дня · без переоценки остатка · нажмите день для расшифровки'
+                  : 'Столбец — прирост за интервал до этой даты · слева старые дни · нажмите день для расшифровки'}
               </p>
             </div>
             <div className="h-72 w-full touch-manipulation sm:h-80">
@@ -398,6 +427,7 @@ export function DailyGrowthPanel() {
         periodReturn={dayBreakdown}
         endDate={selectedEndDate}
         currency={settings.baseCurrency}
+        fxMode={fxMode}
       />
     </div>
   )

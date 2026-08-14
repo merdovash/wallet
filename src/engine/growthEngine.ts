@@ -705,24 +705,87 @@ export function buildNetWorthSeries(
   return points
 }
 
+/**
+ * withFx — full base growth including FX revaluation of opening balances.
+ * withoutFx — native balance delta (minus transfers) × FX rate on the end day only.
+ */
+export type DailyGrowthFxMode = 'withFx' | 'withoutFx'
+
+/**
+ * Quantity-only growth for one check-in interval: Σ (Δ_native × rate_end).
+ * Ignores FX revaluation of the opening balance.
+ */
+export function quantityGrowthForInterval(
+  t0: string,
+  t1: string,
+  accounts: Account[],
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  let sum = 0
+  for (const account of growthPortfolioAccounts(accounts)) {
+    const native = accountGrowth(
+      account.id,
+      t0,
+      t1,
+      snapshots,
+      transfers,
+      accounts,
+      settings,
+      rateBook,
+    )
+    if (native == null) continue
+    sum += convertAmount(
+      native,
+      account.currency,
+      settings.baseCurrency,
+      settings,
+      t1,
+      rateBook,
+    )
+  }
+  return sum
+}
+
 export function buildDailyGrowthSeries(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
   transfers: Transfer[] = [],
+  fxMode: DailyGrowthFxMode = 'withFx',
 ): DailyGrowthPoint[] {
   const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers)
   if (series.length < 2) return []
   const points: DailyGrowthPoint[] = []
+  let cumulativeGrowth = 0
   for (let i = 1; i < series.length; i += 1) {
     const prev = series[i - 1]!
     const cur = series[i]!
+    const growth =
+      fxMode === 'withoutFx'
+        ? quantityGrowthForInterval(
+            prev.date,
+            cur.date,
+            accounts,
+            snapshots,
+            transfers,
+            settings,
+            rateBook,
+          )
+        : cur.growth - prev.growth
+    if (fxMode === 'withoutFx') {
+      cumulativeGrowth += growth
+    } else {
+      cumulativeGrowth = cur.growth
+    }
     points.push({
       date: cur.date,
-      growth: cur.growth - prev.growth,
+      growth,
       total: cur.total,
-      cumulativeGrowth: cur.growth,
+      cumulativeGrowth,
     })
   }
   return points
