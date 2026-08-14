@@ -131,6 +131,12 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const [showHelp, setShowHelp] = useState(false)
   const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
 
+  /** Check-in already saved for this date (Dashboard opens without snapshotId but upserts by date). */
+  const sameDaySnapshot = useMemo(() => {
+    if (editing || !date) return null
+    return snapshots.find((s) => s.date === date) ?? null
+  }, [editing, date, snapshots])
+
   useEffect(() => {
     if (!open) return
 
@@ -179,10 +185,11 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     return next
   }, [formAccounts, date, editing, snapshots])
 
-  // При редактировании серым показываем сохранённые за этот день доход/расход,
-  // так же как текущие остатки в полях счетов.
-  const incomeHint = editing?.income ? formatHintAmount(editing.income) : '0'
-  const expenseHint = editing?.expense ? formatHintAmount(editing.expense) : '0'
+  // При редактировании или повторном чек-ине за день серым показываем сохранённые доход/расход.
+  const savedIncome = editing?.income ?? sameDaySnapshot?.income ?? 0
+  const savedExpense = editing?.expense ?? sameDaySnapshot?.expense ?? 0
+  const incomeHint = savedIncome ? formatHintAmount(savedIncome) : '0'
+  const expenseHint = savedExpense ? formatHintAmount(savedExpense) : '0'
 
   const effectiveLines = useMemo((): SnapshotLine[] => {
     return formAccounts.map((account) => {
@@ -242,12 +249,28 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   useEffect(() => {
     if (!open || locked || incomeManual) return
     if (!suggestedCashflow.hasPrevious) return
-    // При редактировании пустое поле означает «оставить сохранённое»,
-    // поэтому нулевую автоподстановку записываем явно.
-    setIncome(
-      suggestedCashflow.income > 0 ? String(suggestedCashflow.income) : editing ? '0' : '',
-    )
-  }, [open, locked, incomeManual, suggestedCashflow, editing])
+
+    const existingIncome = sameDaySnapshot?.income ?? 0
+    const existingExpense = sameDaySnapshot?.expense ?? 0
+    const autoIncome = suggestedCashflow.income
+    const autoExpense = suggestedCashflow.expense
+
+    // Ручной доход/расход за этот день (отличается от авто) не затираем при повторном чек-ине.
+    const incomeLooksManual =
+      existingIncome > 0 && Math.abs(existingIncome - autoIncome) > 0.009
+    const expenseLooksManual =
+      existingExpense > 0 && Math.abs(existingExpense - autoExpense) > 0.009
+    if (incomeLooksManual || expenseLooksManual) {
+      setIncome('')
+      setExpense('')
+      setIncomeManual(true)
+      return
+    }
+
+    // Авто: пересчёт от предыдущего календарного дня; пустое поле при сохранении = оставить 0 / нет.
+    setIncome(autoIncome > 0 ? String(autoIncome) : '')
+    setExpense(autoExpense > 0 ? String(autoExpense) : '')
+  }, [open, locked, incomeManual, suggestedCashflow, sameDaySnapshot])
 
   function typedLines(): SnapshotLine[] {
     return formAccounts
@@ -299,9 +322,9 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     ).length
 
     try {
-      // Пустое поле при редактировании оставляет сохранённое значение (как у остатков).
-      const incomeValue = parseMoneyInput(income) ?? editing?.income ?? 0
-      const expenseValue = parseMoneyInput(expense) ?? editing?.expense ?? 0
+      // Пустое поле оставляет сохранённое значение за этот день (редактирование или повторный upsert).
+      const incomeValue = parseMoneyInput(income) ?? savedIncome
+      const expenseValue = parseMoneyInput(expense) ?? savedExpense
       if (incomeValue < 0 || expenseValue < 0) {
         alert('Доход и расход не могут быть отрицательными')
         return
@@ -539,7 +562,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
                 className="text-blue-600 hover:underline"
                 onClick={() => setIncomeManual(false)}
               >
-                Вернуть автозаполнение дохода
+                Вернуть автозаполнение дохода и расхода
               </button>
             </p>
           )}
