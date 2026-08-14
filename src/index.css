@@ -12,7 +12,8 @@ body {
 
 .dark body {
   background: #0f172a;
-  color: #f1f5f9;
+  /* Soften primary text vs pure slate-100 so white copy is less harsh */
+  color: #cbd5e1;
 }
 
 @keyframes stack-panel-up {

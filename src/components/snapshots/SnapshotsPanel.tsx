@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { totalOnDate, snapshotDates } from '../../engine/growthEngine'
 import { formatCurrency, formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { formatTransferLabel } from '../../lib/transferCheckIn'
@@ -60,7 +60,7 @@ export function SnapshotsPanel() {
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Чек-ины</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Чек-ины</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Остатки по датам и переводы между счетами
           </p>
@@ -103,7 +103,7 @@ export function SnapshotsPanel() {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-slate-900 dark:text-slate-100">
+                        <span className="font-medium text-slate-900 dark:text-slate-200">
                           {formatDateDisplay(snap.date)}
                         </span>
                         {isTransfer ? (
@@ -142,7 +142,7 @@ export function SnapshotsPanel() {
                         {snap.note ? ` · ${snap.note}` : ''}
                       </span>
                     </span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
+                    <span className="font-medium text-slate-900 dark:text-slate-200">
                       {formatCurrency(snapTotal, settings.baseCurrency)}
                     </span>
                   </button>

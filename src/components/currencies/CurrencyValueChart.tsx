@@ -10,7 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { buildCurrencyValueSeries } from '../../lib/currencyValueSeries'
-import { getChartTheme } from '../../lib/chartTheme'
+import { chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
@@ -81,6 +81,7 @@ export function CurrencyValueChart() {
               width={48}
             />
             <Tooltip
+              {...chartTooltipStyles(chartTheme)}
               formatter={(value: number, name: string) => [
                 formatCurrency(value, settings.baseCurrency),
                 name,

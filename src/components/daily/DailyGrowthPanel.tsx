@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -19,7 +19,7 @@ import {
   signedAmount,
   todayIsoDate,
 } from '../../lib/format'
-import { getChartTheme } from '../../lib/chartTheme'
+import { getChartTheme, chartTooltipStyles } from '../../lib/chartTheme'
 import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
@@ -213,7 +213,7 @@ export function DailyGrowthPanel() {
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">По дням</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">По дням</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Прирост портфеля роста между чек-инами · фонд / вклад / инвестиции
           </p>
@@ -287,7 +287,7 @@ export function DailyGrowthPanel() {
               <p
                 className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${
                   rangeSum > 0
-                    ? 'text-emerald-700'
+                    ? 'text-emerald-700 dark:text-emerald-400'
                     : rangeSum < 0
                       ? 'text-red-600'
                       : 'text-slate-800 dark:text-slate-200'
@@ -298,7 +298,7 @@ export function DailyGrowthPanel() {
             </Card>
             <Card className="!p-2.5 sm:!p-3">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Дней с приростом</p>
-              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:text-lg">
                 {chartRows.filter((row) => row.growth > 0).length}
               </p>
             </Card>
@@ -333,6 +333,7 @@ export function DailyGrowthPanel() {
                     width={48}
                   />
                   <Tooltip
+                    {...chartTooltipStyles(chartTheme)}
                     formatter={(value: number, _name, item) => {
                       const pct = (item?.payload as DayRow | undefined)?.growthPctOfAllMass
                       const amount = formatCurrency(value, settings.baseCurrency)
@@ -372,7 +373,7 @@ export function DailyGrowthPanel() {
                     className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60 active:bg-slate-100 dark:active:bg-slate-800"
                   >
                     <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100">
+                      <span className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-200">
                         {formatDateDisplay(row.date)}
                         {row.date === bestDate ? (
                           <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
@@ -396,7 +397,7 @@ export function DailyGrowthPanel() {
                       <span
                         className={`text-right tabular-nums font-medium ${
                           row.growth > 0
-                            ? 'text-emerald-700'
+                            ? 'text-emerald-700 dark:text-emerald-400'
                             : row.growth < 0
                               ? 'text-red-600'
                               : 'text-slate-700 dark:text-slate-300'

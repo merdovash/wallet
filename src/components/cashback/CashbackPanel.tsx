@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { buildCashbackReport, CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { formatCurrency, formatDateDisplay, formatPercent } from '../../lib/format'
 import { useWalletStore } from '../../store/walletStore'
@@ -20,7 +20,7 @@ export function CashbackPanel() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Кэшбек</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Кэшбек</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Эффективная скидка от расходов: начисленный кэшбек к сумме расходов в чек-инах (1 кэшбек = 1 ₽)
         </p>
@@ -38,7 +38,7 @@ export function CashbackPanel() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Card className="!p-4">
               <p className="text-xs text-slate-500 dark:text-slate-400">Расходы (чек-ины)</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-200">
                 {formatCurrency(report.totalExpense, settings.baseCurrency)}
               </p>
             </Card>
@@ -50,13 +50,13 @@ export function CashbackPanel() {
             </Card>
             <Card className="!p-4">
               <p className="text-xs text-slate-500 dark:text-slate-400">Эффективная скидка</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-200">
                 {formatPercent(report.effectiveDiscountPct, 2)}
               </p>
             </Card>
             <Card className="!p-4">
               <p className="text-xs text-slate-500 dark:text-slate-400">Текущий баланс</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-200">
                 {formatCurrency(report.currentCashbackBalance, CASHBACK_CURRENCY)}
               </p>
             </Card>
@@ -90,7 +90,7 @@ export function CashbackPanel() {
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">
                   {report.rows.map((row) => (
                     <li key={row.date} className="px-3 py-2.5">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-200">
                         {formatDateDisplay(row.date)}
                       </p>
                       <dl className="mt-1.5 grid grid-cols-3 gap-1 text-[11px]">

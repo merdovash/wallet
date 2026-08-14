@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import type { RateBook } from '../../engine/growthEngine'
 import { paddedDataDomain } from '../../lib/chartAxisDomain'
-import { getChartTheme } from '../../lib/chartTheme'
+import { chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { useTheme } from '../../lib/useTheme'
 import type { Account, AccountPoint, BalanceSnapshot, TotalPoint, WalletSettings } from '../../types/wallet'
@@ -159,6 +159,7 @@ export function GrowthChart({
                 />
               ) : null}
               <Tooltip
+                {...chartTooltipStyles(chartTheme)}
                 formatter={(value: number, name: string) => [
                   formatCurrency(value, currency),
                   name === 'primary' ? primaryLabel : growthLabel,

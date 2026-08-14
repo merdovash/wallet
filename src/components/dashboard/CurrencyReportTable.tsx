@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { buildCurrencyReport } from '../../lib/currencyReport'
 import { formatCurrency, signedAmount } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
@@ -136,7 +136,7 @@ export function CurrencyReportTable({
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-100">
+            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-200">
               <td className="px-2 py-2 sm:px-4 sm:py-3">
                 <div>Итого</div>
                 <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
@@ -167,7 +167,7 @@ export function CurrencyReportTable({
 }
 
 function growthTone(value: number): string {
-  if (value > 0) return 'text-emerald-700'
+  if (value > 0) return 'text-emerald-700 dark:text-emerald-400'
   if (value < 0) return 'text-red-600'
   return 'text-slate-700 dark:text-slate-300'
 }
@@ -215,7 +215,7 @@ function CurrencyGroup({
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-100"
+            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-200"
           >
             <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
             <span className="min-w-0">
@@ -232,7 +232,7 @@ function CurrencyGroup({
         <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
           {accountCount}
         </td>
-        <td className="truncate px-2 py-2 tabular-nums text-slate-900 dark:text-slate-100 sm:px-4 sm:py-3">
+        <td className="truncate px-2 py-2 tabular-nums text-slate-900 dark:text-slate-200 sm:px-4 sm:py-3">
           <div>{formatCurrency(balance, currency)}</div>
           {currency !== baseCurrency && (
             <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 lg:hidden">
@@ -240,7 +240,7 @@ function CurrencyGroup({
             </div>
           )}
         </td>
-        <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-900 dark:text-slate-100 lg:table-cell">
+        <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-900 dark:text-slate-200 lg:table-cell">
           {formatCurrency(balanceBase, baseCurrency)}
         </td>
         <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300 md:table-cell">
@@ -257,7 +257,7 @@ function CurrencyGroup({
       </tr>
       {open &&
         accounts.map((acc) => (
-          <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/60/70">
+          <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/80">
             <td className="px-2 py-2 pl-7 sm:px-4 sm:py-2 sm:pl-10">
               <button
                 type="button"

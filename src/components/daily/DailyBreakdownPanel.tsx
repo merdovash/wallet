@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+﻿import { useState, type ReactNode } from 'react'
 import type { DailyGrowthFxMode } from '../../engine/growthEngine'
 import {
   formatCurrency,
@@ -19,7 +19,7 @@ interface DailyBreakdownPanelProps {
 }
 
 function tone(value: number): string {
-  if (value > 0) return 'text-emerald-700'
+  if (value > 0) return 'text-emerald-700 dark:text-emerald-400'
   if (value < 0) return 'text-red-600'
   return 'text-slate-800 dark:text-slate-200'
 }
@@ -45,7 +45,7 @@ function FormulaCell({
         {label}
       </span>
       <span
-        className={`text-center text-xs font-semibold tabular-nums leading-tight ${valueClassName ?? 'text-slate-900 dark:text-slate-100'}`}
+        className={`text-center text-xs font-semibold tabular-nums leading-tight ${valueClassName ?? 'text-slate-900 dark:text-slate-200'}`}
       >
         {value}
       </span>
@@ -95,7 +95,7 @@ function AccountLineWithFx({
 }) {
   return (
     <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
-      <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{acc.name}</p>
+      <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">{acc.name}</p>
       <div className="mt-1 flex min-w-min items-end justify-start gap-1 overflow-x-auto">
         <FormulaCell
           label="Δ"
@@ -140,7 +140,7 @@ function AccountLineWithoutFx({
     Math.abs(growthNative) >= 1e-9 ? quantityEffectBase / growthNative : null
   return (
     <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
-      <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
+      <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">
         {name}
         <span className="ml-1.5 text-[10px] font-normal text-slate-400 dark:text-slate-500">
           {currency}

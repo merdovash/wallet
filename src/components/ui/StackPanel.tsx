@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+﻿import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 interface StackPanelProps {
@@ -118,7 +118,7 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
             onPointerDown={onDragHandlePointerDown}
           />
           <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900 dark:text-slate-200">
               {title}
             </h2>
             <div className="relative z-20 flex shrink-0 items-center gap-2">

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
@@ -34,7 +34,7 @@ type MonthAgg = {
 }
 
 function earnTone(value: number): string {
-  if (value > 0) return 'text-emerald-700'
+  if (value > 0) return 'text-emerald-700 dark:text-emerald-400'
   if (value < 0) return 'text-red-600'
   return 'text-slate-700 dark:text-slate-300'
 }
@@ -112,7 +112,7 @@ export function FloatPanel() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Float</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Float</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Выгода от беспроцентного периода по связанным кошелькам
         </p>
@@ -139,7 +139,7 @@ export function FloatPanel() {
             </Card>
             <Card className="!p-2.5 sm:!p-3">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Долг по кредиткам</p>
-              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:mt-1 sm:text-xl">
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:mt-1 sm:text-xl">
                 {formatCurrency(
                   summary.cards.reduce((s, c) => s + c.totalDebt, 0),
                   currency,
@@ -174,7 +174,7 @@ export function FloatPanel() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-200">
                             {formatMonthLabel(row.month)}
                           </p>
                           <p
@@ -242,7 +242,7 @@ export function FloatPanel() {
                           key={row.month}
                           className={row.overdue ? 'bg-red-50 dark:bg-red-950/40/60' : undefined}
                         >
-                          <td className="py-2.5 pr-3 font-medium text-slate-900 dark:text-slate-100">
+                          <td className="py-2.5 pr-3 font-medium text-slate-900 dark:text-slate-200">
                             {formatMonthLabel(row.month)}
                           </td>
                           <td

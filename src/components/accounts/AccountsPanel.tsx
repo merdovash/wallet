@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useMemo,
   useRef,
@@ -258,7 +258,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Счета</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Счета</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий.
           </p>
@@ -707,7 +707,7 @@ function AccountListItem({
             style={{ backgroundColor: account.color }}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-slate-900 dark:text-slate-100">
+            <span className="block truncate font-medium text-slate-900 dark:text-slate-200">
               {account.name}
               <span className="ml-2 text-xs font-normal text-slate-400 dark:text-slate-500">
                 {ACCOUNT_KIND_LABELS[account.kind].toLowerCase()}
@@ -736,7 +736,7 @@ function AccountListItem({
               <span className="text-sm text-slate-400 dark:text-slate-500">нет данных</span>
             ) : (
               <>
-                <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">
+                <span className="block text-sm font-medium text-slate-900 dark:text-slate-200">
                   {formatCurrency(balance, account.currency)}
                 </span>
                 {account.kind === 'credit' && account.creditLimit != null ? (

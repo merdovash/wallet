@@ -1,4 +1,4 @@
-import {
+﻿import {
   formatCurrency,
   formatDateDisplay,
   formatPercent,
@@ -30,7 +30,7 @@ interface ReturnBreakdownPanelProps {
 }
 
 function tone(value: number): string {
-  if (value > 0) return 'text-emerald-700'
+  if (value > 0) return 'text-emerald-700 dark:text-emerald-400'
   if (value < 0) return 'text-red-600'
   return 'text-slate-800 dark:text-slate-200'
 }
@@ -153,8 +153,8 @@ function GrowthMovementsView({
               <li key={acc.accountId} className="space-y-1.5 px-3 py-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <span className="min-w-0">
-                    <span className="block truncate font-medium text-slate-900 dark:text-slate-100">{acc.name}</span>
-                    <span className="text-[11px] text-emerald-700">
+                    <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{acc.name}</span>
+                    <span className="text-[11px] text-emerald-700 dark:text-emerald-400">
                       {acc.kindLabel}
                       {acc.kind === 'fund' ? ' · накопления' : ''} · {acc.currency}
                     </span>
@@ -242,7 +242,7 @@ function GrowthFxSection({
             .filter((a) => Math.abs(a.growthBase) > 0.001 || Math.abs(a.fxEffectBase) > 0.001)
             .map((acc) => (
               <li key={acc.accountId} className="px-3 py-2 text-xs">
-                <div className="flex justify-between gap-3 font-medium text-slate-900 dark:text-slate-100">
+                <div className="flex justify-between gap-3 font-medium text-slate-900 dark:text-slate-200">
                   <span className="truncate">{acc.name}</span>
                   <span className="shrink-0 tabular-nums">{signedAmount(acc.growthBase, currency)}</span>
                 </div>
@@ -280,7 +280,7 @@ function TransferMovementsSection({
               className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
             >
               <span className="min-w-0">
-                <span className="block font-medium text-slate-900 dark:text-slate-100">
+                <span className="block font-medium text-slate-900 dark:text-slate-200">
                   {t.fromName} → {t.toName}
                 </span>
                 <span className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -459,7 +459,7 @@ function PercentBreakdownView({
                 className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
               >
                 <span>
-                  <span className="block font-medium text-slate-900 dark:text-slate-100">
+                  <span className="block font-medium text-slate-900 dark:text-slate-200">
                     {formatDateDisplay(flow.date)}
                   </span>
                   <span className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -576,10 +576,10 @@ function AccountSection({
           return (
             <li key={acc.accountId} className="flex items-start justify-between gap-3 px-3 py-2">
               <span className="min-w-0">
-                <span className="block truncate font-medium text-slate-900 dark:text-slate-100">{acc.name}</span>
+                <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{acc.name}</span>
                 <span
                   className={`text-[11px] ${
-                    sectionTone === 'include' ? 'text-emerald-700' : 'text-slate-400 dark:text-slate-500'
+                    sectionTone === 'include' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {acc.kindLabel}
@@ -636,7 +636,7 @@ function Row({
         {hint ? <span className="mt-0.5 block text-[11px] text-slate-400 dark:text-slate-500">{hint}</span> : null}
       </dt>
       <dd
-        className={`shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900 dark:text-slate-100'}`}
+        className={`shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900 dark:text-slate-200'}`}
       >
         {value}
       </dd>
@@ -674,7 +674,7 @@ function TwrSubPeriodsSection({
           <li key={`${sp.startDate}-${sp.endDate}`} className="px-3 py-2 text-xs">
             <div className="flex items-start justify-between gap-3">
               <span className="min-w-0">
-                <span className="block font-medium text-slate-900 dark:text-slate-100">
+                <span className="block font-medium text-slate-900 dark:text-slate-200">
                   {formatDateDisplay(sp.startDate)} → {formatDateDisplay(sp.endDate)}
                 </span>
                 {Math.abs(sp.netFlow) >= 0.01 ? (

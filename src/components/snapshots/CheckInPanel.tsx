@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
@@ -681,7 +681,7 @@ function TransfersSection({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Переводы за день</h3>
         {!draft && accounts.length >= 2 && (
-          <Button type="button" variant="secondary" className="!px-2 !py-1" onClick={onStartDraft}>
+          <Button type="button" variant="secondary" className="!px-2.5 !py-1.5 !text-xs" onClick={onStartDraft}>
             Добавить
           </Button>
         )}
@@ -697,7 +697,7 @@ function TransfersSection({
             className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-sm"
           >
             <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">{formatTransferLabel(t, accounts)}</p>
+              <p className="font-medium text-slate-900 dark:text-slate-200">{formatTransferLabel(t, accounts)}</p>
               {t.note ? <p className="text-xs text-slate-500 dark:text-slate-400">{t.note}</p> : null}
             </div>
             <button
@@ -718,7 +718,7 @@ function TransfersSection({
               className="flex items-start justify-between gap-2 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
             >
               <div>
-                <p className="font-medium text-slate-900 dark:text-slate-100">
+                <p className="font-medium text-slate-900 dark:text-slate-200">
                   {from?.name ?? '—'} → {to?.name ?? '—'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">

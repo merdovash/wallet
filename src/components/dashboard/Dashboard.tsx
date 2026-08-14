@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import {
   buildNetWorthSeries,
   buildTotalSeries,
@@ -101,7 +101,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     <div className="mx-auto max-w-5xl space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h1 className="shrink-0 text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
+          <h1 className="shrink-0 text-lg font-semibold text-slate-900 dark:text-slate-200 sm:text-xl">
             Дашборд
           </h1>
           <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">

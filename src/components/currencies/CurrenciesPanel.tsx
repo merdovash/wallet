@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { snapshotDates } from '../../engine/growthEngine'
 import {
   buildCurrencyFxBreakdown,
@@ -54,13 +54,13 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
 
   const absColor =
     (change?.absolute ?? 0) > 0
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-400'
       : (change?.absolute ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
   const relColor =
     (change?.relative ?? 0) > 0
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-400'
       : (change?.relative ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
@@ -68,7 +68,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Валюты</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Валюты</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Эквивалент иностранных валют в {settings.baseCurrency} (без {settings.baseCurrency})
           {foreignCurrencyCount > 0 ? ` · ${foreignCurrencyCount} вал.` : ''}

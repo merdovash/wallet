@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import {
   balanceOnDate,
   netWorthAmount,
@@ -133,13 +133,13 @@ export function DayTotalsPanel({
                         className="flex items-start justify-between gap-3 px-3 py-2 text-sm"
                       >
                         <span className="min-w-0">
-                          <span className="block truncate font-medium text-slate-900 dark:text-slate-100">{row.name}</span>
+                          <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{row.name}</span>
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             {accountKindLabel(row.kind)} · {row.currency}
                           </span>
                         </span>
                         <span className="shrink-0 text-right tabular-nums">
-                          <span className="block text-slate-900 dark:text-slate-100">
+                          <span className="block text-slate-900 dark:text-slate-200">
                             {formatCurrency(row.display, row.currency)}
                           </span>
                           {row.currency !== settings.baseCurrency && (
@@ -195,7 +195,7 @@ function Stat({
   tone?: 'up' | 'down' | 'neutral'
 }) {
   const toneCls =
-    tone === 'up' ? 'text-emerald-700' : tone === 'down' ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'
+    tone === 'up' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'down' ? 'text-red-600' : 'text-slate-900 dark:text-slate-200'
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2">
       <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>

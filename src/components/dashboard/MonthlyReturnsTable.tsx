@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import { buildMonthlyReturns } from '../../lib/monthlyReturns'
 import { buildMonthlyRiskMetrics } from '../../lib/monthlyRiskMetrics'
@@ -25,7 +25,7 @@ export function MonthlyReturnsTable() {
         <div className="grid gap-3 sm:grid-cols-3">
           <Card className="px-4 py-3">
             <p className="text-xs text-slate-500 dark:text-slate-400">Волатильность месяцев</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+            <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-200">
               {formatPercent(risk.volatilityPct)}
             </p>
             <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
@@ -43,7 +43,7 @@ export function MonthlyReturnsTable() {
           </Card>
           <Card className="px-4 py-3">
             <p className="text-xs text-slate-500 dark:text-slate-400">Плюсовые месяцы</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+            <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-200">
               {risk.positiveMonthsRatio == null
                 ? '—'
                 : `${Math.round(risk.positiveMonthsRatio * 100)}%`}
@@ -96,13 +96,13 @@ export function MonthlyReturnsTable() {
               {[...rows].reverse().map((row) => {
                 const pctColor =
                   (row.growthPct ?? 0) > 0
-                    ? 'text-emerald-700'
+                    ? 'text-emerald-700 dark:text-emerald-400'
                     : (row.growthPct ?? 0) < 0
                       ? 'text-red-600'
                       : 'text-slate-700 dark:text-slate-300'
                 return (
                   <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800">
-                    <td className="px-2 py-2 font-medium text-slate-900 dark:text-slate-100 sm:px-4 sm:py-3">
+                    <td className="px-2 py-2 font-medium text-slate-900 dark:text-slate-200 sm:px-4 sm:py-3">
                       <div className="truncate">{row.label}</div>
                       <div className="mt-0.5 truncate text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
                         {signedAmount(row.growth, settings.baseCurrency)}

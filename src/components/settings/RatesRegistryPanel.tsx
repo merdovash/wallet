@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { CURRENCY_ALIASES } from '../../lib/cbrRates'
 import { currencyLabel } from '../../lib/currency'
 import { formatCurrency, formatDateDisplay } from '../../lib/format'
@@ -91,7 +91,7 @@ export function RatesRegistryPanel({
                   key={date}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
                 >
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-200">
                     {formatDateDisplay(date)}
                   </p>
                   <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
@@ -134,7 +134,7 @@ export function RatesRegistryPanel({
                   const pivot = byDate[date] ?? {}
                   return (
                     <tr key={date} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                      <td className="sticky left-0 bg-white dark:bg-slate-900 px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
+                      <td className="sticky left-0 bg-white dark:bg-slate-900 px-3 py-2 font-medium text-slate-900 dark:text-slate-200">
                         {formatDateDisplay(date)}
                       </td>
                       {columns.map((code) => {

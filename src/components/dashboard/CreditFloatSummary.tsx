@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, signedAmount, todayIsoDate } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
@@ -41,7 +41,7 @@ export function CreditFloatSummary() {
   const currency = settings.baseCurrency
   const earnedColor =
     summary.totalEarnedBase > 0
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-400'
       : summary.totalEarnedBase < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
@@ -56,7 +56,7 @@ export function CreditFloatSummary() {
       </Card>
       <Card className="!p-2">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Долг по кредиткам</p>
-        <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-slate-900 dark:text-slate-100">
+        <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-slate-900 dark:text-slate-200">
           {formatCurrency(
             summary.cards.reduce((s, c) => s + c.totalDebtBase, 0),
             currency,

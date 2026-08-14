@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   InputHTMLAttributes,
   ButtonHTMLAttributes,
   SelectHTMLAttributes,
@@ -49,7 +49,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <input
         ref={ref}
         {...rest}
-        className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
+        className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-900 dark:text-slate-200 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
       />
     )
   },
@@ -274,8 +274,9 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   const variants = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
-    secondary: 'bg-white dark:bg-slate-900 text-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60',
-    danger: 'bg-red-50 dark:bg-red-950/40 text-red-700 border border-red-200 hover:bg-red-100',
+    secondary:
+      'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700',
+    danger: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900 hover:bg-red-100 dark:hover:bg-red-950/60',
   }
   return (
     <button

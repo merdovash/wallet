@@ -18,7 +18,13 @@
           var dark =
             mode === 'dark' ||
             (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-          if (dark) document.documentElement.classList.add('dark')
+          if (dark) {
+            document.documentElement.classList.add('dark')
+            var themeMeta = document.querySelector('meta[name="theme-color"]')
+            if (themeMeta) themeMeta.setAttribute('content', '#065f46')
+            var appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+            if (appleMeta) appleMeta.setAttribute('content', 'black-translucent')
+          }
         } catch (e) {}
       })()
     </script>

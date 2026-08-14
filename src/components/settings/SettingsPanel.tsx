@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { resolvePivotForDate } from '../../lib/cbrRates'
 import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
 import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
@@ -68,7 +68,7 @@ export function SettingsPanel() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Настройки</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Настройки</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Базовая валюта и курсы ЦБ РФ на дату чек-ина (cbr-xml-daily.ru)
         </p>

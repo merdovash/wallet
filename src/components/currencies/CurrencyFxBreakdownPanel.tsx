@@ -1,4 +1,4 @@
-import {
+﻿import {
   formatCurrency,
   formatDateDisplay,
   formatPercent,
@@ -15,7 +15,7 @@ interface CurrencyFxBreakdownPanelProps {
 }
 
 function tone(value: number): string {
-  if (value > 0) return 'text-emerald-700'
+  if (value > 0) return 'text-emerald-700 dark:text-emerald-400'
   if (value < 0) return 'text-red-600'
   return 'text-slate-800 dark:text-slate-200'
 }
@@ -75,7 +75,7 @@ export function CurrencyFxBreakdownPanel({
                   className="flex items-start justify-between gap-3 px-3 py-2"
                 >
                   <span className="min-w-0">
-                    <span className="block font-medium text-slate-900 dark:text-slate-100">{factor.label}</span>
+                    <span className="block font-medium text-slate-900 dark:text-slate-200">{factor.label}</span>
                     {factor.hint ? (
                       <span className="text-[11px] text-slate-400 dark:text-slate-500">{factor.hint}</span>
                     ) : null}
@@ -102,7 +102,7 @@ export function CurrencyFxBreakdownPanel({
                   <li key={acc.accountId} className="px-3 py-2">
                     <div className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-900 dark:text-slate-100">
+                        <span className="block truncate font-medium text-slate-900 dark:text-slate-200">
                           {acc.name}
                         </span>
                         <span className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -145,7 +145,7 @@ function Row({
     <div className="flex items-start justify-between gap-3 px-3 py-2.5">
       <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
       <dd
-        className={`shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900 dark:text-slate-100'}`}
+        className={`shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900 dark:text-slate-200'}`}
       >
         {value}
       </dd>

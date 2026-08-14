@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { buildAccountTypeReport } from '../../lib/accountTypeReport'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
@@ -18,7 +18,7 @@ function accountCountLabel(count: number): string {
 
 function pctTone(value: number | null): string {
   if (value == null) return 'text-slate-500 dark:text-slate-400'
-  if (value > 0) return 'text-emerald-700'
+  if (value > 0) return 'text-emerald-700 dark:text-emerald-400'
   if (value < 0) return 'text-red-600'
   return 'text-slate-700 dark:text-slate-300'
 }
@@ -45,7 +45,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">По типам</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">По типам</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Сводка остатков и прироста по видам счетов
           {report.asOfDate ? ` на ${report.asOfDate}` : ''}
@@ -56,7 +56,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
         <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Итого</p>
-            <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100 sm:text-lg">
+            <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:text-lg">
               {formatCurrency(report.grandTotalBase, report.baseCurrency)}
             </p>
           </Card>
@@ -136,12 +136,12 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                 const open = !!expanded[row.kind]
                 const growthColor =
                   row.growthBase > 0
-                    ? 'text-emerald-700'
+                    ? 'text-emerald-700 dark:text-emerald-400'
                     : row.growthBase < 0
                       ? 'text-red-600'
                       : 'text-slate-700 dark:text-slate-300'
                 const balanceColor =
-                  row.balanceBase < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-100'
+                  row.balanceBase < 0 ? 'text-red-600' : 'text-slate-900 dark:text-slate-200'
                 return (
                   <TypeGroup
                     key={row.kind}
@@ -166,7 +166,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-100">
+              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-200">
                 <td className="px-2 py-2 sm:px-4 sm:py-3">
                   <div>Итого</div>
                   <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
@@ -246,7 +246,7 @@ function TypeGroup({
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-100"
+            className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-200"
           >
             <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
             <span className="min-w-0">
@@ -293,18 +293,18 @@ function TypeGroup({
         accounts.map((acc) => {
           const nativeTone =
             acc.growth > 0
-              ? 'text-emerald-700'
+              ? 'text-emerald-700 dark:text-emerald-400'
               : acc.growth < 0
                 ? 'text-red-600'
                 : 'text-slate-600 dark:text-slate-400'
           const baseTone =
             acc.growthBase > 0
-              ? 'text-emerald-700'
+              ? 'text-emerald-700 dark:text-emerald-400'
               : acc.growthBase < 0
                 ? 'text-red-600'
                 : 'text-slate-600 dark:text-slate-400'
           return (
-            <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/60/70">
+            <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/80">
               <td className="px-2 py-2 pl-7 sm:px-4 sm:py-2 sm:pl-10">
                 <button
                   type="button"

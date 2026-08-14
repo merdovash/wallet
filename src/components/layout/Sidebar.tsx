@@ -1,4 +1,4 @@
-import { useEffect, useState, type SVGProps } from 'react'
+﻿import { useEffect, useState, type SVGProps } from 'react'
 import { sectionToPath } from '../../lib/appRoutes'
 import { portalHomeUrl } from '../../lib/portalUrl'
 import type { AppSection } from '../../types/wallet'
@@ -171,12 +171,12 @@ function PortalHomeLink({ collapsed = false }: { collapsed?: boolean }) {
       href={portalHomeUrl()}
       title="На главную"
       aria-label="На главную"
-      className={`flex items-center gap-2 rounded-lg text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-100 ${
+      className={`flex items-center gap-2 rounded-lg text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-200 ${
         collapsed ? 'justify-center p-1.5' : 'px-1 py-0.5'
       }`}
     >
       <HomeIcon className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
-      {!collapsed && <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Портал</span>}
+      {!collapsed && <span className="text-sm font-semibold text-slate-900 dark:text-slate-200">Портал</span>}
     </a>
   )
 }

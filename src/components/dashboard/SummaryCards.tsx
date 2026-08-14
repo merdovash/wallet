@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import {
   explainAnnualizedPct,
@@ -39,12 +39,12 @@ export function SummaryCards({
 }: SummaryCardsProps) {
   const [breakdownFocus, setBreakdownFocus] = useState<BreakdownFocus>(null)
 
-  const growthColor = growth > 0 ? 'text-emerald-700' : growth < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
+  const growthColor = growth > 0 ? 'text-emerald-700 dark:text-emerald-400' : growth < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
   const topUp = periodReturn?.netFlow ?? 0
-  const topUpColor = topUp > 0 ? 'text-emerald-700' : topUp < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
+  const topUpColor = topUp > 0 ? 'text-emerald-700 dark:text-emerald-400' : topUp < 0 ? 'text-red-600' : 'text-slate-800 dark:text-slate-200'
   const pctColor =
     (periodReturn?.growthPct ?? 0) > 0
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-400'
       : (periodReturn?.growthPct ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
@@ -53,14 +53,14 @@ export function SummaryCards({
   const realAnnualized = periodReturn?.realAnnualizedPct
   const allMassColor =
     (allMassAnnualized ?? 0) > 0
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-400'
       : (allMassAnnualized ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
 
   const realColor =
     (realAnnualized ?? 0) > 0
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-400'
       : (realAnnualized ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
@@ -77,7 +77,7 @@ export function SummaryCards({
       <div className="grid grid-cols-2 gap-1.5">
         <Card className={cardClass}>
           <p className={labelClass}>Остаток</p>
-          <p className={`${valueClass} text-slate-900 dark:text-slate-100`}>
+          <p className={`${valueClass} text-slate-900 dark:text-slate-200`}>
             {formatCurrency(total, currency)}
           </p>
         </Card>
@@ -144,7 +144,7 @@ export function SummaryCards({
                 <p
                   className={`${valueClass} ${
                     periodReturn.quantityEffectBase > 0
-                      ? 'text-emerald-700'
+                      ? 'text-emerald-700 dark:text-emerald-400'
                       : periodReturn.quantityEffectBase < 0
                         ? 'text-red-600'
                         : 'text-slate-800 dark:text-slate-200'
@@ -155,7 +155,7 @@ export function SummaryCards({
                 <p
                   className={`mt-0.5 text-[10px] font-semibold tabular-nums leading-tight ${
                     (periodReturn.quantityEffectPct ?? 0) > 0
-                      ? 'text-emerald-700'
+                      ? 'text-emerald-700 dark:text-emerald-400'
                       : (periodReturn.quantityEffectPct ?? 0) < 0
                         ? 'text-red-600'
                         : 'text-slate-600 dark:text-slate-400'
