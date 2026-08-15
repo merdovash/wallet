@@ -368,6 +368,17 @@ describe('growthEngine', () => {
     // native +1 USD × end rate 100 = 100
     expect(withoutFx[0]?.growth).toBeCloseTo(100)
     expect(withoutFx[0]?.cumulativeGrowth).toBeCloseTo(100)
+
+    const totalWithoutFx = buildTotalSeries(
+      accounts,
+      snapshots,
+      settings,
+      rateBook,
+      [],
+      'withoutFx',
+    )
+    expect(totalWithoutFx[totalWithoutFx.length - 1]?.growth).toBeCloseTo(100)
+    expect(totalWithoutFx[totalWithoutFx.length - 1]?.total).toBeCloseTo(1100)
   })
 
   it('gives +6 growth when balance falls after a 16 withdrawal (100→105→90)', () => {

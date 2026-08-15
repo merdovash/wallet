@@ -611,9 +611,21 @@ export function modifiedDietzReturn(
 }
 
 /**
+ * withFx — full base growth including FX revaluation of opening balances.
+ * withoutFx — native balance delta (minus transfers) × FX rate on the end day only.
+ */
+export type GrowthFxMode = 'withFx' | 'withoutFx'
+
+/** @deprecated Use GrowthFxMode */
+export type DailyGrowthFxMode = GrowthFxMode
+
+/**
  * Series for growth accounts on each snapshot date.
  * growth = total change minus cumulative external capital flows
  * (transfers across the growth boundary; income/expense are ignored).
+ *
+ * When fxMode is `withoutFx`, cumulative growth is Σ (native Δ × end-day rate)
+ * and excludes FX revaluation of opening balances. `total` stays market value.
  */
 export function buildTotalSeries(
   accounts: Account[],
@@ -621,6 +633,7 @@ export function buildTotalSeries(
   settings: WalletSettings,
   rateBook?: RateBook,
   transfers: Transfer[] = [],
+  fxMode: GrowthFxMode = 'withFx',
 ): TotalPoint[] {
   const dates = snapshotDates(snapshots)
   if (dates.length === 0) return []
@@ -645,6 +658,7 @@ export function buildTotalSeries(
   const points: TotalPoint[] = []
   let baseline: number | null = null
   let cumCashflow = 0
+  let cumQuantityGrowth = 0
   let prevDate: string | null = null
   for (const date of dates) {
     const total = growthPortfolioTotalOnDate(
@@ -667,11 +681,24 @@ export function buildTotalSeries(
         cumCashflow += amount
       }
     }
-    points.push({
-      date,
-      total,
-      growth: total - baseline - cumCashflow,
-    })
+    if (fxMode === 'withoutFx') {
+      cumQuantityGrowth += quantityGrowthForInterval(
+        prevDate,
+        date,
+        accounts,
+        snapshots,
+        transfers,
+        settings,
+        rateBook,
+      )
+      points.push({ date, total, growth: cumQuantityGrowth })
+    } else {
+      points.push({
+        date,
+        total,
+        growth: total - baseline - cumCashflow,
+      })
+    }
     prevDate = date
   }
   return points
@@ -704,16 +731,6 @@ export function buildNetWorthSeries(
   }
   return points
 }
-
-/**
- * withFx — full base growth including FX revaluation of opening balances.
- * withoutFx — native balance delta (minus transfers) × FX rate on the end day only.
- */
-export type GrowthFxMode = 'withFx' | 'withoutFx'
-
-/** @deprecated Use GrowthFxMode */
-export type DailyGrowthFxMode = GrowthFxMode
-
 
 /**
  * Quantity-only growth for one check-in interval: Σ (Δ_native × rate_end).
@@ -761,35 +778,17 @@ export function buildDailyGrowthSeries(
   transfers: Transfer[] = [],
   fxMode: DailyGrowthFxMode = 'withFx',
 ): DailyGrowthPoint[] {
-  const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers)
+  const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers, fxMode)
   if (series.length < 2) return []
   const points: DailyGrowthPoint[] = []
-  let cumulativeGrowth = 0
   for (let i = 1; i < series.length; i += 1) {
     const prev = series[i - 1]!
     const cur = series[i]!
-    const growth =
-      fxMode === 'withoutFx'
-        ? quantityGrowthForInterval(
-            prev.date,
-            cur.date,
-            accounts,
-            snapshots,
-            transfers,
-            settings,
-            rateBook,
-          )
-        : cur.growth - prev.growth
-    if (fxMode === 'withoutFx') {
-      cumulativeGrowth += growth
-    } else {
-      cumulativeGrowth = cur.growth
-    }
     points.push({
       date: cur.date,
-      growth,
+      growth: cur.growth - prev.growth,
       total: cur.total,
-      cumulativeGrowth,
+      cumulativeGrowth: cur.growth,
     })
   }
   return points
@@ -920,8 +919,9 @@ export function periodGrowth(
   settings: WalletSettings,
   rateBook?: RateBook,
   transfers: Transfer[] = [],
+  fxMode: GrowthFxMode = 'withFx',
 ): number {
-  const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers)
+  const series = buildTotalSeries(accounts, snapshots, settings, rateBook, transfers, fxMode)
   if (series.length < 2) return series[0]?.growth ?? 0
   return series[series.length - 1]!.growth
 }

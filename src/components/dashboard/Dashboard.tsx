@@ -15,6 +15,7 @@ import {
 import { formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { buildPeriodReturn } from '../../lib/monthlyReturns'
 import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
+import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
@@ -38,6 +39,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
+  const fxMode = useFxModeStore((s) => s.fxMode)
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [periodKey, setPeriodKey] = useState<DashboardPeriodKey>('all')
   const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
@@ -63,8 +65,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     [latestDate, accounts, snapshots, settings, rateBook],
   )
   const fullSeries = useMemo(
-    () => buildTotalSeries(accounts, snapshots, settings, rateBook, transfers),
-    [accounts, snapshots, settings, rateBook, transfers],
+    () => buildTotalSeries(accounts, snapshots, settings, rateBook, transfers, fxMode),
+    [accounts, snapshots, settings, rateBook, transfers, fxMode],
   )
   const fullNetWorthSeries = useMemo(
     () => buildNetWorthSeries(accounts, snapshots, settings, rateBook),
@@ -82,8 +84,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const growth = useMemo(() => {
     if (periodReturn) return periodReturn.growth
     if (range) return series.length > 0 ? series[series.length - 1]!.growth : 0
-    return periodGrowth(accounts, snapshots, settings, rateBook, transfers)
-  }, [periodReturn, range, series, accounts, snapshots, settings, rateBook, transfers])
+    return periodGrowth(accounts, snapshots, settings, rateBook, transfers, fxMode)
+  }, [periodReturn, range, series, accounts, snapshots, settings, rateBook, transfers, fxMode])
 
   const personalCoefficients = useMemo(() => {
     if (!periodReturn) return null
