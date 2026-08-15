@@ -275,6 +275,25 @@ export function DailyBreakdownPanel({
   const totalTransfers = accountsWithFx.reduce((s, a) => s + a.transfersBase, 0)
   const balanceChange = periodReturn ? periodReturn.endTotal - periodReturn.startTotal : 0
   const accountCount = withoutFx ? accountsWithoutFx.length : accountsWithFx.length
+  const hasTransfers = (periodReturn?.transferMovements.length ?? 0) > 0
+
+  function transferAmountControl(amount: number, className = '') {
+    if (!hasTransfers) {
+      return <span className={className}>{signedAmount(amount, currency)}</span>
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => setTransfersOpen((v) => !v)}
+        className={`inline-flex items-center gap-0.5 underline decoration-dotted underline-offset-2 hover:text-blue-700 dark:hover:text-blue-400 ${className}`}
+      >
+        {signedAmount(amount, currency)}
+        <span className="text-[9px] text-slate-400" aria-hidden>
+          {transfersOpen ? '▾' : '▸'}
+        </span>
+      </button>
+    )
+  }
 
   return (
     <StackPanel open={open} title={title} onClose={onClose}>
@@ -333,6 +352,16 @@ export function DailyBreakdownPanel({
                     emphasize
                   />
                 </CompactFormula>
+                {hasTransfers ? (
+                  <p className="text-center text-[10px] text-slate-400 dark:text-slate-500">
+                    поток{' '}
+                    {transferAmountControl(
+                      periodReturn.netFlow,
+                      tone(periodReturn.netFlow),
+                    )}{' '}
+                    · нажмите сумму для списка переводов
+                  </p>
+                ) : null}
               </InlineFormulaRow>
 
               {periodReturn.growthFx ? (
@@ -392,7 +421,9 @@ export function DailyBreakdownPanel({
                   />
                 </CompactFormula>
                 <p className="text-center text-[10px] text-slate-400 dark:text-slate-500">
-                  Δ = прирост + переводы ({signedAmount(totalTransfers, currency)})
+                  Δ = прирост + переводы (
+                  {transferAmountControl(totalTransfers, tone(totalTransfers))}
+                  )
                 </p>
               </InlineFormulaRow>
             </>
@@ -472,33 +503,35 @@ export function DailyBreakdownPanel({
             </div>
           ) : null}
 
-          {periodReturn.transferMovements.length > 0 ? (
+          {transfersOpen && hasTransfers ? (
             <div className="rounded-lg border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setTransfersOpen((v) => !v)}
-                className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-300"
-              >
-                <span>Переводы · {periodReturn.transferMovements.length}</span>
-                <span className="text-slate-400">{transfersOpen ? '▾' : '▸'}</span>
-              </button>
-              {transfersOpen ? (
-                <ul className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-                  {periodReturn.transferMovements.map((t) => (
-                    <li
-                      key={t.id}
-                      className="flex items-start justify-between gap-2 px-2 py-1.5 text-[11px]"
-                    >
-                      <span className="min-w-0 truncate text-slate-700 dark:text-slate-300">
-                        {t.fromName} → {t.toName}
-                      </span>
-                      <span className="shrink-0 tabular-nums font-medium">
-                        {formatCurrency(t.amountBase, currency)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-2 py-2 dark:border-slate-800">
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Переводы · {periodReturn.transferMovements.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTransfersOpen(false)}
+                  className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  Скрыть
+                </button>
+              </div>
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {periodReturn.transferMovements.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-start justify-between gap-2 px-2 py-1.5 text-[11px]"
+                  >
+                    <span className="min-w-0 truncate text-slate-700 dark:text-slate-300">
+                      {t.fromName} → {t.toName}
+                    </span>
+                    <span className="shrink-0 tabular-nums font-medium">
+                      {formatCurrency(t.amountBase, currency)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
 

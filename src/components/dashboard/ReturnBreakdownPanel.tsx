@@ -1,4 +1,5 @@
-﻿import {
+﻿import { useState } from 'react'
+import {
   formatCurrency,
   formatDateDisplay,
   formatPercent,
@@ -135,6 +136,8 @@ function GrowthMovementsView({
   }, 0)
   const totalTransfers = accounts.reduce((s, a) => s + a.transfersBase, 0)
   const fxEffect = periodReturn.growthFx?.fxEffectBase ?? 0
+  const [transfersOpen, setTransfersOpen] = useState(false)
+  const hasTransfers = periodReturn.transferMovements.length > 0
 
   return (
     <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
@@ -212,7 +215,13 @@ function GrowthMovementsView({
           label="Переводы (чистые)"
           value={signedAmount(totalTransfers, currency)}
           valueClassName={tone(totalTransfers)}
-          hint="пополнения (+) и снятия (−) по этим счетам"
+          hint={
+            hasTransfers
+              ? 'нажмите сумму, чтобы открыть список'
+              : 'пополнения (+) и снятия (−) по этим счетам'
+          }
+          onValueClick={hasTransfers ? () => setTransfersOpen((v) => !v) : undefined}
+          valueOpen={transfersOpen}
         />
         <Row
           label="Изменение остатков"
@@ -220,6 +229,13 @@ function GrowthMovementsView({
           hint="прирост + переводы (+ курс при полном режиме)"
         />
       </dl>
+
+      {transfersOpen && hasTransfers ? (
+        <TransferMovementsSection
+          transfers={periodReturn.transferMovements}
+          currency={currency}
+        />
+      ) : null}
 
       {periodReturn.growthFx && !withoutFx ? (
         <GrowthFxSection breakdown={periodReturn.growthFx} currency={currency} />
@@ -283,11 +299,6 @@ function GrowthMovementsView({
           </p>
         ) : null}
       </div>
-
-      <TransferMovementsSection
-        transfers={periodReturn.transferMovements}
-        currency={currency}
-      />
     </div>
   )
 }
@@ -429,6 +440,10 @@ function PercentBreakdownView({
     ? (periodReturn.quantityEffectPct ?? periodReturn.growthPct)
     : periodReturn.growthPct
   const showAllMass = focus === 'annualizedPctOfAllMass'
+  const boundaryTransfers = periodReturn.transferMovements.filter((t) => t.crossesGrowthBoundary)
+  const [transfersOpen, setTransfersOpen] = useState(false)
+  const canOpenTransfers = focus === 'topUp' && boundaryTransfers.length > 0
+
   return (
     <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
       <div
@@ -473,8 +488,14 @@ function PercentBreakdownView({
         <Row
           label="Чистый поток"
           value={signedAmount(periodReturn.netFlow, currency)}
-          hint="переводы в/из портфеля роста (доход/расход не входят)"
+          hint={
+            canOpenTransfers
+              ? 'нажмите сумму, чтобы открыть список переводов'
+              : 'переводы в/из портфеля роста (доход/расход не входят)'
+          }
           emphasize={focus === 'topUp'}
+          onValueClick={canOpenTransfers ? () => setTransfersOpen((v) => !v) : undefined}
+          valueOpen={transfersOpen}
         />
         <Row
           label="Взвешенный капитал"
@@ -592,11 +613,8 @@ function PercentBreakdownView({
         </div>
       ) : null}
 
-      {focus === 'topUp' ? (
-        <TransferMovementsSection
-          transfers={periodReturn.transferMovements.filter((t) => t.crossesGrowthBoundary)}
-          currency={currency}
-        />
+      {focus === 'topUp' && transfersOpen && boundaryTransfers.length > 0 ? (
+        <TransferMovementsSection transfers={boundaryTransfers} currency={currency} />
       ) : null}
 
       <AccountSection
@@ -732,13 +750,18 @@ function Row({
   hint,
   emphasize = false,
   valueClassName,
+  onValueClick,
+  valueOpen = false,
 }: {
   label: string
   value: string
   hint?: string
   emphasize?: boolean
   valueClassName?: string
+  onValueClick?: () => void
+  valueOpen?: boolean
 }) {
+  const valueClasses = `shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900 dark:text-slate-200'}`
   return (
     <div
       className={`flex items-start justify-between gap-3 px-3 py-2.5 ${
@@ -749,10 +772,21 @@ function Row({
         <span className="block">{label}</span>
         {hint ? <span className="mt-0.5 block text-[11px] text-slate-400 dark:text-slate-500">{hint}</span> : null}
       </dt>
-      <dd
-        className={`shrink-0 text-right font-medium tabular-nums ${valueClassName ?? 'text-slate-900 dark:text-slate-200'}`}
-      >
-        {value}
+      <dd className={valueClasses}>
+        {onValueClick ? (
+          <button
+            type="button"
+            onClick={onValueClick}
+            className="inline-flex items-center gap-1 rounded-md underline decoration-dotted underline-offset-2 hover:text-blue-700 dark:hover:text-blue-400"
+          >
+            {value}
+            <span className="text-[10px] text-slate-400 dark:text-slate-500" aria-hidden>
+              {valueOpen ? '▾' : '▸'}
+            </span>
+          </button>
+        ) : (
+          value
+        )}
       </dd>
     </div>
   )
