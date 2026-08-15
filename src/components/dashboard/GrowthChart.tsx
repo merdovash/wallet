@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import type { RateBook } from '../../engine/growthEngine'
 import { paddedDataDomain } from '../../lib/chartAxisDomain'
-import { chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
+import { chartActiveDot, chartDot, chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { useTheme } from '../../lib/useTheme'
 import type { Account, AccountPoint, BalanceSnapshot, TotalPoint, WalletSettings } from '../../types/wallet'
@@ -179,8 +179,8 @@ export function GrowthChart({
                 name="primary"
                 stroke={chartTheme.primaryLine}
                 strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 6 }}
+                dot={chartDot(chartTheme, chartTheme.primaryLine)}
+                activeDot={chartActiveDot(chartTheme, chartTheme.primaryLine)}
               />
               {showGrowthLine ? (
                 <Line
@@ -191,8 +191,8 @@ export function GrowthChart({
                   stroke={chartTheme.growthLine}
                   strokeWidth={2}
                   strokeDasharray="4 4"
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 6 }}
+                  dot={chartDot(chartTheme, chartTheme.growthLine)}
+                  activeDot={chartActiveDot(chartTheme, chartTheme.growthLine)}
                 />
               ) : null}
             </LineChart>

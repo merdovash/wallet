@@ -10,7 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { buildCurrencyValueSeries } from '../../lib/currencyValueSeries'
-import { chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
+import { chartActiveDot, chartDot, chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
@@ -92,18 +92,21 @@ export function CurrencyValueChart() {
               }}
             />
             <Legend />
-            {currencies.map((currency, index) => (
+            {currencies.map((currency, index) => {
+              const stroke = LINE_COLORS[index % LINE_COLORS.length]!
+              return (
               <Line
                 key={currency}
                 type="monotone"
                 dataKey={currency}
                 name={currency}
-                stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                stroke={stroke}
                 strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
+                dot={chartDot(chartTheme, stroke)}
+                activeDot={chartActiveDot(chartTheme, stroke, 5)}
               />
-            ))}
+              )
+            })}
           </LineChart>
         </ResponsiveContainer>
       </div>
