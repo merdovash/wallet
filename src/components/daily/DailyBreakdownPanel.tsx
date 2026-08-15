@@ -6,6 +6,7 @@ import {
   formatPercent,
   signedAmount,
 } from '../../lib/format'
+import type { GrowthFxAccountLine } from '../../lib/growthFxBreakdown'
 import type { PeriodReturnAccountLine, PeriodReturnSummary } from '../../lib/monthlyReturns'
 import { StackPanel } from '../ui/StackPanel'
 
@@ -86,7 +87,8 @@ function InlineFormulaRow({
   )
 }
 
-function AccountLineWithFx({
+/** Base-currency account (or no FX split): Δ = рост + переводы. */
+function AccountLineBase({
   acc,
   currency,
 }: {
@@ -123,54 +125,106 @@ function AccountLineWithFx({
   )
 }
 
-function AccountLineWithoutFx({
-  name,
-  currency,
-  growthNative,
-  quantityEffectBase,
+/**
+ * Foreign account with FX: Δ = рост по курсу (кол-во×курс_дня) + рост курса (переоценка остатка).
+ */
+function AccountLineWithFxSplit({
+  acc,
+  fx,
   baseCurrency,
 }: {
-  name: string
-  currency: string
-  growthNative: number
-  quantityEffectBase: number
+  acc: PeriodReturnAccountLine
+  fx: GrowthFxAccountLine
   baseCurrency: string
 }) {
-  const unitRate =
-    Math.abs(growthNative) >= 1e-9 ? quantityEffectBase / growthNative : null
+  const qty = fx.quantityEffectBase
+  const rateFx = fx.fxEffectBase
+  const timing = fx.transferTimingBase
+  const composed = qty + rateFx + timing
+
   return (
     <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
       <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">
-        {name}
+        {acc.name}
         <span className="ml-1.5 text-[10px] font-normal text-slate-400 dark:text-slate-500">
-          {currency}
+          {acc.currency}
         </span>
       </p>
       <div className="mt-1 flex min-w-min items-end justify-start gap-1 overflow-x-auto">
         <FormulaCell
-          label="дельта"
-          value={signedAmount(growthNative, currency)}
-          valueClassName={tone(growthNative)}
-        />
-        <FormulaOp>×</FormulaOp>
-        <FormulaCell
-          label="курс"
-          value={
-            unitRate == null
-              ? '—'
-              : unitRate.toLocaleString('ru-RU', {
-                  maximumFractionDigits: 4,
-                })
-          }
+          label="Δ"
+          value={signedAmount(acc.growthBase, baseCurrency)}
+          valueClassName={tone(acc.growthBase)}
+          emphasize
         />
         <FormulaOp>=</FormulaOp>
         <FormulaCell
-          label="прирост"
-          value={signedAmount(quantityEffectBase, baseCurrency)}
-          valueClassName={tone(quantityEffectBase)}
+          label="по курсу"
+          value={signedAmount(qty, baseCurrency)}
+          valueClassName={tone(qty)}
+        />
+        <FormulaOp>+</FormulaOp>
+        <FormulaCell
+          label="рост курса"
+          value={signedAmount(rateFx, baseCurrency)}
+          valueClassName={tone(rateFx)}
+        />
+        {Math.abs(timing) >= 0.01 ? (
+          <>
+            <FormulaOp>+</FormulaOp>
+            <FormulaCell
+              label="даты"
+              value={signedAmount(timing, baseCurrency)}
+              valueClassName={tone(timing)}
+            />
+          </>
+        ) : null}
+      </div>
+      {Math.abs(composed - acc.growthBase) >= 0.05 ? (
+        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+          проверка: {signedAmount(composed, baseCurrency)}
+        </p>
+      ) : null}
+      {Math.abs(acc.transfersBase) >= 0.01 ? (
+        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+          переводы {signedAmount(acc.transfersBase, baseCurrency)} · Δ остатка{' '}
+          {signedAmount(acc.balanceChangeBase, baseCurrency)}
+        </p>
+      ) : null}
+    </li>
+  )
+}
+
+/** Without FX: прирост = только дельта по курсу (кол-во × курс дня). */
+function AccountLineQuantityOnly({
+  fx,
+  baseCurrency,
+}: {
+  fx: GrowthFxAccountLine
+  baseCurrency: string
+}) {
+  return (
+    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
+      <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">
+        {fx.name}
+        <span className="ml-1.5 text-[10px] font-normal text-slate-400 dark:text-slate-500">
+          {fx.currency}
+        </span>
+      </p>
+      <div className="mt-1 flex min-w-min items-end justify-start gap-1 overflow-x-auto">
+        <FormulaCell
+          label="дельта по курсу"
+          value={signedAmount(fx.quantityEffectBase, baseCurrency)}
+          valueClassName={tone(fx.quantityEffectBase)}
           emphasize
         />
       </div>
+      <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+        {signedAmount(fx.growthNative, fx.currency)} × курс дня
+        {Math.abs(fx.fxEffectBase) >= 0.01
+          ? ` · курс на остаток ${signedAmount(fx.fxEffectBase, baseCurrency)} не входит`
+          : ''}
+      </p>
     </li>
   )
 }
@@ -192,12 +246,17 @@ export function DailyBreakdownPanel({
     : 'Расшифровка дня'
 
   const quantityGrowth = periodReturn?.quantityEffectBase ?? periodReturn?.growth ?? 0
+  const fxEffect = periodReturn?.growthFx?.fxEffectBase ?? 0
   const quantityPctOfMass =
     periodReturn != null &&
     Number.isFinite(periodReturn.startTotalAllMass) &&
     periodReturn.startTotalAllMass !== 0
       ? quantityGrowth / periodReturn.startTotalAllMass
       : null
+
+  const fxByAccount = new Map(
+    (periodReturn?.growthFx?.accounts ?? []).map((a) => [a.accountId, a]),
+  )
 
   const accountsWithFx = periodReturn
     ? [...periodReturn.includedAccounts].sort(
@@ -228,26 +287,26 @@ export function DailyBreakdownPanel({
           <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
             {formatDateDisplay(periodReturn.startDate)} → {formatDateDisplay(periodReturn.endDate)}
             {periodReturn.days > 1 ? ` · ${periodReturn.days} дн.` : ''}
-            {withoutFx ? ' · без учёта курса' : ''}
+            {withoutFx ? ' · без учёта курса' : ' · с учётом курса'}
           </p>
 
           {withoutFx ? (
-            <InlineFormulaRow label="Прирост без курса">
+            <InlineFormulaRow label="Прирост = дельта по курсу">
               <CompactFormula>
-                <FormulaCell label="дельта" value="в валюте" />
-                <FormulaOp>×</FormulaOp>
-                <FormulaCell label="курс" value="дня" />
-                <FormulaOp>=</FormulaOp>
                 <FormulaCell
-                  label="прирост"
+                  label="дельта по курсу"
                   value={signedAmount(quantityGrowth, currency)}
                   valueClassName={tone(quantityGrowth)}
                   emphasize
                 />
               </CompactFormula>
               <p className="text-center text-[10px] text-slate-400 dark:text-slate-500">
-                Σ (изменение остатка − переводы) × курс на {formatDateDisplay(periodReturn.endDate)}.
-                Переоценка остатка из‑за курса не входит.
+                Только Σ (изменение остатка − переводы) × курс на{' '}
+                {formatDateDisplay(periodReturn.endDate)}. Рост курса остатка не входит
+                {Math.abs(fxEffect) >= 0.01
+                  ? ` (${signedAmount(fxEffect, currency)})`
+                  : ''}
+                .
               </p>
             </InlineFormulaRow>
           ) : (
@@ -275,6 +334,44 @@ export function DailyBreakdownPanel({
                   />
                 </CompactFormula>
               </InlineFormulaRow>
+
+              {periodReturn.growthFx ? (
+                <InlineFormulaRow label="Состав прироста">
+                  <CompactFormula>
+                    <FormulaCell
+                      label="по курсу"
+                      value={signedAmount(periodReturn.growthFx.quantityEffectBase, currency)}
+                      valueClassName={tone(periodReturn.growthFx.quantityEffectBase)}
+                    />
+                    <FormulaOp>+</FormulaOp>
+                    <FormulaCell
+                      label="рост курса"
+                      value={signedAmount(periodReturn.growthFx.fxEffectBase, currency)}
+                      valueClassName={tone(periodReturn.growthFx.fxEffectBase)}
+                    />
+                    {Math.abs(periodReturn.growthFx.transferTimingBase) >= 0.01 ? (
+                      <>
+                        <FormulaOp>+</FormulaOp>
+                        <FormulaCell
+                          label="даты"
+                          value={signedAmount(periodReturn.growthFx.transferTimingBase, currency)}
+                          valueClassName={tone(periodReturn.growthFx.transferTimingBase)}
+                        />
+                      </>
+                    ) : null}
+                    <FormulaOp>=</FormulaOp>
+                    <FormulaCell
+                      label="прирост"
+                      value={signedAmount(periodReturn.growth, currency)}
+                      valueClassName={tone(periodReturn.growth)}
+                      emphasize
+                    />
+                  </CompactFormula>
+                  <p className="text-center text-[10px] text-slate-400 dark:text-slate-500">
+                    по курсу = дельта в валюте × курс дня · рост курса = переоценка начального остатка
+                  </p>
+                </InlineFormulaRow>
+              ) : null}
 
               <InlineFormulaRow label="Проверка Δ остатка">
                 <CompactFormula>
@@ -347,18 +444,29 @@ export function DailyBreakdownPanel({
                 <ul className="border-t border-slate-100 dark:border-slate-800">
                   {withoutFx
                     ? accountsWithoutFx.map((acc) => (
-                        <AccountLineWithoutFx
+                        <AccountLineQuantityOnly
                           key={acc.accountId}
-                          name={acc.name}
-                          currency={acc.currency}
-                          growthNative={acc.growthNative}
-                          quantityEffectBase={acc.quantityEffectBase}
+                          fx={acc}
                           baseCurrency={currency}
                         />
                       ))
-                    : accountsWithFx.map((acc) => (
-                        <AccountLineWithFx key={acc.accountId} acc={acc} currency={currency} />
-                      ))}
+                    : accountsWithFx.map((acc) => {
+                        const fx = fxByAccount.get(acc.accountId)
+                        const isForeign = acc.currency !== currency
+                        if (isForeign && fx) {
+                          return (
+                            <AccountLineWithFxSplit
+                              key={acc.accountId}
+                              acc={acc}
+                              fx={fx}
+                              baseCurrency={currency}
+                            />
+                          )
+                        }
+                        return (
+                          <AccountLineBase key={acc.accountId} acc={acc} currency={currency} />
+                        )
+                      })}
                 </ul>
               ) : null}
             </div>
