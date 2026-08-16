@@ -113,8 +113,9 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
                 />
               ))}
             </nav>
-            <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 p-3">
+            <div className="shrink-0 space-y-2 border-t border-slate-200 dark:border-slate-700 p-3">
               <AuthControls />
+              <AppVersion />
             </div>
           </aside>
         </div>
@@ -159,9 +160,23 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
           >
             <CollapseIcon className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />
           </button>
+          <AppVersion collapsed={collapsed} />
         </div>
       </aside>
     </div>
+  )
+}
+
+function AppVersion({ collapsed = false }: { collapsed?: boolean }) {
+  return (
+    <p
+      className={`select-none text-center text-[10px] leading-none text-slate-400 dark:text-slate-500 ${
+        collapsed ? 'px-0' : 'px-1'
+      }`}
+      title={`Версия ${__APP_VERSION__}`}
+    >
+      {collapsed ? `v${__APP_VERSION__}` : `версия ${__APP_VERSION__}`}
+    </p>
   )
 }
 
