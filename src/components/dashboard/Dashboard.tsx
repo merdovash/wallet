@@ -7,6 +7,11 @@ import {
   totalOnDate,
 } from '../../engine/growthEngine'
 import {
+  buildCheckInReminderStatus,
+  formatDaysRu,
+  readCheckInIntervalDays,
+} from '../../lib/checkInReminder'
+import {
   DASHBOARD_PERIOD_OPTIONS,
   resolveDashboardPeriod,
   slicePeriodSeries,
@@ -28,6 +33,9 @@ import { ChartSeriesToggle } from './ChartSeriesToggle'
 import { PersonalCoefficientsPanel } from './PersonalCoefficientsPanel'
 import { SummaryCards } from './SummaryCards'
 
+/** После стольких чек-инов показываем расширенные виджеты по умолчанию. */
+const ADVANCED_DASHBOARD_AFTER_CHECKINS = 3
+
 interface DashboardProps {
   onOpenAccount: (accountId: string) => void
 }
@@ -41,16 +49,42 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const fxMode = useFxModeStore((s) => s.fxMode)
   const [checkInOpen, setCheckInOpen] = useState(false)
+  const [checkInMode, setCheckInMode] = useState<'quick' | 'full'>('quick')
   const [periodKey, setPeriodKey] = useState<DashboardPeriodKey>('all')
   const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [intervalDays, setIntervalDays] = useState(readCheckInIntervalDays)
 
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const latestDate = dates[dates.length - 1]
+  const manualCheckInCount = useMemo(
+    () => snapshots.filter((s) => (s.origin ?? 'manual') === 'manual').length,
+    [snapshots],
+  )
+  const advancedUnlocked = manualCheckInCount >= ADVANCED_DASHBOARD_AFTER_CHECKINS
+  const showAdvancedWidgets = advancedUnlocked || showAdvanced
 
   useEffect(() => {
     void ensureRates([...dates, todayIsoDate()])
   }, [dates, ensureRates])
+
+  useEffect(() => {
+    function onStorage() {
+      setIntervalDays(readCheckInIntervalDays())
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('wallet-checkin-interval-changed', onStorage)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('wallet-checkin-interval-changed', onStorage)
+    }
+  }, [])
+
+  const reminder = useMemo(
+    () => buildCheckInReminderStatus(snapshots, intervalDays, todayIsoDate()),
+    [snapshots, intervalDays],
+  )
 
   const range = useMemo(
     () => (periodKey === 'all' ? undefined : (resolveDashboardPeriod(periodKey, dates) ?? undefined)),
@@ -100,6 +134,16 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     )
   }, [accounts, snapshots, settings, rateBook, periodReturn])
 
+  function openQuickCheckIn() {
+    setCheckInMode('quick')
+    setCheckInOpen(true)
+  }
+
+  function openFullCheckIn() {
+    setCheckInMode('full')
+    setCheckInOpen(true)
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-3">
       <div className="space-y-2">
@@ -131,7 +175,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
               </span>
             ) : null}
           </div>
-          <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={() => setCheckInOpen(true)}>
+          <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={openQuickCheckIn}>
             Чек-ин
           </Button>
         </div>
@@ -141,6 +185,12 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         </div>
       </div>
 
+      <CheckInReminderBanner
+        reminder={reminder}
+        onCheckIn={openQuickCheckIn}
+        onFullCheckIn={openFullCheckIn}
+      />
+
       <SummaryCards
         total={total}
         growth={growth}
@@ -148,10 +198,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         periodReturn={periodReturn}
         annualInflationPct={settings.annualInflationPct}
       />
-
-      <PersonalCoefficientsPanel coefficients={personalCoefficients} />
-
-      <CreditFloatSummary />
 
       <GrowthChart
         data={series}
@@ -166,12 +212,95 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         rateBook={rateBook}
       />
 
-      <CurrencyReportTable
-        accountCount={activeAccounts.length}
-        onOpenAccount={onOpenAccount}
-      />
+      {!showAdvancedWidgets ? (
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(true)}
+          className="w-full rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800/50"
+        >
+          Показать дополнительные виджеты
+        </button>
+      ) : (
+        <>
+          <PersonalCoefficientsPanel coefficients={personalCoefficients} />
+          <CreditFloatSummary />
+          <CurrencyReportTable
+            accountCount={activeAccounts.length}
+            onOpenAccount={onOpenAccount}
+          />
+          {!advancedUnlocked && (
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(false)}
+              className="text-xs text-slate-500 hover:underline dark:text-slate-400"
+            >
+              Скрыть дополнительные виджеты
+            </button>
+          )}
+        </>
+      )}
 
-      <CheckInPanel open={checkInOpen} onClose={() => setCheckInOpen(false)} />
+      <CheckInPanel
+        open={checkInOpen}
+        onClose={() => setCheckInOpen(false)}
+        mode={checkInMode}
+      />
+    </div>
+  )
+}
+
+function CheckInReminderBanner({
+  reminder,
+  onCheckIn,
+  onFullCheckIn,
+}: {
+  reminder: ReturnType<typeof buildCheckInReminderStatus>
+  onCheckIn: () => void
+  onFullCheckIn: () => void
+}) {
+  if (reminder.kind === 'ok') {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+        <p className="text-sm text-emerald-900 dark:text-emerald-200">
+          Чек-ины актуальны · следующий через {formatDaysRu(reminder.daysUntilDue)}
+        </p>
+        <button
+          type="button"
+          onClick={onFullCheckIn}
+          className="text-xs font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+        >
+          Полный чек-ин
+        </button>
+      </div>
+    )
+  }
+
+  const title =
+    reminder.kind === 'empty'
+      ? 'Сделайте первый чек-ин'
+      : reminder.daysOverdue === 0
+        ? 'Пора сделать чек-ин'
+        : `Чек-ин просрочен на ${formatDaysRu(reminder.daysOverdue)}`
+
+  const detail =
+    reminder.kind === 'empty'
+      ? `Цель — раз в ${formatDaysRu(reminder.intervalDays)}. Зафиксируйте остатки, чтобы считать прирост.`
+      : `Последний ${formatDateDisplay(reminder.latestDate)} · интервал ${formatDaysRu(reminder.intervalDays)}`
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/25">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">{title}</p>
+        <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-200/80">{detail}</p>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        <Button type="button" className="!px-3 !py-1.5 text-sm" onClick={onCheckIn}>
+          Быстрый чек-ин
+        </Button>
+        <Button type="button" variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={onFullCheckIn}>
+          Полный
+        </Button>
+      </div>
     </div>
   )
 }

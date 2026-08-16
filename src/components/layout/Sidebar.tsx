@@ -1,23 +1,30 @@
 ﻿import { useEffect, useState, type SVGProps } from 'react'
 import { sectionToPath } from '../../lib/appRoutes'
+import {
+  ANALYTICS_NAV_ITEMS,
+  PRIMARY_NAV_SECTIONS,
+  isAnalyticsSection,
+  primaryNavActiveId,
+} from '../../lib/navSections'
 import { portalHomeUrl } from '../../lib/portalUrl'
 import type { AppSection } from '../../types/wallet'
 import { AuthControls } from './AuthControls'
 
 type NavIcon = (props: SVGProps<SVGSVGElement>) => React.ReactElement
 
-const NAV_ITEMS: { id: AppSection; label: string; Icon: NavIcon }[] = [
-  { id: 'dashboard', label: 'Дашборд', Icon: ChartIcon },
-  { id: 'checkins', label: 'Чек-ины', Icon: CheckInIcon },
-  { id: 'daily', label: 'По дням', Icon: DailyIcon },
-  { id: 'accounts', label: 'Счета', Icon: AccountsIcon },
-  { id: 'types', label: 'По типам', Icon: TypesIcon },
-  { id: 'currencies', label: 'Валюты', Icon: CurrenciesIcon },
-  { id: 'monthly', label: 'Помесячно', Icon: MonthlyIcon },
-  { id: 'float', label: 'Float', Icon: FloatIcon },
-  { id: 'cashback', label: 'Кэшбек', Icon: CashbackIcon },
-  { id: 'settings', label: 'Настройки', Icon: SettingsIcon },
-]
+const NAV_META: Record<AppSection, { label: string; Icon: NavIcon }> = {
+  dashboard: { label: 'Дашборд', Icon: ChartIcon },
+  checkins: { label: 'Чек-ины', Icon: CheckInIcon },
+  accounts: { label: 'Счета', Icon: AccountsIcon },
+  analytics: { label: 'Аналитика', Icon: AnalyticsIcon },
+  daily: { label: 'По дням', Icon: DailyIcon },
+  types: { label: 'По типам', Icon: TypesIcon },
+  currencies: { label: 'Валюты', Icon: CurrenciesIcon },
+  monthly: { label: 'Помесячно', Icon: MonthlyIcon },
+  float: { label: 'Float', Icon: FloatIcon },
+  cashback: { label: 'Кэшбек', Icon: CashbackIcon },
+  settings: { label: 'Настройки', Icon: SettingsIcon },
+}
 
 interface SidebarProps {
   active: AppSection
@@ -28,6 +35,14 @@ interface SidebarProps {
 
 export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: SidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [analyticsOpen, setAnalyticsOpen] = useState(() => isAnalyticsSection(active))
+  const primaryActive = primaryNavActiveId(active)
+
+  useEffect(() => {
+    if (isAnalyticsSection(active) || active === 'analytics') {
+      setAnalyticsOpen(true)
+    }
+  }, [active])
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -58,22 +73,25 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             title="Меню"
             aria-label="Открыть меню"
             aria-expanded={mobileMenuOpen}
-            className="flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
+            className="flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <MenuIcon className="h-5 w-5" aria-hidden />
             <span className="text-[10px] font-medium leading-none">Меню</span>
           </button>
-          {NAV_ITEMS.map(({ id, label, Icon }) => (
-            <NavButton
-              key={id}
-              id={id}
-              label={label}
-              Icon={Icon}
-              isActive={active === id}
-              mode="icon"
-              onChange={selectSection}
-            />
-          ))}
+          {PRIMARY_NAV_SECTIONS.map((id) => {
+            const { label, Icon } = NAV_META[id]
+            return (
+              <NavButton
+                key={id}
+                id={id}
+                label={label}
+                Icon={Icon}
+                isActive={primaryActive === id}
+                mode="icon"
+                onChange={selectSection}
+              />
+            )
+          })}
         </nav>
       </aside>
 
@@ -95,23 +113,20 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="rounded-lg px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 Закрыть
               </button>
             </div>
             <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3">
-              {NAV_ITEMS.map(({ id, label, Icon }) => (
-                <NavButton
-                  key={id}
-                  id={id}
-                  label={label}
-                  Icon={Icon}
-                  isActive={active === id}
-                  mode="full"
-                  onChange={selectSection}
-                />
-              ))}
+              <PrimaryNavList
+                active={active}
+                primaryActive={primaryActive}
+                analyticsOpen={analyticsOpen}
+                onAnalyticsOpenChange={setAnalyticsOpen}
+                onChange={selectSection}
+                collapsed={false}
+              />
             </nav>
             <div className="shrink-0 space-y-2 border-t border-slate-200 dark:border-slate-700 p-3">
               <AuthControls />
@@ -136,17 +151,14 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             collapsed ? 'items-center px-2' : ''
           }`}
         >
-          {NAV_ITEMS.map(({ id, label, Icon }) => (
-            <NavButton
-              key={id}
-              id={id}
-              label={label}
-              Icon={Icon}
-              isActive={active === id}
-              mode={collapsed ? 'icon' : 'full'}
-              onChange={onChange}
-            />
-          ))}
+          <PrimaryNavList
+            active={active}
+            primaryActive={primaryActive}
+            analyticsOpen={analyticsOpen}
+            onAnalyticsOpenChange={setAnalyticsOpen}
+            onChange={onChange}
+            collapsed={collapsed}
+          />
         </nav>
 
         <div className="shrink-0 space-y-2 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2">
@@ -154,7 +166,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
           <button
             type="button"
             onClick={() => onCollapsedChange(!collapsed)}
-            className="flex w-full items-center justify-center rounded-lg px-2 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-800 dark:text-slate-200"
+            className="flex w-full items-center justify-center rounded-lg px-2 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
             title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
             aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
           >
@@ -164,6 +176,97 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
         </div>
       </aside>
     </div>
+  )
+}
+
+function PrimaryNavList({
+  active,
+  primaryActive,
+  analyticsOpen,
+  onAnalyticsOpenChange,
+  onChange,
+  collapsed,
+}: {
+  active: AppSection
+  primaryActive: AppSection
+  analyticsOpen: boolean
+  onAnalyticsOpenChange: (open: boolean) => void
+  onChange: (id: AppSection) => void
+  collapsed: boolean
+}) {
+  return (
+    <>
+      {PRIMARY_NAV_SECTIONS.map((id) => {
+        const { label, Icon } = NAV_META[id]
+        if (id === 'analytics' && !collapsed) {
+          return (
+            <div key={id} className="space-y-1">
+              <div className="flex items-stretch gap-0.5">
+                <div className="min-w-0 flex-1">
+                  <NavButton
+                    id={id}
+                    label={label}
+                    Icon={Icon}
+                    isActive={primaryActive === id}
+                    mode="full"
+                    onChange={(next) => {
+                      onAnalyticsOpenChange(true)
+                      onChange(next)
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-label={analyticsOpen ? 'Свернуть аналитику' : 'Развернуть аналитику'}
+                  aria-expanded={analyticsOpen}
+                  onClick={() => onAnalyticsOpenChange(!analyticsOpen)}
+                  className={`shrink-0 rounded-lg px-1.5 ${
+                    primaryActive === id
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <ChevronIcon
+                    className={`h-4 w-4 transition ${analyticsOpen ? 'rotate-90' : ''}`}
+                  />
+                </button>
+              </div>
+              {analyticsOpen && (
+                <div className="ml-3 space-y-0.5 border-l border-slate-200 pl-2 dark:border-slate-700">
+                  {ANALYTICS_NAV_ITEMS.map((item) => {
+                    const meta = NAV_META[item.id]
+                    return (
+                      <NavButton
+                        key={item.id}
+                        id={item.id}
+                        label={item.label}
+                        Icon={meta.Icon}
+                        isActive={active === item.id}
+                        mode="full"
+                        onChange={onChange}
+                        compact
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        return (
+          <NavButton
+            key={id}
+            id={id}
+            label={label}
+            Icon={Icon}
+            isActive={primaryActive === id}
+            mode={collapsed ? 'icon' : 'full'}
+            onChange={onChange}
+          />
+        )
+      })}
+    </>
   )
 }
 
@@ -186,7 +289,7 @@ function PortalHomeLink({ collapsed = false }: { collapsed?: boolean }) {
       href={portalHomeUrl()}
       title="На главную"
       aria-label="На главную"
-      className={`flex items-center gap-2 rounded-lg text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-200 ${
+      className={`flex items-center gap-2 rounded-lg text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 ${
         collapsed ? 'justify-center p-1.5' : 'px-1 py-0.5'
       }`}
     >
@@ -203,6 +306,7 @@ function NavButton({
   isActive,
   mode,
   onChange,
+  compact = false,
 }: {
   id: AppSection
   label: string
@@ -210,11 +314,14 @@ function NavButton({
   isActive: boolean
   mode: 'icon' | 'full'
   onChange: (id: AppSection) => void
+  compact?: boolean
 }) {
   const base =
     mode === 'icon'
       ? 'flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5'
-      : 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm'
+      : compact
+        ? 'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs'
+        : 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm'
   const activeCls = isActive
     ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
@@ -230,11 +337,11 @@ function NavButton({
       aria-current={isActive ? 'page' : undefined}
       className={`${base} ${activeCls}`}
     >
-      <Icon className="h-5 w-5 shrink-0" aria-hidden />
+      <Icon className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} shrink-0`} aria-hidden />
       {mode === 'icon' ? (
         <span className="text-[10px] font-medium leading-none">{label}</span>
       ) : (
-        <span className="truncate font-medium">{label}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
       )}
     </a>
   )
@@ -278,6 +385,18 @@ function AccountsIcon(props: SVGProps<SVGSVGElement>) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M8 11h8M8 15h5"
+      />
+    </svg>
+  )
+}
+
+function AnalyticsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 19V5M4 19h16M7 15l3-4 3 2 4-6M14 5h6v4h-6V5Z"
       />
     </svg>
   )
@@ -381,6 +500,14 @@ function CollapseIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...iconProps(props)}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 6 9 12l6 6" />
+    </svg>
+  )
+}
+
+function ChevronIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...iconProps(props)}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m9 6 6 6-6 6" />
     </svg>
   )
 }

@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
+import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
@@ -16,6 +17,8 @@ interface CheckInPanelProps {
   onClose: () => void
   /** If set, panel edits this snapshot instead of creating a new one. */
   snapshotId?: string | null
+  /** quick — подставляет остатки и выделяет пропущенные счета. */
+  mode?: 'quick' | 'full'
 }
 
 function formatHintAmount(amount: number): string {
@@ -78,7 +81,12 @@ function parsePendingTransfer(t: PendingTransfer): {
   }
 }
 
-export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelProps) {
+export function CheckInPanel({
+  open,
+  onClose,
+  snapshotId = null,
+  mode = 'full',
+}: CheckInPanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
@@ -96,6 +104,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   )
 
   const locked = editing?.origin === 'transfer'
+  const quickMode = mode === 'quick' && !editing && !locked
 
   const formAccounts = useMemo(() => {
     const active = accounts
@@ -129,6 +138,7 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
   const [draftTransfer, setDraftTransfer] = useState<PendingTransfer | null>(null)
   const [incomeManual, setIncomeManual] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showAllAccounts, setShowAllAccounts] = useState(false)
   const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
 
   /** Check-in already saved for this date (Dashboard opens without snapshotId but upserts by date). */
@@ -136,6 +146,11 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
     if (editing || !date) return null
     return snapshots.find((s) => s.date === date) ?? null
   }, [editing, date, snapshots])
+
+  const staleStatuses = useMemo(
+    () => buildAccountStaleStatuses(accounts, snapshots),
+    [accounts, snapshots],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -147,18 +162,30 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       setIncome('')
       setExpense('')
       setIncomeManual(true)
+      setAmounts({})
     } else {
       setDate(todayIsoDate())
       setNote('')
       setIncome('')
       setExpense('')
       setIncomeManual(false)
+      if (mode === 'quick') {
+        const asOf = todayIsoDate()
+        const next: Record<string, string> = {}
+        for (const account of accounts.filter((a) => !a.archived)) {
+          const prev = balanceOnDate(account.id, asOf, snapshots)
+          next[account.id] = String(prev ?? 0)
+        }
+        setAmounts(next)
+      } else {
+        setAmounts({})
+      }
     }
-    setAmounts({})
     setPendingTransfers([])
     setDraftTransfer(null)
     setShowHelp(false)
-  }, [open, editing])
+    setShowAllAccounts(false)
+  }, [open, editing, mode]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on open/mode
 
   const dateTransfers = useMemo(
     () =>
@@ -425,6 +452,39 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
       ? 'Введите остаток хотя бы для одного счёта'
       : null
 
+  const attentionIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const account of formAccounts) {
+      const status = staleStatuses.get(account.id)
+      if (!status) continue
+      if (
+        status.missingFromLatestCheckIn ||
+        (status.daysSinceRecorded != null && status.daysSinceRecorded > 0)
+      ) {
+        ids.add(account.id)
+      }
+    }
+    return ids
+  }, [formAccounts, staleStatuses])
+
+  const orderedAccounts = useMemo(() => {
+    if (!quickMode || attentionIds.size === 0) return formAccounts
+    const attention: Account[] = []
+    const rest: Account[] = []
+    for (const account of formAccounts) {
+      if (attentionIds.has(account.id)) attention.push(account)
+      else rest.push(account)
+    }
+    return [...attention, ...rest]
+  }, [formAccounts, quickMode, attentionIds])
+
+  const visibleAccounts = useMemo(() => {
+    if (!quickMode || showAllAccounts || attentionIds.size === 0) return orderedAccounts
+    return orderedAccounts.filter((a) => attentionIds.has(a.id))
+  }, [quickMode, showAllAccounts, attentionIds, orderedAccounts])
+
+  const hiddenCount = orderedAccounts.length - visibleAccounts.length
+
   return (
     <StackPanel
       open={open}
@@ -433,7 +493,9 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           ? 'Перевод'
           : editing
             ? 'Редактировать чек-ин'
-            : 'Чек-ин остатков'
+            : quickMode
+              ? 'Быстрый чек-ин'
+              : 'Чек-ин остатков'
       }
       onClose={onClose}
       headerActions={
@@ -484,11 +546,17 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
               наличка / кредитки, с учётом переводов), пока вы не введёте его вручную.
             </p>
             <p>
-              Серым в полях счетов — текущий остаток. Введите новое значение только для
-              изменившихся счетов; пустое поле оставляет остаток без изменений. Для кредитки —
-              доступный остаток лимита.
+              {quickMode
+                ? 'В быстром режиме остатки уже подставлены. Измените только то, что изменилось, и сохраните. Счета без фиксации в последнем чек-ине подсвечены.'
+                : 'Серым в полях счетов — текущий остаток. Введите новое значение только для изменившихся счетов; пустое поле оставляет остаток без изменений. Для кредитки — доступный остаток лимита.'}
             </p>
             <p>Укажите переводы между счетами за день, чтобы они не считались приростом.</p>
+          </div>
+        )}
+
+        {quickMode && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+            Остатки подставлены с прошлого чек-ина. Правьте изменившиеся счета и сохраняйте.
           </div>
         )}
 
@@ -572,17 +640,36 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
           <p className="text-sm text-slate-500 dark:text-slate-400">Сначала добавьте хотя бы один счёт.</p>
         ) : (
           <div className="space-y-2">
-            {formAccounts.map((account) => {
+            {quickMode && attentionIds.size > 0 && !showAllAccounts && (
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
+                Счета, которые стоит проверить
+              </p>
+            )}
+            {visibleAccounts.map((account) => {
               const typed = amounts[account.id] ?? ''
+              const status = staleStatuses.get(account.id)
+              const needsAttention = attentionIds.has(account.id)
               const noteParts = [
                 account.kind === 'credit' ? 'остаток лимита' : null,
                 account.kind === 'credit' && account.creditLimit != null
                   ? `лимит ${formatHintAmount(account.creditLimit)}`
                   : null,
                 account.archived ? 'архив' : null,
+                needsAttention && status
+                  ? status.missingFromLatestCheckIn
+                    ? 'не был в последнем чек-ине'
+                    : formatStaleDays(status.daysSinceRecorded)
+                  : null,
               ].filter((p): p is string => p != null)
               return (
-                <label key={account.id} className="block min-w-0 max-w-full">
+                <label
+                  key={account.id}
+                  className={`block min-w-0 max-w-full rounded-lg px-1 py-1 ${
+                    needsAttention && quickMode
+                      ? 'bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-950/20 dark:ring-amber-900/40'
+                      : ''
+                  }`}
+                >
                   <span className="flex items-center gap-2">
                     <span className="w-10 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                       {account.currency}
@@ -617,6 +704,24 @@ export function CheckInPanel({ open, onClose, snapshotId = null }: CheckInPanelP
                 </label>
               )
             })}
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                onClick={() => setShowAllAccounts(true)}
+              >
+                Показать остальные счета ({hiddenCount})
+              </button>
+            )}
+            {quickMode && showAllAccounts && attentionIds.size > 0 && (
+              <button
+                type="button"
+                className="text-xs text-slate-500 hover:underline dark:text-slate-400"
+                onClick={() => setShowAllAccounts(false)}
+              >
+                Скрыть актуальные счета
+              </button>
+            )}
           </div>
         )}
 

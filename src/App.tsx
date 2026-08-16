@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AccountsPanel } from './components/accounts/AccountsPanel'
+import { AnalyticsPanel } from './components/analytics/AnalyticsPanel'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { Sidebar } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/settings/SettingsPanel'
@@ -13,11 +14,12 @@ import { CashbackPanel } from './components/cashback/CashbackPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
+import { isAnalyticsSection } from './lib/navSections'
 import { useAppSection } from './lib/useAppSection'
 import { useAuthStore } from './store/authStore'
 import { useRatesStore } from './store/ratesStore'
 import { useWalletStore } from './store/walletStore'
-import type { AppSection } from './types/wallet'
+import type { AnalyticsSection, AppSection } from './types/wallet'
 
 const SIDEBAR_STORAGE_KEY = 'wallet-sidebar-collapsed'
 
@@ -105,6 +107,7 @@ export default function App() {
             <SectionContent
               section={section}
               onOpenAccount={openAccount}
+              onOpenSection={setSection}
               focusAccountId={focusAccountId}
               onFocusConsumed={clearFocus}
             />
@@ -118,14 +121,27 @@ export default function App() {
 function SectionContent({
   section,
   onOpenAccount,
+  onOpenSection,
   focusAccountId,
   onFocusConsumed,
 }: {
   section: AppSection
   onOpenAccount: (accountId: string) => void
+  onOpenSection: (section: AppSection) => void
   focusAccountId: string | null
   onFocusConsumed: () => void
 }) {
+  const analyticsCrumb =
+    isAnalyticsSection(section) ? (
+      <button
+        type="button"
+        onClick={() => onOpenSection('analytics')}
+        className="mb-3 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+      >
+        ← Аналитика
+      </button>
+    ) : null
+
   switch (section) {
     case 'dashboard':
       return <Dashboard onOpenAccount={onOpenAccount} />
@@ -135,18 +151,52 @@ function SectionContent({
       return (
         <AccountsPanel focusAccountId={focusAccountId} onFocusConsumed={onFocusConsumed} />
       )
+    case 'analytics':
+      return (
+        <AnalyticsPanel onOpenSection={(s: AnalyticsSection) => onOpenSection(s)} />
+      )
     case 'types':
-      return <AccountTypesPanel onOpenAccount={onOpenAccount} />
+      return (
+        <>
+          {analyticsCrumb}
+          <AccountTypesPanel onOpenAccount={onOpenAccount} />
+        </>
+      )
     case 'currencies':
-      return <CurrenciesPanel onOpenAccount={onOpenAccount} />
+      return (
+        <>
+          {analyticsCrumb}
+          <CurrenciesPanel onOpenAccount={onOpenAccount} />
+        </>
+      )
     case 'monthly':
-      return <MonthlyPanel />
+      return (
+        <>
+          {analyticsCrumb}
+          <MonthlyPanel />
+        </>
+      )
     case 'daily':
-      return <DailyGrowthPanel />
+      return (
+        <>
+          {analyticsCrumb}
+          <DailyGrowthPanel />
+        </>
+      )
     case 'float':
-      return <FloatPanel />
+      return (
+        <>
+          {analyticsCrumb}
+          <FloatPanel />
+        </>
+      )
     case 'cashback':
-      return <CashbackPanel />
+      return (
+        <>
+          {analyticsCrumb}
+          <CashbackPanel />
+        </>
+      )
     case 'settings':
       return <SettingsPanel />
   }

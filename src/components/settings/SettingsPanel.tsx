@@ -1,5 +1,11 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { resolvePivotForDate } from '../../lib/cbrRates'
+import {
+  CHECK_IN_INTERVAL_OPTIONS,
+  normalizeCheckInIntervalDays,
+  readCheckInIntervalDays,
+  writeCheckInIntervalDays,
+} from '../../lib/checkInReminder'
 import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
 import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
 import {
@@ -26,6 +32,7 @@ export function SettingsPanel() {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const refreshDate = useRatesStore((s) => s.refreshDate)
   const [registryOpen, setRegistryOpen] = useState(false)
+  const [checkInIntervalDays, setCheckInIntervalDays] = useState(readCheckInIntervalDays)
   const [inflationText, setInflationText] = useState(() =>
     formatInflationPercentInput(settings.annualInflationPct),
   )
@@ -84,6 +91,28 @@ export function SettingsPanel() {
             <option value="light">Светлая</option>
             <option value="dark">Тёмная</option>
           </Select>
+        </Field>
+      </Card>
+
+      <Card className="space-y-4">
+        <Field label="Интервал чек-инов">
+          <Select
+            value={String(checkInIntervalDays)}
+            onChange={(e) => {
+              const next = Number(e.target.value)
+              writeCheckInIntervalDays(next)
+              setCheckInIntervalDays(normalizeCheckInIntervalDays(next))
+            }}
+          >
+            {CHECK_IN_INTERVAL_OPTIONS.map((days) => (
+              <option key={days} value={days}>
+                раз в {days === 1 ? 'день' : `${days} ${days < 5 ? 'дня' : 'дней'}`}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            На дашборде появится напоминание, если с последнего чек-ина прошло больше интервала
+          </p>
         </Field>
       </Card>
 

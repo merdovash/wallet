@@ -2,6 +2,7 @@ export type AppSection =
   | 'dashboard'
   | 'checkins'
   | 'accounts'
+  | 'analytics'
   | 'types'
   | 'currencies'
   | 'monthly'
@@ -9,6 +10,12 @@ export type AppSection =
   | 'float'
   | 'cashback'
   | 'settings'
+
+/** Разделы внутри хаба «Аналитика». */
+export type AnalyticsSection = Extract<
+  AppSection,
+  'daily' | 'types' | 'currencies' | 'monthly' | 'float' | 'cashback'
+>
 
 export type SnapshotOrigin = 'manual' | 'transfer'
 
