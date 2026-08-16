@@ -26,6 +26,38 @@ export interface CreditMonthBucket {
   overdue: boolean
 }
 
+export interface CreditFloatDayRow {
+  /** Check-in date where linked-account change is attributed (YYYY-MM-DD). */
+  date: string
+  /** Calendar month (YYYY-MM). */
+  month: string
+  linkedGrowth: number
+  linkedGrowthBase: number
+  floatSharePct: number | null
+  earned: number
+  earnedBase: number
+  baseGrowth: number
+  baseGrowthBase: number
+  creditGrowth: number
+  creditGrowthBase: number
+  interestGrowth: number
+  interestGrowthBase: number
+  /** Capital baskets used for the split (linked currency / base). */
+  baseCapital: number
+  baseCapitalBase: number
+  creditCapital: number
+  creditCapitalBase: number
+  interestCapital: number
+  interestCapitalBase: number
+  /** Locked float earnings after this day (linked currency). */
+  lockedEarnings: number
+  lockedEarningsBase: number
+  baseSharePct: number | null
+  creditSharePct: number | null
+  interestSharePct: number | null
+  avgDebt: number
+}
+
 export interface CreditFloatMonthRow {
   /** Calendar month of the benefit / context (YYYY-MM) */
   month: string
@@ -60,6 +92,8 @@ export interface CreditFloatMonthRow {
   overdue: boolean
   avgDebt: number
   maxDebt: number
+  /** Days with linked-account growth in this month (newest first in UI). */
+  days: CreditFloatDayRow[]
 }
 
 export interface CreditFloatSummary {
@@ -67,7 +101,7 @@ export interface CreditFloatSummary {
   linkedAccountId?: string
   cumulativeEarned: number
   cumulativeEarnedBase: number
-  /** Sum of interestGrowth across months (compounding on locked earnings). */
+  /** Sum of interestGrowth across days (compounding on locked earnings). */
   cumulativeInterestBase: number
   totalDebt: number
   totalDebtBase: number
@@ -127,23 +161,6 @@ function monthStart(ym: string): string {
 function monthEnd(ym: string): string {
   const [ys, ms] = ym.split('-')
   return lastDayOfMonth(Number(ys), Number(ms))
-}
-
-function addMonth(ym: string, delta: number): string {
-  const [ys, ms] = ym.split('-')
-  const d = new Date(Date.UTC(Number(ys), Number(ms) - 1 + delta, 1))
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-}
-
-function enumerateMonths(fromYm: string, toYm: string): string[] {
-  if (compareDate(fromYm, toYm) > 0) return []
-  const out: string[] = []
-  let cur = fromYm
-  while (compareDate(cur, toYm) <= 0) {
-    out.push(cur)
-    cur = addMonth(cur, 1)
-  }
-  return out
 }
 
 function repaymentsToCard(
@@ -258,7 +275,7 @@ function emptyLinkedFloatAttribution(
 /**
  * Split linked-account growth into base / credit / interest-on-locked baskets.
  * Float principal = max(average credit debt, linked→card repayments).
- * Previously locked earnings compound as a third basket on later months.
+ * Previously locked earnings compound as a third basket on later days.
  */
 export function attributedLinkedFloatYield(
   linkedAccountId: string,
@@ -487,9 +504,38 @@ function debtOnDate(credit: Account, date: string, snapshots: BalanceSnapshot[])
   return creditDebt(credit.creditLimit ?? 0, avail)
 }
 
+/** Average credit debt over [t0, t1] from known endpoints (credit currency). */
+function averageDebtInInterval(
+  credit: Account,
+  t0: string,
+  t1: string,
+  snapshots: BalanceSnapshot[],
+): number {
+  const d0 = debtOnDate(credit, t0, snapshots)
+  const d1 = debtOnDate(credit, t1, snapshots)
+  if (d0 != null && d1 != null) return (d0 + d1) / 2
+  return d1 ?? d0 ?? 0
+}
+
+/** Snapshot dates that explicitly mention the linked account (ascending). */
+function linkedChangeDates(
+  linkedAccountId: string,
+  snapshots: BalanceSnapshot[],
+  asOfDate: string,
+): string[] {
+  const dates = new Set<string>()
+  for (const snap of sortSnapshots(snapshots)) {
+    if (compareDate(snap.date, asOfDate) > 0) continue
+    if (snap.lines.some((l) => l.accountId === linkedAccountId)) {
+      dates.add(snap.date)
+    }
+  }
+  return [...dates].sort(compareDate)
+}
+
 /**
- * Monthly float benefit with cumulative three-basket split:
- * base / credit principal / interest on previously locked earnings.
+ * Daily float benefit with cumulative three-basket split between linked-account
+ * check-ins; months roll up day rows for the Float UI.
  */
 export function buildCreditFloatSummary(
   credit: Account,
@@ -533,38 +579,127 @@ export function buildCreditFloatSummary(
   const bucketByMonth = new Map(buckets.map((b) => [b.month, b]))
 
   const linkedId = credit.linkedAccountId
-  const knownCreditDates = sortSnapshots(snapshots)
+  if (!linkedId) return empty
+
+  const linkedDates = linkedChangeDates(linkedId, snapshots, asOfDate)
+  if (linkedDates.length < 2) return empty
+
+  const firstCreditDate = sortSnapshots(snapshots)
     .map((s) => s.date)
-    .filter((d) => compareDate(d, asOfDate) <= 0 && balanceOnDate(credit.id, d, snapshots) != null)
+    .find((d) => compareDate(d, asOfDate) <= 0 && balanceOnDate(credit.id, d, snapshots) != null)
+  if (!firstCreditDate) return empty
 
-  if (knownCreditDates.length === 0) return empty
-
-  const firstYm = monthKey(knownCreditDates[0]!)
-  const lastYm = monthKey(asOfDate)
-  const months = enumerateMonths(firstYm, lastYm)
-
-  const rows: CreditFloatMonthRow[] = []
-  let lockedEarnings = 0
-  let cumulativeEarnedBase = 0
-  let cumulativeInterestBase = 0
-
-  const linked = linkedId ? accounts.find((a) => a.id === linkedId) : undefined
+  const linked = accounts.find((a) => a.id === linkedId)
   const linkedCurrency = linked?.currency ?? credit.currency
 
   const toBase = (amount: number, onDate: string) =>
-    linkedId
-      ? convertAmount(amount, linkedCurrency, settings.baseCurrency, settings, onDate, rateBook)
-      : amount
+    convertAmount(amount, linkedCurrency, settings.baseCurrency, settings, onDate, rateBook)
 
-  for (const ym of months) {
-    const start = monthStart(ym)
-    const end = monthEnd(ym)
-    const periodEnd = compareDate(end, asOfDate) < 0 ? end : asOfDate
+  let lockedEarnings = 0
+  let cumulativeEarnedBase = 0
+  let cumulativeInterestBase = 0
+  const dayRows: CreditFloatDayRow[] = []
 
-    // Debt stats within month from snapshot dates (needed for float principal).
+  for (let i = 1; i < linkedDates.length; i += 1) {
+    const t0 = linkedDates[i - 1]!
+    const t1 = linkedDates[i]!
+    if (compareDate(t1, firstCreditDate) < 0) continue
+    if (compareDate(t0, firstCreditDate) < 0 && compareDate(t1, firstCreditDate) >= 0) {
+      // First interval that reaches credit history: start from firstCreditDate if later.
+    }
+    const start = compareDate(t0, firstCreditDate) < 0 ? firstCreditDate : t0
+    if (compareDate(start, t1) >= 0) continue
+
+    const avgDebt = averageDebtInInterval(credit, start, t1, snapshots)
+    const avgDebtInLinked =
+      credit.currency === linkedCurrency
+        ? avgDebt
+        : convertAmount(avgDebt, credit.currency, linkedCurrency, settings, t1, rateBook)
+
+    const attr = attributedLinkedFloatYield(
+      linkedId,
+      credit.id,
+      start,
+      t1,
+      snapshots,
+      transfers,
+      accounts,
+      settings,
+      avgDebtInLinked,
+      rateBook,
+      lockedEarnings,
+    )
+
+    // Only surface days where the linked account actually changed (ex-transfers).
+    if (Math.abs(attr.linkedGrowth) < 1e-9) {
+      lockedEarnings += attr.earned
+      continue
+    }
+
+    lockedEarnings += attr.earned
+
+    const creditCapital = Math.min(attr.floatPrincipal, attr.weightedCapital)
+    dayRows.push({
+      date: t1,
+      month: monthKey(t1),
+      linkedGrowth: attr.linkedGrowth,
+      linkedGrowthBase: toBase(attr.linkedGrowth, t1),
+      floatSharePct: attr.floatSharePct,
+      earned: attr.earned,
+      earnedBase: toBase(attr.earned, t1),
+      baseGrowth: attr.baseGrowth,
+      baseGrowthBase: toBase(attr.baseGrowth, t1),
+      creditGrowth: attr.creditGrowth,
+      creditGrowthBase: toBase(attr.creditGrowth, t1),
+      interestGrowth: attr.interestGrowth,
+      interestGrowthBase: toBase(attr.interestGrowth, t1),
+      baseCapital: attr.baseCapital,
+      baseCapitalBase: toBase(attr.baseCapital, t1),
+      creditCapital,
+      creditCapitalBase: toBase(creditCapital, t1),
+      interestCapital: attr.lockedCapital,
+      interestCapitalBase: toBase(attr.lockedCapital, t1),
+      lockedEarnings,
+      lockedEarningsBase: toBase(lockedEarnings, t1),
+      baseSharePct: attr.baseSharePct,
+      creditSharePct: attr.creditSharePct,
+      interestSharePct: attr.interestSharePct,
+      avgDebt,
+    })
+
+    cumulativeEarnedBase += toBase(attr.earned, t1)
+    cumulativeInterestBase += toBase(attr.interestGrowth, t1)
+  }
+
+  const byMonth = new Map<string, CreditFloatDayRow[]>()
+  for (const day of dayRows) {
+    const list = byMonth.get(day.month) ?? []
+    list.push(day)
+    byMonth.set(day.month, list)
+  }
+
+  const monthKeys = [...byMonth.keys()].sort(compareDate)
+  const rows: CreditFloatMonthRow[] = monthKeys.map((ym) => {
+    const days = byMonth.get(ym) ?? []
+    const linkedGrowth = days.reduce((s, d) => s + d.linkedGrowth, 0)
+    const linkedGrowthBase = days.reduce((s, d) => s + d.linkedGrowthBase, 0)
+    const earned = days.reduce((s, d) => s + d.earned, 0)
+    const earnedBase = days.reduce((s, d) => s + d.earnedBase, 0)
+    const baseGrowth = days.reduce((s, d) => s + d.baseGrowth, 0)
+    const baseGrowthBase = days.reduce((s, d) => s + d.baseGrowthBase, 0)
+    const creditGrowth = days.reduce((s, d) => s + d.creditGrowth, 0)
+    const creditGrowthBase = days.reduce((s, d) => s + d.creditGrowthBase, 0)
+    const interestGrowth = days.reduce((s, d) => s + d.interestGrowth, 0)
+    const interestGrowthBase = days.reduce((s, d) => s + d.interestGrowthBase, 0)
+    const last = days[days.length - 1]!
+    const bucket = bucketByMonth.get(ym)
+
     let maxDebt = 0
     let debtSum = 0
     let debtCount = 0
+    const start = monthStart(ym)
+    const end = monthEnd(ym)
+    const periodEnd = compareDate(end, asOfDate) < 0 ? end : asOfDate
     for (const snap of sortSnapshots(snapshots)) {
       if (compareDate(snap.date, start) < 0) continue
       if (compareDate(snap.date, periodEnd) > 0) break
@@ -574,72 +709,12 @@ export function buildCreditFloatSummary(
       debtSum += d
       debtCount += 1
     }
-    const avgDebt =
-      debtCount > 0 ? debtSum / debtCount : (debtOnDate(credit, periodEnd, snapshots) ?? 0)
 
-    let linkedGrowth = 0
-    let floatSharePct: number | null = null
-    let baseSharePct: number | null = null
-    let creditSharePct: number | null = null
-    let interestSharePct: number | null = null
-    let baseGrowth = 0
-    let creditGrowth = 0
-    let interestGrowth = 0
-    let earned = 0
-
-    if (linkedId && compareDate(periodEnd, start) > 0) {
-      const avgDebtInLinked =
-        credit.currency === linkedCurrency
-          ? avgDebt
-          : convertAmount(
-              avgDebt,
-              credit.currency,
-              linkedCurrency,
-              settings,
-              periodEnd,
-              rateBook,
-            )
-      const attr = attributedLinkedFloatYield(
-        linkedId,
-        credit.id,
-        start,
-        periodEnd,
-        snapshots,
-        transfers,
-        accounts,
-        settings,
-        avgDebtInLinked,
-        rateBook,
-        lockedEarnings,
-      )
-      linkedGrowth = attr.linkedGrowth
-      floatSharePct = attr.floatSharePct
-      baseSharePct = attr.baseSharePct
-      creditSharePct = attr.creditSharePct
-      interestSharePct = attr.interestSharePct
-      baseGrowth = attr.baseGrowth
-      creditGrowth = attr.creditGrowth
-      interestGrowth = attr.interestGrowth
-      earned = attr.earned
-      lockedEarnings += earned
-    }
-
-    const linkedGrowthBase = toBase(linkedGrowth, periodEnd)
-    const earnedBase = toBase(earned, periodEnd)
-    const baseGrowthBase = toBase(baseGrowth, periodEnd)
-    const creditGrowthBase = toBase(creditGrowth, periodEnd)
-    const interestGrowthBase = toBase(interestGrowth, periodEnd)
-    const lockedEarningsBase = toBase(lockedEarnings, periodEnd)
-
-    cumulativeEarnedBase += earnedBase
-    cumulativeInterestBase += interestGrowthBase
-
-    const bucket = bucketByMonth.get(ym)
-    rows.push({
+    return {
       month: ym,
       linkedGrowth,
       linkedGrowthBase,
-      floatSharePct,
+      floatSharePct: linkedGrowth !== 0 ? earned / linkedGrowth : null,
       earned,
       earnedBase,
       baseGrowth,
@@ -648,20 +723,21 @@ export function buildCreditFloatSummary(
       creditGrowthBase,
       interestGrowth,
       interestGrowthBase,
-      lockedEarnings,
-      lockedEarningsBase,
-      baseSharePct,
-      creditSharePct,
-      interestSharePct,
+      lockedEarnings: last.lockedEarnings,
+      lockedEarningsBase: last.lockedEarningsBase,
+      baseSharePct: linkedGrowth !== 0 ? baseGrowth / linkedGrowth : null,
+      creditSharePct: linkedGrowth !== 0 ? creditGrowth / linkedGrowth : null,
+      interestSharePct: linkedGrowth !== 0 ? interestGrowth / linkedGrowth : null,
       spent: bucket?.spent ?? 0,
       repaid: bucket?.repaid ?? 0,
       remaining: bucket?.remaining ?? 0,
       dueDate: bucket?.dueDate ?? graceDueDate(ym, resolveGraceMonths(credit)),
       overdue: bucket?.overdue ?? false,
-      avgDebt,
+      avgDebt: debtCount > 0 ? debtSum / debtCount : last.avgDebt,
       maxDebt,
-    })
-  }
+      days: [...days].sort((a, b) => compareDate(b.date, a.date)),
+    }
+  })
 
   return {
     creditAccountId: credit.id,

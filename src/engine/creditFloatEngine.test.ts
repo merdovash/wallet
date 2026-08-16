@@ -152,10 +152,15 @@ describe('creditFloatEngine', () => {
     expect(march?.interestGrowth).toBeCloseTo(0, 8)
     expect(march?.earned).toBeCloseTo(3, 8)
     expect(march?.lockedEarnings).toBeCloseTo(3, 8)
+    expect(march?.days).toHaveLength(1)
+    expect(march?.days[0]?.date).toBe('2026-03-31')
+    expect(march?.days[0]?.baseCapital).toBeCloseTo(900, 8)
+    expect(march?.days[0]?.creditCapital).toBeCloseTo(100, 8)
+    expect(march?.days[0]?.interestCapital).toBeCloseTo(0, 8)
     expect(summary.cumulativeEarned).toBeCloseTo(3, 8)
   })
 
-  it('compounds locked float earnings as a third capital basket', () => {
+  it('compounds locked float earnings daily across check-ins', () => {
     const credit = account({
       id: 'cc',
       name: 'Card',
@@ -205,8 +210,9 @@ describe('creditFloatEngine', () => {
 
     expect(march?.earned).toBeCloseTo(3, 8)
     expect(march?.lockedEarnings).toBeCloseTo(3, 8)
+    expect(march?.days).toHaveLength(1)
 
-    // April: G=30, W=1030, C=100, I=3, B=927
+    // April day: G=30, W=1030, C=100, I=3, B=927
     expect(april?.linkedGrowth).toBeCloseTo(30, 8)
     expect(april?.baseGrowth).toBeCloseTo((30 * 927) / 1030, 8)
     expect(april?.creditGrowth).toBeCloseTo((30 * 100) / 1030, 8)
@@ -214,8 +220,75 @@ describe('creditFloatEngine', () => {
     expect(april?.earned).toBeCloseTo((30 * 103) / 1030, 8)
     expect(april?.floatSharePct).toBeCloseTo(103 / 1030, 8)
     expect(april?.lockedEarnings).toBeCloseTo(3 + (30 * 103) / 1030, 8)
+    expect(april?.days[0]?.date).toBe('2026-04-30')
+    expect(april?.days[0]?.interestCapital).toBeCloseTo(3, 8)
     expect(summary.cumulativeEarned).toBeCloseTo(3 + (30 * 103) / 1030, 8)
     expect(summary.cumulativeInterestBase).toBeCloseTo((30 * 3) / 1030, 8)
+  })
+
+  it('locks earnings on each linked-account change day within a month', () => {
+    const credit = account({
+      id: 'cc',
+      name: 'Card',
+      kind: 'credit',
+      creditLimit: 300,
+      linkedAccountId: 'float',
+    })
+    const float = account({ id: 'float', name: 'Float' })
+    const accounts = [credit, float]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-03-01',
+        lines: [
+          { accountId: 'cc', amount: 200 },
+          { accountId: 'float', amount: 1000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-03-15',
+        lines: [
+          { accountId: 'cc', amount: 200 },
+          { accountId: 'float', amount: 1010 },
+        ],
+      },
+      {
+        id: 's3',
+        date: '2026-03-31',
+        lines: [
+          { accountId: 'cc', amount: 200 },
+          { accountId: 'float', amount: 1020 },
+        ],
+      },
+    ]
+
+    const summary = buildCreditFloatSummary(
+      credit,
+      snapshots,
+      [],
+      accounts,
+      settings,
+      '2026-03-31',
+    )
+    const march = summary.months.find((m) => m.month === '2026-03')
+    expect(march?.days).toHaveLength(2)
+    expect(march?.days.map((d) => d.date)).toEqual(['2026-03-31', '2026-03-15'])
+
+    const mid = march?.days.find((d) => d.date === '2026-03-15')
+    // First day: G=10, W=1000, C=100 → earned 1, locked 1
+    expect(mid?.baseGrowth).toBeCloseTo(9, 8)
+    expect(mid?.creditGrowth).toBeCloseTo(1, 8)
+    expect(mid?.interestGrowth).toBeCloseTo(0, 8)
+    expect(mid?.lockedEarnings).toBeCloseTo(1, 8)
+
+    const end = march?.days.find((d) => d.date === '2026-03-31')
+    // Second day: G=10, W=1010, C=100, I=1, B=909
+    expect(end?.interestCapital).toBeCloseTo(1, 8)
+    expect(end?.interestGrowth).toBeCloseTo((10 * 1) / 1010, 8)
+    expect(end?.creditGrowth).toBeCloseTo((10 * 100) / 1010, 8)
+    expect(end?.lockedEarnings).toBeCloseTo(1 + (10 * 101) / 1010, 8)
+    expect(summary.cumulativeEarned).toBeCloseTo(1 + (10 * 101) / 1010, 8)
   })
 
   it('uses repayment amount when it exceeds average debt', () => {

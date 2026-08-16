@@ -1,4 +1,5 @@
-﻿import { useMemo } from 'react'
+﻿import { useMemo, useState } from 'react'
+import type { CreditFloatDayRow } from '../../engine/creditFloatEngine'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
 import { useRatesStore } from '../../store/ratesStore'
@@ -21,6 +22,20 @@ function formatDueDate(iso: string): string {
   return `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
 }
 
+type DayAgg = {
+  date: string
+  linkedGrowthBase: number
+  earnedBase: number
+  baseGrowthBase: number
+  creditGrowthBase: number
+  interestGrowthBase: number
+  baseCapitalBase: number
+  creditCapitalBase: number
+  interestCapitalBase: number
+  lockedEarningsBase: number
+  floatSharePct: number | null
+}
+
 type MonthAgg = {
   month: string
   linkedGrowthBase: number
@@ -35,6 +50,7 @@ type MonthAgg = {
   remaining: number
   dueDate: string
   overdue: boolean
+  days: DayAgg[]
 }
 
 function earnTone(value: number): string {
@@ -43,12 +59,90 @@ function earnTone(value: number): string {
   return 'text-slate-700 dark:text-slate-300'
 }
 
+function mergeDay(prev: DayAgg | undefined, day: CreditFloatDayRow): DayAgg {
+  if (!prev) {
+    return {
+      date: day.date,
+      linkedGrowthBase: day.linkedGrowthBase,
+      earnedBase: day.earnedBase,
+      baseGrowthBase: day.baseGrowthBase,
+      creditGrowthBase: day.creditGrowthBase,
+      interestGrowthBase: day.interestGrowthBase,
+      baseCapitalBase: day.baseCapitalBase,
+      creditCapitalBase: day.creditCapitalBase,
+      interestCapitalBase: day.interestCapitalBase,
+      lockedEarningsBase: day.lockedEarningsBase,
+      floatSharePct: null,
+    }
+  }
+  return {
+    ...prev,
+    linkedGrowthBase: prev.linkedGrowthBase + day.linkedGrowthBase,
+    earnedBase: prev.earnedBase + day.earnedBase,
+    baseGrowthBase: prev.baseGrowthBase + day.baseGrowthBase,
+    creditGrowthBase: prev.creditGrowthBase + day.creditGrowthBase,
+    interestGrowthBase: prev.interestGrowthBase + day.interestGrowthBase,
+    baseCapitalBase: prev.baseCapitalBase + day.baseCapitalBase,
+    creditCapitalBase: prev.creditCapitalBase + day.creditCapitalBase,
+    interestCapitalBase: prev.interestCapitalBase + day.interestCapitalBase,
+    lockedEarningsBase: prev.lockedEarningsBase + day.lockedEarningsBase,
+  }
+}
+
+function DayBreakdown({ day, currency }: { day: DayAgg; currency: string }) {
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950/50">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+          {formatDueDate(day.date)}
+        </p>
+        <p className={`text-xs font-semibold tabular-nums ${earnTone(day.earnedBase)}`}>
+          float {signedAmount(day.earnedBase, currency)}
+        </p>
+      </div>
+      <dl className="grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <dt className="text-slate-500 dark:text-slate-400">Прирост базы</dt>
+          <dd className={`font-medium tabular-nums ${earnTone(day.baseGrowthBase)}`}>
+            {signedAmount(day.baseGrowthBase, currency)}
+          </dd>
+          <dd className="mt-0.5 tabular-nums text-slate-500 dark:text-slate-400">
+            база {formatCurrency(day.baseCapitalBase, currency)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500 dark:text-slate-400">С кредитки</dt>
+          <dd className={`font-medium tabular-nums ${earnTone(day.creditGrowthBase)}`}>
+            {signedAmount(day.creditGrowthBase, currency)}
+          </dd>
+          <dd className="mt-0.5 tabular-nums text-slate-500 dark:text-slate-400">
+            кредит {formatCurrency(day.creditCapitalBase, currency)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500 dark:text-slate-400">С накопл.</dt>
+          <dd className={`font-medium tabular-nums ${earnTone(day.interestGrowthBase)}`}>
+            {signedAmount(day.interestGrowthBase, currency)}
+          </dd>
+          <dd className="mt-0.5 tabular-nums text-slate-500 dark:text-slate-400">
+            накопл. {formatCurrency(day.interestCapitalBase, currency)}
+          </dd>
+        </div>
+      </dl>
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+        Доля кредитных {formatPercent(day.floatSharePct)}
+      </p>
+    </div>
+  )
+}
+
 export function FloatPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const creditAccounts = useMemo(
     () => accounts.filter((a) => !a.archived && a.kind === 'credit'),
@@ -78,6 +172,19 @@ export function FloatPanel() {
     for (const card of summary.cards) {
       for (const row of card.months) {
         const prev = byMonth.get(row.month)
+        const dayMap = new Map<string, DayAgg>()
+        for (const day of prev?.days ?? []) dayMap.set(day.date, day)
+        for (const day of row.days) {
+          dayMap.set(day.date, mergeDay(dayMap.get(day.date), day))
+        }
+        const days = [...dayMap.values()]
+          .map((d) => ({
+            ...d,
+            floatSharePct:
+              d.linkedGrowthBase !== 0 ? d.earnedBase / d.linkedGrowthBase : null,
+          }))
+          .sort((a, b) => b.date.localeCompare(a.date))
+
         if (!prev) {
           byMonth.set(row.month, {
             month: row.month,
@@ -93,6 +200,7 @@ export function FloatPanel() {
             remaining: row.remaining,
             dueDate: row.dueDate,
             overdue: row.overdue,
+            days,
           })
         } else {
           prev.linkedGrowthBase += row.linkedGrowthBase
@@ -106,6 +214,7 @@ export function FloatPanel() {
           prev.remaining += row.remaining
           prev.overdue = prev.overdue || row.overdue
           if (row.dueDate < prev.dueDate) prev.dueDate = row.dueDate
+          prev.days = days
         }
       }
     }
@@ -148,6 +257,10 @@ export function FloatPanel() {
     0,
   )
 
+  function toggleMonth(month: string) {
+    setExpanded((prev) => ({ ...prev, [month]: !prev[month] }))
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div>
@@ -173,7 +286,7 @@ export function FloatPanel() {
                 {signedAmount(summary.totalEarnedBase, currency)}
               </p>
               <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-xs">
-                Накопительно, с учётом процентов на закреплённый доход
+                Накопление по дням изменений связанного счёта
               </p>
               {cumulativeInterestBase !== 0 ? (
                 <p className={`mt-0.5 text-[11px] tabular-nums sm:text-xs ${earnTone(cumulativeInterestBase)}`}>
@@ -198,7 +311,7 @@ export function FloatPanel() {
             </h2>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
               Прирост связанного счёта делится на базу, долю кредитки и проценты на ранее
-              закреплённый float.
+              закреплённый float — каждый день изменения остатка.
             </p>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
               <div>
@@ -231,8 +344,8 @@ export function FloatPanel() {
           <Card className="!p-3 sm:!p-4">
             <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">По месяцам</h2>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              База / кредитка / % с кредитки — разложение прироста. Float — сумма двух последних.
-              Дедлайн: траты N → конец N+грейс.
+              Нажмите на месяц, чтобы открыть дни с изменением связанного счёта. По каждому дню —
+              прирост и сумма корзин (база / кредит / накопленная кредитка).
             </p>
             {months.length === 0 ? (
               <EmptyState
@@ -240,30 +353,43 @@ export function FloatPanel() {
                 description="Зафиксируйте остатки кредитки и связанного кошелька в чек-инах."
               />
             ) : (
-              <>
-                {/* Mobile / adaptive cards */}
-                <ul className="space-y-2 md:hidden">
-                  {months.map((row) => (
+              <ul className="space-y-2">
+                {months.map((row) => {
+                  const open = Boolean(expanded[row.month])
+                  return (
                     <li
                       key={row.month}
-                      className={`rounded-xl border px-3 py-2.5 ${
+                      className={`rounded-xl border ${
                         row.overdue
-                          ? 'border-red-200 bg-red-50 dark:bg-red-950/40/70'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
+                          ? 'border-red-200 bg-red-50 dark:bg-red-950/40'
+                          : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
+                      <button
+                        type="button"
+                        onClick={() => toggleMonth(row.month)}
+                        className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left"
+                        aria-expanded={open}
+                      >
+                        <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-200">
+                            <span className="mr-1.5 inline-block w-3 text-slate-400">
+                              {open ? '▾' : '▸'}
+                            </span>
                             {formatMonthLabel(row.month)}
                           </p>
                           <p
                             className={`text-[11px] ${
-                              row.overdue ? 'font-medium text-red-700' : 'text-slate-500 dark:text-slate-400'
+                              row.overdue
+                                ? 'font-medium text-red-700'
+                                : 'text-slate-500 dark:text-slate-400'
                             }`}
                           >
                             до {formatDueDate(row.dueDate)}
                             {row.overdue ? ' · просрочено' : ''}
+                            {' · '}
+                            {row.days.length}{' '}
+                            {row.days.length === 1 ? 'день' : 'дн.'}
                           </p>
                         </div>
                         <p
@@ -271,8 +397,9 @@ export function FloatPanel() {
                         >
                           {signedAmount(row.earnedBase, currency)}
                         </p>
-                      </div>
-                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                      </button>
+
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-slate-100 px-3 py-2 text-xs dark:border-slate-800 sm:grid-cols-4">
                         <div>
                           <dt className="text-slate-500 dark:text-slate-400">База</dt>
                           <dd className={`font-medium tabular-nums ${earnTone(row.baseGrowthBase)}`}>
@@ -287,7 +414,9 @@ export function FloatPanel() {
                         </div>
                         <div>
                           <dt className="text-slate-500 dark:text-slate-400">% с кредитки</dt>
-                          <dd className={`font-medium tabular-nums ${earnTone(row.interestGrowthBase)}`}>
+                          <dd
+                            className={`font-medium tabular-nums ${earnTone(row.interestGrowthBase)}`}
+                          >
                             {signedAmount(row.interestGrowthBase, currency)}
                           </dd>
                         </div>
@@ -297,87 +426,25 @@ export function FloatPanel() {
                             {formatPercent(row.floatSharePct)}
                           </dd>
                         </div>
-                        <div>
-                          <dt className="text-slate-500 dark:text-slate-400">Траты</dt>
-                          <dd className="font-medium tabular-nums text-slate-800 dark:text-slate-200">
-                            {formatCurrency(row.spent, currency)}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-slate-500 dark:text-slate-400">Погашено</dt>
-                          <dd className="font-medium tabular-nums text-slate-800 dark:text-slate-200">
-                            {formatCurrency(row.repaid, currency)}
-                          </dd>
-                        </div>
                       </dl>
-                    </li>
-                  ))}
-                </ul>
 
-                {/* Desktop table */}
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[48rem] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
-                        <th className="py-2 pr-3 font-medium">Месяц</th>
-                        <th className="py-2 pr-3 font-medium">База</th>
-                        <th className="py-2 pr-3 font-medium">Кредитка</th>
-                        <th className="py-2 pr-3 font-medium">% с кредитки</th>
-                        <th className="py-2 pr-3 font-medium">Float</th>
-                        <th className="py-2 pr-3 font-medium">Доля</th>
-                        <th className="py-2 pr-3 font-medium">Траты</th>
-                        <th className="py-2 pr-3 font-medium">Погашено</th>
-                        <th className="py-2 font-medium">Дедлайн</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {months.map((row) => (
-                        <tr
-                          key={row.month}
-                          className={row.overdue ? 'bg-red-50 dark:bg-red-950/40/60' : undefined}
-                        >
-                          <td className="py-2.5 pr-3 font-medium text-slate-900 dark:text-slate-200">
-                            {formatMonthLabel(row.month)}
-                          </td>
-                          <td className={`py-2.5 pr-3 tabular-nums ${earnTone(row.baseGrowthBase)}`}>
-                            {signedAmount(row.baseGrowthBase, currency)}
-                          </td>
-                          <td className={`py-2.5 pr-3 tabular-nums ${earnTone(row.creditGrowthBase)}`}>
-                            {signedAmount(row.creditGrowthBase, currency)}
-                          </td>
-                          <td
-                            className={`py-2.5 pr-3 tabular-nums ${earnTone(row.interestGrowthBase)}`}
-                          >
-                            {signedAmount(row.interestGrowthBase, currency)}
-                          </td>
-                          <td
-                            className={`py-2.5 pr-3 tabular-nums font-medium ${earnTone(row.earnedBase)}`}
-                          >
-                            {signedAmount(row.earnedBase, currency)}
-                          </td>
-                          <td className="py-2.5 pr-3 tabular-nums text-slate-700 dark:text-slate-300">
-                            {formatPercent(row.floatSharePct)}
-                          </td>
-                          <td className="py-2.5 pr-3 tabular-nums text-slate-700 dark:text-slate-300">
-                            {formatCurrency(row.spent, currency)}
-                          </td>
-                          <td className="py-2.5 pr-3 tabular-nums text-slate-700 dark:text-slate-300">
-                            {formatCurrency(row.repaid, currency)}
-                          </td>
-                          <td
-                            className={`py-2.5 ${
-                              row.overdue ? 'font-medium text-red-700' : 'text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {formatDueDate(row.dueDate)}
-                            {row.overdue ? ' · просрочено' : ''}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                      {open ? (
+                        <div className="space-y-2 border-t border-slate-100 px-3 py-2.5 dark:border-slate-800">
+                          {row.days.length === 0 ? (
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Нет дней с изменением связанного счёта
+                            </p>
+                          ) : (
+                            row.days.map((day) => (
+                              <DayBreakdown key={day.date} day={day} currency={currency} />
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </Card>
         </>
