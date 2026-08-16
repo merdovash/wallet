@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CreditFloatDayRow } from '../../engine/creditFloatEngine'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
@@ -59,6 +59,96 @@ function earnTone(value: number): string {
   return 'text-slate-700 dark:text-slate-300'
 }
 
+function canHover(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
+/** Number with hover (desktop) / click (mobile) explanation. */
+function ExplainableValue({
+  display,
+  title,
+  description,
+  className = '',
+}: {
+  display: string
+  title: string
+  description: string
+  className?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocPointer(e: MouseEvent | TouchEvent) {
+      const el = rootRef.current
+      if (!el) return
+      if (e.target instanceof Node && !el.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocPointer)
+    document.addEventListener('touchstart', onDocPointer)
+    return () => {
+      document.removeEventListener('mousedown', onDocPointer)
+      document.removeEventListener('touchstart', onDocPointer)
+    }
+  }, [open])
+
+  return (
+    <span ref={rootRef} className="relative inline-flex max-w-full">
+      <button
+        type="button"
+        className={`underline decoration-dotted underline-offset-2 ${className}`}
+        aria-expanded={open}
+        aria-label={`${title}: ${description}`}
+        onClick={() => {
+          if (!canHover()) setOpen((v) => !v)
+        }}
+        onMouseEnter={() => {
+          if (canHover()) setOpen(true)
+        }}
+        onMouseLeave={() => {
+          if (canHover()) setOpen(false)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          if (canHover()) setOpen(false)
+        }}
+      >
+        {display}
+      </button>
+      {open ? (
+        <span
+          role="tooltip"
+          className="absolute left-1/2 top-full z-30 mt-1 w-44 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left shadow-lg dark:border-slate-600 dark:bg-slate-900 sm:w-52"
+        >
+          <span className="block text-[11px] font-semibold text-slate-800 dark:text-slate-100">
+            {title}
+          </span>
+          <span className="mt-0.5 block text-[10px] leading-snug text-slate-500 dark:text-slate-400">
+            {description}
+          </span>
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function FormulaOp({ children }: { children: string }) {
+  return (
+    <span className="shrink-0 pb-px text-[11px] font-medium text-slate-400 dark:text-slate-500">
+      {children}
+    </span>
+  )
+}
+
+function FormulaLine({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-start gap-x-1 gap-y-0.5 text-[11px] tabular-nums leading-tight">
+      {children}
+    </div>
+  )
+}
+
 function mergeDay(prev: DayAgg | undefined, day: CreditFloatDayRow): DayAgg {
   if (!prev) {
     return {
@@ -90,8 +180,12 @@ function mergeDay(prev: DayAgg | undefined, day: CreditFloatDayRow): DayAgg {
 }
 
 function DayBreakdown({ day, currency }: { day: DayAgg; currency: string }) {
+  const baseEnd = day.baseCapitalBase + day.baseGrowthBase
+  const creditEnd = day.creditCapitalBase + day.creditGrowthBase
+  const lockedEnd = day.interestCapitalBase + day.creditGrowthBase + day.interestGrowthBase
+
   return (
-    <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950/50">
+    <div className="space-y-2.5 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950/50">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
           {formatDueDate(day.date)}
@@ -100,35 +194,104 @@ function DayBreakdown({ day, currency }: { day: DayAgg; currency: string }) {
           float {signedAmount(day.earnedBase, currency)}
         </p>
       </div>
-      <dl className="grid grid-cols-3 gap-2 text-[11px]">
-        <div>
-          <dt className="text-slate-500 dark:text-slate-400">Прирост базы</dt>
-          <dd className={`font-medium tabular-nums ${earnTone(day.baseGrowthBase)}`}>
-            {signedAmount(day.baseGrowthBase, currency)}
-          </dd>
-          <dd className="mt-0.5 tabular-nums text-slate-500 dark:text-slate-400">
-            база {formatCurrency(day.baseCapitalBase, currency)}
-          </dd>
+
+      <div className="space-y-2.5">
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            База
+          </p>
+          <FormulaLine>
+            <ExplainableValue
+              display={formatCurrency(day.baseCapitalBase, currency)}
+              title="База на начало дня"
+              description="Собственные средства связанного счёта (взвешенный капитал минус долг кредитки и ранее закреплённый float)."
+              className="font-medium text-slate-800 dark:text-slate-200"
+            />
+            <FormulaOp>+</FormulaOp>
+            <ExplainableValue
+              display={signedAmount(day.baseGrowthBase, currency)}
+              title="Дельта базы"
+              description="Доля дневного прироста связанного счёта, приходящаяся на собственные средства."
+              className={`font-medium ${earnTone(day.baseGrowthBase)}`}
+            />
+            <FormulaOp>=</FormulaOp>
+            <ExplainableValue
+              display={formatCurrency(baseEnd, currency)}
+              title="База на конец дня"
+              description="Сумма собственных средств после прироста: начало + дельта базы."
+              className="font-semibold text-slate-900 dark:text-slate-100"
+            />
+          </FormulaLine>
         </div>
-        <div>
-          <dt className="text-slate-500 dark:text-slate-400">С кредитки</dt>
-          <dd className={`font-medium tabular-nums ${earnTone(day.creditGrowthBase)}`}>
-            {signedAmount(day.creditGrowthBase, currency)}
-          </dd>
-          <dd className="mt-0.5 tabular-nums text-slate-500 dark:text-slate-400">
-            кредит {formatCurrency(day.creditCapitalBase, currency)}
-          </dd>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            Кредитка
+          </p>
+          <FormulaLine>
+            <ExplainableValue
+              display={formatCurrency(day.creditCapitalBase, currency)}
+              title="Кредитка на начало дня"
+              description="Доля капитала под долгом / погашениями (float principal) на этот день."
+              className="font-medium text-slate-800 dark:text-slate-200"
+            />
+            <FormulaOp>+</FormulaOp>
+            <ExplainableValue
+              display={signedAmount(day.creditGrowthBase, currency)}
+              title="Доля кредитки"
+              description="Часть прироста связанного счёта, отнесённая к кредитным средствам."
+              className={`font-medium ${earnTone(day.creditGrowthBase)}`}
+            />
+            <FormulaOp>=</FormulaOp>
+            <ExplainableValue
+              display={formatCurrency(creditEnd, currency)}
+              title="Кредитка на конец дня"
+              description="Кредитная корзина после прироста: начало + доля кредитки."
+              className="font-semibold text-slate-900 dark:text-slate-100"
+            />
+          </FormulaLine>
         </div>
-        <div>
-          <dt className="text-slate-500 dark:text-slate-400">С накопл.</dt>
-          <dd className={`font-medium tabular-nums ${earnTone(day.interestGrowthBase)}`}>
-            {signedAmount(day.interestGrowthBase, currency)}
-          </dd>
-          <dd className="mt-0.5 tabular-nums text-slate-500 dark:text-slate-400">
-            накопл. {formatCurrency(day.interestCapitalBase, currency)}
-          </dd>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            Накопленный
+          </p>
+          <FormulaLine>
+            <ExplainableValue
+              display={formatCurrency(day.interestCapitalBase, currency)}
+              title="Накопленное на начало дня"
+              description="Ранее закреплённая выгода float, которая уже лежит на связанном счёте и сама даёт прирост."
+              className="font-medium text-slate-800 dark:text-slate-200"
+            />
+            <FormulaOp>+</FormulaOp>
+            <ExplainableValue
+              display={signedAmount(day.creditGrowthBase, currency)}
+              title="Доля кредитки"
+              description="Новый прирост от кредитных средств — закрепляется в накопленном float."
+              className={`font-medium ${earnTone(day.creditGrowthBase)}`}
+            />
+            <FormulaOp>+</FormulaOp>
+            <ExplainableValue
+              display={signedAmount(day.interestGrowthBase, currency)}
+              title="Доля накоплений"
+              description="Прирост на ранее закреплённом float (проценты на проценты)."
+              className={`font-medium ${earnTone(day.interestGrowthBase)}`}
+            />
+            <FormulaOp>=</FormulaOp>
+            <ExplainableValue
+              display={formatCurrency(day.lockedEarningsBase, currency)}
+              title="Накопленное на конец дня"
+              description={
+                Math.abs(lockedEnd - day.lockedEarningsBase) < 0.01
+                  ? 'Закреплённый float после дня: начало + доля кредитки + доля накоплений.'
+                  : `Закреплённый float после дня (начало + доли = ${formatCurrency(lockedEnd, currency)}).`
+              }
+              className="font-semibold text-slate-900 dark:text-slate-100"
+            />
+          </FormulaLine>
         </div>
-      </dl>
+      </div>
+
       <p className="text-[11px] text-slate-500 dark:text-slate-400">
         Доля кредитных {formatPercent(day.floatSharePct)}
       </p>
@@ -344,8 +507,8 @@ export function FloatPanel() {
           <Card className="!p-3 sm:!p-4">
             <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">По месяцам</h2>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              Нажмите на месяц, чтобы открыть дни с изменением связанного счёта. По каждому дню —
-              прирост и сумма корзин (база / кредит / накопленная кредитка).
+              Откройте месяц: по каждому дню — формулы корзин. Наведите на число (на телефоне —
+              нажмите), чтобы увидеть описание.
             </p>
             {months.length === 0 ? (
               <EmptyState
