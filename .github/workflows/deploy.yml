@@ -1,10 +1,11 @@
 name: Redeploy project_hub
 
 # SSH на VPS и полный редеплой через deploy-all.sh.
-# Команда выполняется из домашнего каталога пользователя на сервере.
+# DEPLOY_PATH — абсолютный путь к project_hub на сервере
+# (например /root/hub/project_hub или /home/github-deploy/hub/project_hub).
 #
 # Secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_SSH_PASSPHRASE,
-#          optional DEPLOY_PORT
+#          DEPLOY_PATH, optional DEPLOY_PORT
 
 on:
   push:
@@ -34,4 +35,5 @@ jobs:
             if [ -s "$NVM_DIR/nvm.sh" ]; then
               . "$NVM_DIR/nvm.sh"
             fi
-            chmod +x hub/project_hub/scripts/deploy-all.sh && ./hub/project_hub/scripts/deploy-all.sh
+            cd "${{ secrets.DEPLOY_PATH }}"
+            chmod +x scripts/deploy-all.sh && ./scripts/deploy-all.sh
