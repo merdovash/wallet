@@ -25,6 +25,10 @@ type MonthAgg = {
   month: string
   linkedGrowthBase: number
   earnedBase: number
+  baseGrowthBase: number
+  creditGrowthBase: number
+  interestGrowthBase: number
+  lockedEarningsBase: number
   floatSharePct: number | null
   spent: number
   repaid: number
@@ -79,6 +83,10 @@ export function FloatPanel() {
             month: row.month,
             linkedGrowthBase: row.linkedGrowthBase,
             earnedBase: row.earnedBase,
+            baseGrowthBase: row.baseGrowthBase,
+            creditGrowthBase: row.creditGrowthBase,
+            interestGrowthBase: row.interestGrowthBase,
+            lockedEarningsBase: row.lockedEarningsBase,
             floatSharePct: null,
             spent: row.spent,
             repaid: row.repaid,
@@ -89,6 +97,10 @@ export function FloatPanel() {
         } else {
           prev.linkedGrowthBase += row.linkedGrowthBase
           prev.earnedBase += row.earnedBase
+          prev.baseGrowthBase += row.baseGrowthBase
+          prev.creditGrowthBase += row.creditGrowthBase
+          prev.interestGrowthBase += row.interestGrowthBase
+          prev.lockedEarningsBase += row.lockedEarningsBase
           prev.spent += row.spent
           prev.repaid += row.repaid
           prev.remaining += row.remaining
@@ -106,8 +118,35 @@ export function FloatPanel() {
       .sort((a, b) => b.month.localeCompare(a.month))
   }, [summary.cards])
 
+  const totals = useMemo(() => {
+    let baseGrowthBase = 0
+    let creditGrowthBase = 0
+    let interestGrowthBase = 0
+    let linkedGrowthBase = 0
+    for (const row of months) {
+      baseGrowthBase += row.baseGrowthBase
+      creditGrowthBase += row.creditGrowthBase
+      interestGrowthBase += row.interestGrowthBase
+      linkedGrowthBase += row.linkedGrowthBase
+    }
+    const earnedBase = creditGrowthBase + interestGrowthBase
+    return {
+      baseGrowthBase,
+      creditGrowthBase,
+      interestGrowthBase,
+      linkedGrowthBase,
+      earnedBase,
+      creditShareOfGrowth:
+        linkedGrowthBase !== 0 ? earnedBase / linkedGrowthBase : null,
+    }
+  }, [months])
+
   const currency = settings.baseCurrency
   const earnedColor = earnTone(summary.totalEarnedBase)
+  const cumulativeInterestBase = summary.cards.reduce(
+    (sum, c) => sum + c.cumulativeInterestBase,
+    0,
+  )
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -134,14 +173,19 @@ export function FloatPanel() {
                 {signedAmount(summary.totalEarnedBase, currency)}
               </p>
               <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-xs">
-                Доход благодаря беспроцентному кредиту
+                Накопительно, с учётом процентов на закреплённый доход
               </p>
+              {cumulativeInterestBase !== 0 ? (
+                <p className={`mt-0.5 text-[11px] tabular-nums sm:text-xs ${earnTone(cumulativeInterestBase)}`}>
+                  в т.ч. % с закреплённого {signedAmount(cumulativeInterestBase, currency)}
+                </p>
+              ) : null}
             </Card>
             <Card className="!p-2.5 sm:!p-3">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Долг по кредиткам</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:mt-1 sm:text-xl">
                 {formatCurrency(
-                  summary.cards.reduce((s, c) => s + c.totalDebt, 0),
+                  summary.cards.reduce((s, c) => s + c.totalDebtBase, 0),
                   currency,
                 )}
               </p>
@@ -149,10 +193,46 @@ export function FloatPanel() {
           </div>
 
           <Card className="!p-3 sm:!p-4">
+            <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+              Расшифровка
+            </h2>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Прирост связанного счёта делится на базу, долю кредитки и проценты на ранее
+              закреплённый float.
+            </p>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-xs text-slate-500 dark:text-slate-400">База</dt>
+                <dd className={`font-medium tabular-nums ${earnTone(totals.baseGrowthBase)}`}>
+                  {signedAmount(totals.baseGrowthBase, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500 dark:text-slate-400">Кредитка</dt>
+                <dd className={`font-medium tabular-nums ${earnTone(totals.creditGrowthBase)}`}>
+                  {signedAmount(totals.creditGrowthBase, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500 dark:text-slate-400">% с кредитки</dt>
+                <dd className={`font-medium tabular-nums ${earnTone(totals.interestGrowthBase)}`}>
+                  {signedAmount(totals.interestGrowthBase, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500 dark:text-slate-400">Доля от кредитных</dt>
+                <dd className="font-medium tabular-nums text-slate-800 dark:text-slate-200">
+                  {formatPercent(totals.creditShareOfGrowth)}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+
+          <Card className="!p-3 sm:!p-4">
             <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">По месяцам</h2>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              Счёт — прирост связанного кошелька. Доля — часть капитала под долгом кредитки.
-              Float — доход благодаря беспроцентному периоду. Дедлайн: траты N → конец N+грейс.
+              База / кредитка / % с кредитки — разложение прироста. Float — сумма двух последних.
+              Дедлайн: траты N → конец N+грейс.
             </p>
             {months.length === 0 ? (
               <EmptyState
@@ -194,13 +274,25 @@ export function FloatPanel() {
                       </div>
                       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                         <div>
-                          <dt className="text-slate-500 dark:text-slate-400">Счёт заработал</dt>
-                          <dd className={`font-medium tabular-nums ${earnTone(row.linkedGrowthBase)}`}>
-                            {signedAmount(row.linkedGrowthBase, currency)}
+                          <dt className="text-slate-500 dark:text-slate-400">База</dt>
+                          <dd className={`font-medium tabular-nums ${earnTone(row.baseGrowthBase)}`}>
+                            {signedAmount(row.baseGrowthBase, currency)}
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-slate-500 dark:text-slate-400">Доля кредитки</dt>
+                          <dt className="text-slate-500 dark:text-slate-400">Кредитка</dt>
+                          <dd className={`font-medium tabular-nums ${earnTone(row.creditGrowthBase)}`}>
+                            {signedAmount(row.creditGrowthBase, currency)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-500 dark:text-slate-400">% с кредитки</dt>
+                          <dd className={`font-medium tabular-nums ${earnTone(row.interestGrowthBase)}`}>
+                            {signedAmount(row.interestGrowthBase, currency)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-slate-500 dark:text-slate-400">Доля кредитных</dt>
                           <dd className="font-medium tabular-nums text-slate-800 dark:text-slate-200">
                             {formatPercent(row.floatSharePct)}
                           </dd>
@@ -224,13 +316,15 @@ export function FloatPanel() {
 
                 {/* Desktop table */}
                 <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[40rem] text-left text-sm">
+                  <table className="w-full min-w-[48rem] text-left text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
                         <th className="py-2 pr-3 font-medium">Месяц</th>
-                        <th className="py-2 pr-3 font-medium">Счёт заработал</th>
-                        <th className="py-2 pr-3 font-medium">Доля кредитки</th>
-                        <th className="py-2 pr-3 font-medium">Доход float</th>
+                        <th className="py-2 pr-3 font-medium">База</th>
+                        <th className="py-2 pr-3 font-medium">Кредитка</th>
+                        <th className="py-2 pr-3 font-medium">% с кредитки</th>
+                        <th className="py-2 pr-3 font-medium">Float</th>
+                        <th className="py-2 pr-3 font-medium">Доля</th>
                         <th className="py-2 pr-3 font-medium">Траты</th>
                         <th className="py-2 pr-3 font-medium">Погашено</th>
                         <th className="py-2 font-medium">Дедлайн</th>
@@ -245,18 +339,24 @@ export function FloatPanel() {
                           <td className="py-2.5 pr-3 font-medium text-slate-900 dark:text-slate-200">
                             {formatMonthLabel(row.month)}
                           </td>
-                          <td
-                            className={`py-2.5 pr-3 tabular-nums ${earnTone(row.linkedGrowthBase)}`}
-                          >
-                            {signedAmount(row.linkedGrowthBase, currency)}
+                          <td className={`py-2.5 pr-3 tabular-nums ${earnTone(row.baseGrowthBase)}`}>
+                            {signedAmount(row.baseGrowthBase, currency)}
                           </td>
-                          <td className="py-2.5 pr-3 tabular-nums text-slate-700 dark:text-slate-300">
-                            {formatPercent(row.floatSharePct)}
+                          <td className={`py-2.5 pr-3 tabular-nums ${earnTone(row.creditGrowthBase)}`}>
+                            {signedAmount(row.creditGrowthBase, currency)}
+                          </td>
+                          <td
+                            className={`py-2.5 pr-3 tabular-nums ${earnTone(row.interestGrowthBase)}`}
+                          >
+                            {signedAmount(row.interestGrowthBase, currency)}
                           </td>
                           <td
                             className={`py-2.5 pr-3 tabular-nums font-medium ${earnTone(row.earnedBase)}`}
                           >
                             {signedAmount(row.earnedBase, currency)}
+                          </td>
+                          <td className="py-2.5 pr-3 tabular-nums text-slate-700 dark:text-slate-300">
+                            {formatPercent(row.floatSharePct)}
                           </td>
                           <td className="py-2.5 pr-3 tabular-nums text-slate-700 dark:text-slate-300">
                             {formatCurrency(row.spent, currency)}

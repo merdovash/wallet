@@ -53,6 +53,9 @@ export function CreditFloatSummary() {
         <p className={`mt-0.5 text-sm font-semibold tabular-nums leading-tight ${earnedColor}`}>
           {signedAmount(summary.totalEarnedBase, currency)}
         </p>
+        <p className="mt-0.5 text-[10px] leading-tight text-slate-500 dark:text-slate-400">
+          Накопительно: доля долга + % на закреплённый доход
+        </p>
       </Card>
       <Card className="!p-2">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Долг по кредиткам</p>
