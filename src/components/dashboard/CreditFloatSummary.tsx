@@ -54,7 +54,7 @@ export function CreditFloatSummary() {
           {signedAmount(summary.totalEarnedBase, currency)}
         </p>
         <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-xs">
-          Доля дохода связанного счёта от долга / погашений
+          Накопительно: доля долга + % на закреплённый доход
         </p>
       </Card>
       <Card className="!p-2.5 sm:!p-3">

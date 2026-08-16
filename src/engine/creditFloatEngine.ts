@@ -32,11 +32,27 @@ export interface CreditFloatMonthRow {
   /** Full linked-account growth for the month (ex-transfers). */
   linkedGrowth: number
   linkedGrowthBase: number
-  /** Share of linked capital attributed to float (0..1). */
+  /** Share of linked growth attributed to credit funds: earned / G (0..1). */
   floatSharePct: number | null
-  /** Linked growth × float share (interest-free credit benefit). */
+  /** creditGrowth + interestGrowth (interest-free credit benefit). */
   earned: number
   earnedBase: number
+  /** Growth on own (non-credit) capital. */
+  baseGrowth: number
+  baseGrowthBase: number
+  /** Growth attributed to float principal (debt / repayments). */
+  creditGrowth: number
+  creditGrowthBase: number
+  /** Growth on previously locked float earnings. */
+  interestGrowth: number
+  interestGrowthBase: number
+  /** Locked float earnings after this month (linked currency). */
+  lockedEarnings: number
+  lockedEarningsBase: number
+  /** Capital basket shares for the month (0..1). */
+  baseSharePct: number | null
+  creditSharePct: number | null
+  interestSharePct: number | null
   spent: number
   repaid: number
   remaining: number
@@ -51,6 +67,8 @@ export interface CreditFloatSummary {
   linkedAccountId?: string
   cumulativeEarned: number
   cumulativeEarnedBase: number
+  /** Sum of interestGrowth across months (compounding on locked earnings). */
+  cumulativeInterestBase: number
   totalDebt: number
   totalDebtBase: number
   months: CreditFloatMonthRow[]
@@ -199,16 +217,48 @@ function accountCapitalFlows(
 export type LinkedFloatAttribution = {
   linkedGrowth: number
   weightedCapital: number
-  /** Principal used for the share: max(avg debt, linked→card repayments). */
+  /** Principal used for the credit basket: max(avg debt, linked→card repayments). */
   floatPrincipal: number
+  /** Locked earnings basket after clamp to remaining weighted capital. */
+  lockedCapital: number
+  baseCapital: number
+  baseGrowth: number
+  creditGrowth: number
+  interestGrowth: number
+  /** Share of linked growth attributed to credit funds: earned / G. */
   floatSharePct: number | null
+  baseSharePct: number | null
+  creditSharePct: number | null
+  interestSharePct: number | null
+  /** creditGrowth + interestGrowth. */
   earned: number
 }
 
+function emptyLinkedFloatAttribution(
+  overrides: Partial<LinkedFloatAttribution> = {},
+): LinkedFloatAttribution {
+  return {
+    linkedGrowth: 0,
+    weightedCapital: 0,
+    floatPrincipal: 0,
+    lockedCapital: 0,
+    baseCapital: 0,
+    baseGrowth: 0,
+    creditGrowth: 0,
+    interestGrowth: 0,
+    floatSharePct: null,
+    baseSharePct: null,
+    creditSharePct: null,
+    interestSharePct: null,
+    earned: 0,
+    ...overrides,
+  }
+}
+
 /**
- * Credit float yield = linked-account growth × (float principal ÷ Dietz-weighted capital).
- * Float principal = max(average credit debt, linked→card repayments), so months with
- * outstanding debt still show benefit before / without a repayment transfer.
+ * Split linked-account growth into base / credit / interest-on-locked baskets.
+ * Float principal = max(average credit debt, linked→card repayments).
+ * Previously locked earnings compound as a third basket on later months.
  */
 export function attributedLinkedFloatYield(
   linkedAccountId: string,
@@ -221,15 +271,9 @@ export function attributedLinkedFloatYield(
   settings: WalletSettings,
   floatPrincipalInLinkedCurrency: number,
   rateBook?: RateBook,
+  lockedEarningsInLinkedCurrency = 0,
 ): LinkedFloatAttribution {
-  const empty: LinkedFloatAttribution = {
-    linkedGrowth: 0,
-    weightedCapital: 0,
-    floatPrincipal: 0,
-    floatSharePct: null,
-    earned: 0,
-  }
-  if (compareDate(startDate, endDate) >= 0) return empty
+  if (compareDate(startDate, endDate) >= 0) return emptyLinkedFloatAttribution()
 
   const repaid = repaymentsFromLinked(
     linkedAccountId,
@@ -253,7 +297,7 @@ export function attributedLinkedFloatYield(
       rateBook,
     ) ?? 0
   if (startBal == null) {
-    return { ...empty, linkedGrowth: growth, floatPrincipal }
+    return emptyLinkedFloatAttribution({ linkedGrowth: growth, floatPrincipal })
   }
 
   const flows = accountCapitalFlows(
@@ -272,23 +316,56 @@ export function attributedLinkedFloatYield(
     endDate,
     flows,
   )
-  if (!Number.isFinite(weightedCapital) || weightedCapital <= 0 || floatPrincipal <= 0) {
-    return {
+
+  if (!Number.isFinite(weightedCapital) || weightedCapital <= 0) {
+    return emptyLinkedFloatAttribution({
       linkedGrowth: growth,
       weightedCapital,
       floatPrincipal,
-      floatSharePct: null,
-      earned: 0,
-    }
+    })
   }
 
-  const floatSharePct = Math.min(1, floatPrincipal / weightedCapital)
+  const creditCap = Math.min(floatPrincipal, weightedCapital)
+  const lockedCapital = Math.min(
+    Math.max(0, lockedEarningsInLinkedCurrency),
+    Math.max(0, weightedCapital - creditCap),
+  )
+  const baseCapital = Math.max(0, weightedCapital - creditCap - lockedCapital)
+  const totalCap = baseCapital + creditCap + lockedCapital
+
+  if (totalCap <= 0) {
+    return emptyLinkedFloatAttribution({
+      linkedGrowth: growth,
+      weightedCapital,
+      floatPrincipal,
+      lockedCapital,
+      baseCapital,
+    })
+  }
+
+  const baseSharePct = baseCapital / totalCap
+  const creditSharePct = creditCap / totalCap
+  const interestSharePct = lockedCapital / totalCap
+  const baseGrowth = growth * baseSharePct
+  const creditGrowth = growth * creditSharePct
+  const interestGrowth = growth * interestSharePct
+  const earned = creditGrowth + interestGrowth
+  const floatSharePct = growth !== 0 ? earned / growth : creditSharePct + interestSharePct
+
   return {
     linkedGrowth: growth,
     weightedCapital,
     floatPrincipal,
+    lockedCapital,
+    baseCapital,
+    baseGrowth,
+    creditGrowth,
+    interestGrowth,
     floatSharePct,
-    earned: growth * floatSharePct,
+    baseSharePct,
+    creditSharePct,
+    interestSharePct,
+    earned,
   }
 }
 
@@ -411,8 +488,8 @@ function debtOnDate(credit: Account, date: string, snapshots: BalanceSnapshot[])
 }
 
 /**
- * Monthly float benefit: share of linked-wallet growth attributed to
- * repayments from that wallet onto this credit card (Dietz-weighted).
+ * Monthly float benefit with cumulative three-basket split:
+ * base / credit principal / interest on previously locked earnings.
  */
 export function buildCreditFloatSummary(
   credit: Account,
@@ -437,6 +514,7 @@ export function buildCreditFloatSummary(
     linkedAccountId: credit.linkedAccountId,
     cumulativeEarned: 0,
     cumulativeEarnedBase: 0,
+    cumulativeInterestBase: 0,
     totalDebt,
     totalDebtBase,
     months: [],
@@ -466,11 +544,17 @@ export function buildCreditFloatSummary(
   const months = enumerateMonths(firstYm, lastYm)
 
   const rows: CreditFloatMonthRow[] = []
-  let cumulativeEarned = 0
+  let lockedEarnings = 0
   let cumulativeEarnedBase = 0
+  let cumulativeInterestBase = 0
 
   const linked = linkedId ? accounts.find((a) => a.id === linkedId) : undefined
   const linkedCurrency = linked?.currency ?? credit.currency
+
+  const toBase = (amount: number, onDate: string) =>
+    linkedId
+      ? convertAmount(amount, linkedCurrency, settings.baseCurrency, settings, onDate, rateBook)
+      : amount
 
   for (const ym of months) {
     const start = monthStart(ym)
@@ -495,7 +579,14 @@ export function buildCreditFloatSummary(
 
     let linkedGrowth = 0
     let floatSharePct: number | null = null
+    let baseSharePct: number | null = null
+    let creditSharePct: number | null = null
+    let interestSharePct: number | null = null
+    let baseGrowth = 0
+    let creditGrowth = 0
+    let interestGrowth = 0
     let earned = 0
+
     if (linkedId && compareDate(periodEnd, start) > 0) {
       const avgDebtInLinked =
         credit.currency === linkedCurrency
@@ -519,28 +610,29 @@ export function buildCreditFloatSummary(
         settings,
         avgDebtInLinked,
         rateBook,
+        lockedEarnings,
       )
       linkedGrowth = attr.linkedGrowth
       floatSharePct = attr.floatSharePct
+      baseSharePct = attr.baseSharePct
+      creditSharePct = attr.creditSharePct
+      interestSharePct = attr.interestSharePct
+      baseGrowth = attr.baseGrowth
+      creditGrowth = attr.creditGrowth
+      interestGrowth = attr.interestGrowth
       earned = attr.earned
+      lockedEarnings += earned
     }
 
-    const linkedGrowthBase = linkedId
-      ? convertAmount(
-          linkedGrowth,
-          linkedCurrency,
-          settings.baseCurrency,
-          settings,
-          periodEnd,
-          rateBook,
-        )
-      : linkedGrowth
-    const earnedBase = linkedId
-      ? convertAmount(earned, linkedCurrency, settings.baseCurrency, settings, periodEnd, rateBook)
-      : earned
+    const linkedGrowthBase = toBase(linkedGrowth, periodEnd)
+    const earnedBase = toBase(earned, periodEnd)
+    const baseGrowthBase = toBase(baseGrowth, periodEnd)
+    const creditGrowthBase = toBase(creditGrowth, periodEnd)
+    const interestGrowthBase = toBase(interestGrowth, periodEnd)
+    const lockedEarningsBase = toBase(lockedEarnings, periodEnd)
 
-    cumulativeEarned += earned
     cumulativeEarnedBase += earnedBase
+    cumulativeInterestBase += interestGrowthBase
 
     const bucket = bucketByMonth.get(ym)
     rows.push({
@@ -550,6 +642,17 @@ export function buildCreditFloatSummary(
       floatSharePct,
       earned,
       earnedBase,
+      baseGrowth,
+      baseGrowthBase,
+      creditGrowth,
+      creditGrowthBase,
+      interestGrowth,
+      interestGrowthBase,
+      lockedEarnings,
+      lockedEarningsBase,
+      baseSharePct,
+      creditSharePct,
+      interestSharePct,
       spent: bucket?.spent ?? 0,
       repaid: bucket?.repaid ?? 0,
       remaining: bucket?.remaining ?? 0,
@@ -563,8 +666,9 @@ export function buildCreditFloatSummary(
   return {
     creditAccountId: credit.id,
     linkedAccountId: linkedId,
-    cumulativeEarned,
+    cumulativeEarned: lockedEarnings,
     cumulativeEarnedBase,
+    cumulativeInterestBase,
     totalDebt,
     totalDebtBase,
     months: rows,
