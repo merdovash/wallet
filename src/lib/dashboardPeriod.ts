@@ -6,13 +6,15 @@ export type DashboardPeriodKey = '1m' | '3m' | '1y' | 'all'
 export interface DashboardPeriodOption {
   key: DashboardPeriodKey
   label: string
+  /** Compact label for tight toolbars. */
+  shortLabel: string
 }
 
 export const DASHBOARD_PERIOD_OPTIONS: DashboardPeriodOption[] = [
-  { key: '1m', label: 'Месяц' },
-  { key: '3m', label: 'Квартал' },
-  { key: '1y', label: 'Год' },
-  { key: 'all', label: 'Всё время' },
+  { key: '1m', label: 'Месяц', shortLabel: '1м' },
+  { key: '3m', label: 'Квартал', shortLabel: '3м' },
+  { key: '1y', label: 'Год', shortLabel: 'Год' },
+  { key: 'all', label: 'Всё время', shortLabel: 'Всё' },
 ]
 
 export interface PeriodRange {

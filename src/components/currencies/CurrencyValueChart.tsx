@@ -12,6 +12,7 @@ import {
 import { buildCurrencyValueSeries } from '../../lib/currencyValueSeries'
 import { chartActiveDot, chartDot, chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
@@ -24,13 +25,17 @@ export function CurrencyValueChart() {
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
+  const { range } = usePeriodRange()
   const { mode: themeMode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(), [themeMode])
 
   const { currencies, points } = useMemo(
     () =>
-      buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, { foreignOnly: true }),
-    [accounts, snapshots, settings, rateBook],
+      buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, {
+        foreignOnly: true,
+        range: range ?? undefined,
+      }),
+    [accounts, snapshots, settings, rateBook, range],
   )
 
   const rows = useMemo(

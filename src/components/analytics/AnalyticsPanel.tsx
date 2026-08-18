@@ -1,6 +1,7 @@
 import { ANALYTICS_NAV_ITEMS } from '../../lib/navSections'
 import { sectionToPath } from '../../lib/appRoutes'
 import type { AnalyticsSection } from '../../types/wallet'
+import { PeriodFilter } from '../ui/PeriodFilter'
 
 interface AnalyticsPanelProps {
   onOpenSection: (section: AnalyticsSection) => void
@@ -9,11 +10,14 @@ interface AnalyticsPanelProps {
 export function AnalyticsPanel({ onOpenSection }: AnalyticsPanelProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Аналитика</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Подробные отчёты по дням, типам счетов, валютам и кредитному float
-        </p>
+      <div className="space-y-2">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Аналитика</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Подробные отчёты по дням, типам счетов, валютам и кредитному float
+          </p>
+        </div>
+        <PeriodFilter showRange />
       </div>
 
       <ul className="space-y-2">

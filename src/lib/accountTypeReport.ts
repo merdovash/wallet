@@ -140,10 +140,11 @@ export function buildAccountTypeReport(
   settings: WalletSettings,
   rateBook?: RateBook,
   fxMode: GrowthFxMode = 'withFx',
+  range?: { startDate: string; endDate: string },
 ): AccountTypeReport {
   const dates = snapshotDates(snapshots)
-  const t0 = dates[0] ?? null
-  const t1 = dates[dates.length - 1] ?? null
+  const t0 = range?.startDate ?? dates[0] ?? null
+  const t1 = range?.endDate ?? dates[dates.length - 1] ?? null
   const active = accounts
     .filter((a) => !a.archived)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))

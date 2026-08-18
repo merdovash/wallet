@@ -2,9 +2,11 @@
 import type { CreditFloatDayRow } from '../../engine/creditFloatEngine'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
+import { PeriodFilter } from '../ui/PeriodFilter'
 
 const MONTH_LABEL = new Intl.DateTimeFormat('ru-RU', {
   month: 'long',
@@ -305,6 +307,7 @@ export function FloatPanel() {
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
+  const { range } = usePeriodRange()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const creditAccounts = useMemo(
@@ -387,8 +390,12 @@ export function FloatPanel() {
         floatSharePct:
           row.linkedGrowthBase !== 0 ? row.earnedBase / row.linkedGrowthBase : null,
       }))
+      .filter((row) => {
+        if (!range) return true
+        return row.month >= range.startDate.slice(0, 7) && row.month <= range.endDate.slice(0, 7)
+      })
       .sort((a, b) => b.month.localeCompare(a.month))
-  }, [summary.cards])
+  }, [summary.cards, range])
 
   const totals = useMemo(() => {
     let baseGrowthBase = 0
@@ -426,11 +433,14 @@ export function FloatPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Float</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Выгода от беспроцентного периода по связанным кошелькам
-        </p>
+      <div className="space-y-2">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Float</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Выгода от беспроцентного кредита на связанном счёте
+          </p>
+        </div>
+        <PeriodFilter showRange />
       </div>
 
       {creditAccounts.length === 0 ? (

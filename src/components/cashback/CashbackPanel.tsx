@@ -1,29 +1,35 @@
 ﻿import { useMemo } from 'react'
 import { buildCashbackReport, CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { formatCurrency, formatDateDisplay, formatPercent } from '../../lib/format'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
+import { PeriodFilter } from '../ui/PeriodFilter'
 
 export function CashbackPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
+  const { range } = usePeriodRange()
 
   const report = useMemo(
-    () => buildCashbackReport(accounts, snapshots, transfers, settings),
-    [accounts, snapshots, transfers, settings],
+    () => buildCashbackReport(accounts, snapshots, transfers, settings, range ?? undefined),
+    [accounts, snapshots, transfers, settings, range],
   )
 
   const hasCashbackAccounts = report.accounts.length > 0
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Кэшбек</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Эффективная скидка от расходов: начисленный кэшбек к сумме расходов в чек-инах (1 кэшбек = 1 ₽)
-        </p>
+      <div className="space-y-2">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Кэшбек</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Эффективная скидка от расходов: начисленный кэшбек к сумме расходов в чек-инах (1 кэшбек = 1 ₽)
+          </p>
+        </div>
+        <PeriodFilter showRange />
       </div>
 
       {!hasCashbackAccounts ? (

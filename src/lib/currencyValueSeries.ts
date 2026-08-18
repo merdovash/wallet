@@ -119,9 +119,11 @@ export function buildCurrencyFxBreakdown(
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  range?: { startDate: string; endDate: string },
 ): CurrencyFxBreakdown | null {
   const { points } = buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, {
     foreignOnly: true,
+    range,
   })
   const summary = summarizeCurrencyValueChange(points)
   if (!summary) return null
@@ -232,10 +234,13 @@ export function buildCurrencyValueSeries(
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
   rateBook?: RateBook,
-  opts?: { foreignOnly?: boolean },
+  opts?: { foreignOnly?: boolean; range?: { startDate: string; endDate: string } },
 ): { currencies: string[]; points: CurrencyValuePoint[] } {
   const foreignOnly = opts?.foreignOnly ?? true
-  const dates = snapshotDates(snapshots)
+  const dates = snapshotDates(snapshots).filter((date) => {
+    if (!opts?.range) return true
+    return date >= opts.range.startDate && date <= opts.range.endDate
+  })
   const active = accounts.filter((a) => !a.archived)
   const currencies = [
     ...new Set(

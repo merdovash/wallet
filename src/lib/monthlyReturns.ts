@@ -253,6 +253,7 @@ export function buildMonthlyReturns(
   rateBook?: RateBook,
   transfers: Transfer[] = [],
   fxMode: GrowthFxMode = 'withFx',
+  range?: { startDate: string; endDate: string },
 ): MonthlyReturnRow[] {
   const eligible = growthPortfolioAccounts(accounts)
   const dates = snapshotDates(snapshots)
@@ -326,7 +327,8 @@ export function buildMonthlyReturns(
           : annualizePeriodReturn(growthPct, daysBetween(startDate, endDate)),
     })
   }
-  return rows
+  if (!range) return rows
+  return rows.filter((row) => row.endDate > range.startDate && row.endDate <= range.endDate)
 }
 
 /** Overall return over a date range, cashflow-adjusted (Modified Dietz).

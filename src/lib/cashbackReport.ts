@@ -89,6 +89,7 @@ export function buildCashbackReport(
   snapshots: BalanceSnapshot[],
   transfers: Transfer[],
   settings: WalletSettings,
+  range?: { startDate: string; endDate: string },
 ): CashbackReport {
   const cbAccounts = cashbackAccounts(accounts)
   const dates = snapshotDates(snapshots)
@@ -112,6 +113,7 @@ export function buildCashbackReport(
 
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i]!
+    if (range && (date <= range.startDate || date > range.endDate)) continue
     const snap = snapshots.find((s) => s.date === date)
     const expense = snap?.expense ?? 0
     const cashbackEarned =

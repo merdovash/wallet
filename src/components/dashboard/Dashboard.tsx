@@ -12,19 +12,19 @@ import {
   readCheckInIntervalDays,
 } from '../../lib/checkInReminder'
 import {
-  DASHBOARD_PERIOD_OPTIONS,
   resolveDashboardPeriod,
   slicePeriodSeries,
-  type DashboardPeriodKey,
 } from '../../lib/dashboardPeriod'
 import { formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { buildPeriodReturn } from '../../lib/monthlyReturns'
 import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
 import { useFxModeStore } from '../../store/fxModeStore'
+import { usePeriodStore } from '../../store/periodStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
 import { FxModeToggle } from '../ui/FxModeToggle'
+import { PeriodFilter } from '../ui/PeriodFilter'
 import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
@@ -48,8 +48,8 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const fxMode = useFxModeStore((s) => s.fxMode)
+  const periodKey = usePeriodStore((s) => s.periodKey)
   const [checkInOpen, setCheckInOpen] = useState(false)
-  const [periodKey, setPeriodKey] = useState<DashboardPeriodKey>('all')
   const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [intervalDays, setIntervalDays] = useState(readCheckInIntervalDays)
@@ -141,38 +141,15 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     <div className="mx-auto max-w-5xl space-y-3">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="shrink-0 text-lg font-semibold text-slate-900 dark:text-slate-200 sm:text-xl">
-              Дашборд
-            </h1>
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
-              {DASHBOARD_PERIOD_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setPeriodKey(option.key)}
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition sm:px-2.5 sm:py-1 sm:text-xs ${
-                    periodKey === option.key
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            {periodReturn ? (
-              <span className="hidden text-[10px] text-slate-500 dark:text-slate-400 sm:inline sm:text-xs">
-                {formatDateDisplay(periodReturn.startDate)} →{' '}
-                {formatDateDisplay(periodReturn.endDate)}
-              </span>
-            ) : null}
-          </div>
+          <h1 className="min-w-0 truncate text-lg font-semibold text-slate-900 dark:text-slate-200 sm:text-xl">
+            Дашборд
+          </h1>
           <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={openCheckIn}>
             Чек-ин
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <PeriodFilter showRange />
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <FxModeToggle showLabel={false} compact />
           <ChartSeriesToggle value={chartSeries} onChange={setChartSeries} />
         </div>

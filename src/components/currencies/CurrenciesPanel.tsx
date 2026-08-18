@@ -6,10 +6,12 @@ import {
   summarizeCurrencyValueChange,
 } from '../../lib/currencyValueSeries'
 import { formatCurrency, formatPercent, formatShortDate, signedAmount, todayIsoDate } from '../../lib/format'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { CurrencyReportTable } from '../dashboard/CurrencyReportTable'
 import { Card } from '../ui/FormControls'
+import { PeriodFilter } from '../ui/PeriodFilter'
 import { CurrencyFxBreakdownPanel } from './CurrencyFxBreakdownPanel'
 import { CurrencyValueChart } from './CurrencyValueChart'
 
@@ -24,6 +26,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
+  const { range } = usePeriodRange()
 
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts])
   const foreignAccounts = useMemo(
@@ -39,13 +42,14 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   const change = useMemo(() => {
     const { points } = buildCurrencyValueSeries(accounts, snapshots, settings, rateBook, {
       foreignOnly: true,
+      range: range ?? undefined,
     })
     return summarizeCurrencyValueChange(points)
-  }, [accounts, snapshots, settings, rateBook])
+  }, [accounts, snapshots, settings, rateBook, range])
 
   const breakdown = useMemo(
-    () => buildCurrencyFxBreakdown(accounts, snapshots, settings, rateBook),
-    [accounts, snapshots, settings, rateBook],
+    () => buildCurrencyFxBreakdown(accounts, snapshots, settings, rateBook, range ?? undefined),
+    [accounts, snapshots, settings, rateBook, range],
   )
 
   useEffect(() => {
@@ -67,12 +71,15 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Валюты</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Эквивалент иностранных валют в {settings.baseCurrency} (без {settings.baseCurrency})
-          {foreignCurrencyCount > 0 ? ` · ${foreignCurrencyCount} вал.` : ''}
-        </p>
+      <div className="space-y-2">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Валюты</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Эквивалент иностранных валют в {settings.baseCurrency} (без {settings.baseCurrency})
+            {foreignCurrencyCount > 0 ? ` · ${foreignCurrencyCount} вал.` : ''}
+          </p>
+        </div>
+        <PeriodFilter showRange />
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3">

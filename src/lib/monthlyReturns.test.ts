@@ -90,6 +90,18 @@ describe('monthlyReturns', () => {
     expect(rows[1]?.growth).toBeCloseTo(1020, 4)
     expect(rows[1]?.netFlow).toBe(5_000)
     expect(rows[1]?.growthPct).toBeCloseTo(1020 / 101_000, 8)
+
+    const febOnly = buildMonthlyReturns(
+      accounts,
+      snapshots,
+      settings,
+      undefined,
+      transfers,
+      'withFx',
+      { startDate: '2026-01-31', endDate: '2026-02-28' },
+    )
+    expect(febOnly).toHaveLength(1)
+    expect(febOnly[0]?.yearMonth).toBe('2026-02')
   })
 
   it('time-weights mid-period transfer in Modified Dietz percent', () => {

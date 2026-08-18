@@ -21,13 +21,15 @@ import {
 } from '../../lib/format'
 import { getChartTheme, chartTooltipStyles } from '../../lib/chartTheme'
 import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useWalletStore } from '../../store/walletStore'
 import { DailyBreakdownPanel } from './DailyBreakdownPanel'
-import { Card, DateInput, EmptyState, Field } from '../ui/FormControls'
+import { Card, EmptyState } from '../ui/FormControls'
 import { FxModeToggle } from '../ui/FxModeToggle'
+import { PeriodFilter } from '../ui/PeriodFilter'
 
 type DayRow = {
   date: string
@@ -47,13 +49,6 @@ function calendarDaysBetween(startDate: string, endDate: string): number | null 
   const end = Date.parse(`${endDate}T00:00:00Z`)
   if (!Number.isFinite(start) || !Number.isFinite(end)) return null
   return Math.max(0, Math.round((end - start) / 86_400_000))
-}
-
-function clampIsoDate(value: string, min: string, max: string): string {
-  if (!value) return min
-  if (min && value < min) return min
-  if (max && value > max) return max
-  return value
 }
 
 function dateFromChartClick(
@@ -117,23 +112,9 @@ export function DailyGrowthPanel() {
   const chartTheme = useMemo(() => getChartTheme(), [themeMode])
 
   const checkInDates = useMemo(() => snapshotDates(snapshots), [snapshots])
-  const firstDate = checkInDates[0] ?? ''
-  const lastDate = checkInDates[checkInDates.length - 1] ?? ''
-
-  const [fromDate, setFromDate] = useState(firstDate)
-  const [toDate, setToDate] = useState(lastDate)
+  const { range } = usePeriodRange()
   const [selectedEndDate, setSelectedEndDate] = useState<string | null>(null)
   const fxMode = useFxModeStore((s) => s.fxMode)
-
-  useEffect(() => {
-    if (!firstDate || !lastDate) {
-      setFromDate('')
-      setToDate('')
-      return
-    }
-    setFromDate((prev) => clampIsoDate(prev || firstDate, firstDate, lastDate))
-    setToDate((prev) => clampIsoDate(prev || lastDate, firstDate, lastDate))
-  }, [firstDate, lastDate])
 
   useEffect(() => {
     void ensureRates([...checkInDates, todayIsoDate()])
@@ -145,11 +126,9 @@ export function DailyGrowthPanel() {
   )
 
   const filtered = useMemo(() => {
-    if (!fromDate || !toDate) return []
-    const lo = fromDate <= toDate ? fromDate : toDate
-    const hi = fromDate <= toDate ? toDate : fromDate
-    return allPoints.filter((p) => p.date >= lo && p.date <= hi)
-  }, [allPoints, fromDate, toDate])
+    if (!range) return allPoints
+    return allPoints.filter((p) => p.date >= range.startDate && p.date <= range.endDate)
+  }, [allPoints, range])
 
   const buildRow = (p: (typeof filtered)[number]): DayRow =>
     buildDayRow(p, checkInDates, accounts, snapshots, settings, rateBook)
@@ -190,22 +169,6 @@ export function DailyGrowthPanel() {
     return buildPeriodReturn(accounts, snapshots, settings, rateBook, transfers, interval)
   }, [selectedEndDate, checkInDates, accounts, snapshots, settings, rateBook, transfers])
 
-  function setFromClamped(iso: string) {
-    if (!firstDate || !lastDate) {
-      setFromDate(iso)
-      return
-    }
-    setFromDate(clampIsoDate(iso, firstDate, lastDate))
-  }
-
-  function setToClamped(iso: string) {
-    if (!firstDate || !lastDate) {
-      setToDate(iso)
-      return
-    }
-    setToDate(clampIsoDate(iso, firstDate, lastDate))
-  }
-
   function openDay(date: string | undefined) {
     if (!date) return
     setSelectedEndDate(date)
@@ -213,36 +176,18 @@ export function DailyGrowthPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">По дням</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Прирост портфеля роста между чек-инами · фонд / вклад / инвестиции
-          </p>
+      <div className="space-y-2">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">По дням</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Прирост портфеля роста между чек-инами · фонд / вклад / инвестиции
+            </p>
+          </div>
+          <FxModeToggle showLabel={false} compact className="shrink-0" />
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <FxModeToggle />
-          <Field label="С даты" className="w-40">
-            <DateInput
-              value={fromDate}
-              disabled={!firstDate}
-              onChange={setFromClamped}
-            />
-          </Field>
-          <Field label="По дату" className="w-40">
-            <DateInput
-              value={toDate}
-              disabled={!lastDate}
-              onChange={setToClamped}
-            />
-          </Field>
-        </div>
+        <PeriodFilter showRange />
       </div>
-      {firstDate && lastDate ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Доступный интервал: {formatDateDisplay(firstDate)} — {formatDateDisplay(lastDate)}
-        </p>
-      ) : null}
 
       {checkInDates.length < 2 ? (
         <Card>

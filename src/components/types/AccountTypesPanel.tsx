@@ -1,12 +1,14 @@
 ﻿import { useMemo, useState } from 'react'
 import { buildAccountTypeReport } from '../../lib/accountTypeReport'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { AccountKind } from '../../types/wallet'
 import { Card, EmptyState } from '../ui/FormControls'
 import { FxModeToggle } from '../ui/FxModeToggle'
+import { PeriodFilter } from '../ui/PeriodFilter'
 
 function formatShare(share: number): string {
   return `${(share * 100).toFixed(1).replace('.', ',')}%`
@@ -36,27 +38,40 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const fxMode = useFxModeStore((s) => s.fxMode)
+  const { range } = usePeriodRange()
   const [expanded, setExpanded] = useState<Partial<Record<AccountKind, boolean>>>({})
 
   const report = useMemo(
-    () => buildAccountTypeReport(accounts, snapshots, transfers, settings, rateBook, fxMode),
-    [accounts, snapshots, transfers, settings, rateBook, fxMode],
+    () =>
+      buildAccountTypeReport(
+        accounts,
+        snapshots,
+        transfers,
+        settings,
+        rateBook,
+        fxMode,
+        range ?? undefined,
+      ),
+    [accounts, snapshots, transfers, settings, rateBook, fxMode, range],
   )
 
   const totalAccounts = report.rows.reduce((s, r) => s + r.accountCount, 0)
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">По типам</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Сводка остатков и прироста по видам счетов
-            {report.asOfDate ? ` на ${report.asOfDate}` : ''}
-            {fxMode === 'withoutFx' ? ' · без курсового эффекта' : ''}
-          </p>
+      <div className="space-y-2">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">По типам</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Сводка остатков и прироста по видам счетов
+              {report.asOfDate ? ` на ${report.asOfDate}` : ''}
+              {fxMode === 'withoutFx' ? ' · без курсового эффекта' : ''}
+            </p>
+          </div>
+          <FxModeToggle showLabel={false} compact className="shrink-0" />
         </div>
-        <FxModeToggle />
+        <PeriodFilter showRange />
       </div>
 
       {report.rows.length > 0 ? (

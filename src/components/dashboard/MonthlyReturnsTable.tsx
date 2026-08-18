@@ -2,6 +2,7 @@
 import { buildMonthlyReturns } from '../../lib/monthlyReturns'
 import { buildMonthlyRiskMetrics } from '../../lib/monthlyRiskMetrics'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
@@ -14,10 +15,20 @@ export function MonthlyReturnsTable() {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const fxMode = useFxModeStore((s) => s.fxMode)
+  const { range } = usePeriodRange()
 
   const rows = useMemo(
-    () => buildMonthlyReturns(accounts, snapshots, settings, rateBook, transfers, fxMode),
-    [accounts, snapshots, settings, rateBook, transfers, fxMode],
+    () =>
+      buildMonthlyReturns(
+        accounts,
+        snapshots,
+        settings,
+        rateBook,
+        transfers,
+        fxMode,
+        range ?? undefined,
+      ),
+    [accounts, snapshots, settings, rateBook, transfers, fxMode, range],
   )
   const risk = useMemo(() => buildMonthlyRiskMetrics(rows), [rows])
 

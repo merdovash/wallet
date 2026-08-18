@@ -135,4 +135,27 @@ describe('buildAccountTypeReport', () => {
     expect(report.rows.find((r) => r.kind === 'fund')?.growthPct).toBeCloseTo(1_000 / 125_000, 8)
     expect(report.growthPct).toBeCloseTo(1_000 / 500_000, 8)
   })
+
+  it('limits growth to the selected period', () => {
+    const accounts = [account({ id: 'fund', name: 'Фонд', kind: 'fund' })]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'fund', amount: 100_000 }] },
+      { id: 's2', date: '2026-02-01', lines: [{ accountId: 'fund', amount: 101_000 }] },
+      { id: 's3', date: '2026-03-01', lines: [{ accountId: 'fund', amount: 103_000 }] },
+    ]
+    const full = buildAccountTypeReport(accounts, snapshots, [], settings)
+    expect(full.grandGrowthBase).toBeCloseTo(3_000, 4)
+    const lastMonth = buildAccountTypeReport(
+      accounts,
+      snapshots,
+      [],
+      settings,
+      undefined,
+      'withFx',
+      { startDate: '2026-02-01', endDate: '2026-03-01' },
+    )
+    expect(lastMonth.startDate).toBe('2026-02-01')
+    expect(lastMonth.asOfDate).toBe('2026-03-01')
+    expect(lastMonth.grandGrowthBase).toBeCloseTo(2_000, 4)
+  })
 })
