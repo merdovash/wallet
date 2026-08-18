@@ -121,7 +121,16 @@ interface DateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'va
   onChange: (iso: string) => void
 }
 
-export function DateInput({ value, onChange, className = '', id, disabled, ...rest }: DateInputProps) {
+export function DateInput({
+  value,
+  onChange,
+  className = '',
+  id,
+  disabled,
+  min,
+  max,
+  ...rest
+}: DateInputProps) {
   const autoId = useId()
   const inputId = id ?? autoId
   const [text, setText] = useState(() => formatIsoToRu(value))
@@ -232,6 +241,8 @@ export function DateInput({ value, onChange, className = '', id, disabled, ...re
         ref={pickerRef}
         type="date"
         value={pickerValue}
+        min={typeof min === 'string' ? min : undefined}
+        max={typeof max === 'string' ? max : undefined}
         disabled={disabled}
         tabIndex={-1}
         aria-hidden

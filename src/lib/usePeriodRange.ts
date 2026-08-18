@@ -14,8 +14,18 @@ export function usePeriodRange(): {
   dates: string[]
 } {
   const periodKey = usePeriodStore((s) => s.periodKey)
+  const customStart = usePeriodStore((s) => s.customStart)
+  const customEnd = usePeriodStore((s) => s.customEnd)
   const snapshots = useWalletStore((s) => s.snapshots)
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
-  const range = useMemo(() => resolveDashboardPeriod(periodKey, dates), [periodKey, dates])
+  const range = useMemo(
+    () =>
+      resolveDashboardPeriod(
+        periodKey,
+        dates,
+        customStart && customEnd ? { startDate: customStart, endDate: customEnd } : null,
+      ),
+    [periodKey, dates, customStart, customEnd],
+  )
   return { periodKey, range, dates }
 }

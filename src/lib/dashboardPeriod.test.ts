@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  resolveCustomPeriod,
   resolveDashboardPeriod,
   shiftIsoMonths,
   slicePeriodSeries,
@@ -49,9 +50,35 @@ describe('resolveDashboardPeriod', () => {
     })
   })
 
+  it('snaps a custom calendar range onto check-in dates', () => {
+    expect(
+      resolveCustomPeriod('2026-02-10', '2026-04-20', dates),
+    ).toEqual({
+      startDate: '2025-12-01',
+      endDate: '2026-04-01',
+    })
+  })
+
+  it('swaps inverted custom dates and expands a collapsed range', () => {
+    expect(resolveCustomPeriod('2026-05-01', '2026-05-01', dates)).toEqual({
+      startDate: '2026-04-01',
+      endDate: '2026-05-01',
+    })
+    expect(
+      resolveDashboardPeriod('custom', dates, {
+        startDate: '2026-03-15',
+        endDate: '2026-04-15',
+      }),
+    ).toEqual({
+      startDate: '2026-03-01',
+      endDate: '2026-04-01',
+    })
+  })
+
   it('returns null when fewer than two check-ins', () => {
     expect(resolveDashboardPeriod('1m', ['2026-05-01'])).toBeNull()
     expect(resolveDashboardPeriod('all', [])).toBeNull()
+    expect(resolveDashboardPeriod('custom', dates, { startDate: '', endDate: '' })).toBeNull()
   })
 })
 

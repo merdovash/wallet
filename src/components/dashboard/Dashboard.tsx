@@ -11,15 +11,12 @@ import {
   formatDaysRu,
   readCheckInIntervalDays,
 } from '../../lib/checkInReminder'
-import {
-  resolveDashboardPeriod,
-  slicePeriodSeries,
-} from '../../lib/dashboardPeriod'
+import { slicePeriodSeries } from '../../lib/dashboardPeriod'
 import { formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { buildPeriodReturn } from '../../lib/monthlyReturns'
 import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useFxModeStore } from '../../store/fxModeStore'
-import { usePeriodStore } from '../../store/periodStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button } from '../ui/FormControls'
@@ -48,7 +45,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const fxMode = useFxModeStore((s) => s.fxMode)
-  const periodKey = usePeriodStore((s) => s.periodKey)
+  const { range: selectedRange } = usePeriodRange()
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -85,10 +82,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     [snapshots, intervalDays],
   )
 
-  const range = useMemo(
-    () => (periodKey === 'all' ? undefined : (resolveDashboardPeriod(periodKey, dates) ?? undefined)),
-    [periodKey, dates],
-  )
+  const range = selectedRange ?? undefined
 
   const total = useMemo(
     () =>
