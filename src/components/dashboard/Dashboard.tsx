@@ -49,7 +49,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const fxMode = useFxModeStore((s) => s.fxMode)
   const [checkInOpen, setCheckInOpen] = useState(false)
-  const [checkInMode, setCheckInMode] = useState<'quick' | 'full'>('quick')
   const [periodKey, setPeriodKey] = useState<DashboardPeriodKey>('all')
   const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -134,13 +133,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     )
   }, [accounts, snapshots, settings, rateBook, periodReturn])
 
-  function openQuickCheckIn() {
-    setCheckInMode('quick')
-    setCheckInOpen(true)
-  }
-
-  function openFullCheckIn() {
-    setCheckInMode('full')
+  function openCheckIn() {
     setCheckInOpen(true)
   }
 
@@ -175,7 +168,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
               </span>
             ) : null}
           </div>
-          <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={openQuickCheckIn}>
+          <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={openCheckIn}>
             Чек-ин
           </Button>
         </div>
@@ -185,11 +178,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         </div>
       </div>
 
-      <CheckInReminderBanner
-        reminder={reminder}
-        onCheckIn={openQuickCheckIn}
-        onFullCheckIn={openFullCheckIn}
-      />
+      <CheckInReminderBanner reminder={reminder} onCheckIn={openCheckIn} />
 
       <SummaryCards
         total={total}
@@ -243,7 +232,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
       <CheckInPanel
         open={checkInOpen}
         onClose={() => setCheckInOpen(false)}
-        mode={checkInMode}
       />
     </div>
   )
@@ -252,28 +240,11 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
 function CheckInReminderBanner({
   reminder,
   onCheckIn,
-  onFullCheckIn,
 }: {
   reminder: ReturnType<typeof buildCheckInReminderStatus>
   onCheckIn: () => void
-  onFullCheckIn: () => void
 }) {
-  if (reminder.kind === 'ok') {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-        <p className="text-sm text-emerald-900 dark:text-emerald-200">
-          Чек-ины актуальны · следующий через {formatDaysRu(reminder.daysUntilDue)}
-        </p>
-        <button
-          type="button"
-          onClick={onFullCheckIn}
-          className="text-xs font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
-        >
-          Полный чек-ин
-        </button>
-      </div>
-    )
-  }
+  if (reminder.kind === 'ok') return null
 
   const title =
     reminder.kind === 'empty'
@@ -293,14 +264,9 @@ function CheckInReminderBanner({
         <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">{title}</p>
         <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-200/80">{detail}</p>
       </div>
-      <div className="flex shrink-0 flex-wrap gap-2">
-        <Button type="button" className="!px-3 !py-1.5 text-sm" onClick={onCheckIn}>
-          Быстрый чек-ин
-        </Button>
-        <Button type="button" variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={onFullCheckIn}>
-          Полный
-        </Button>
-      </div>
+      <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={onCheckIn}>
+        Чек-ин
+      </Button>
     </div>
   )
 }
