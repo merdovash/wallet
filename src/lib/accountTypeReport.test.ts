@@ -97,4 +97,42 @@ describe('buildAccountTypeReport', () => {
     expect(report.growthPct).toBeCloseTo(0.01, 8)
     expect(report.annualizedPct).not.toBeNull()
   })
+
+  it('takes overall % from all money, excluding top-ups', () => {
+    const accounts: Account[] = [
+      account({ id: 'fund', name: 'Фонд', kind: 'fund' }),
+      account({ id: 'op', name: 'Карта', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 100_000 },
+          { accountId: 'op', amount: 400_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'fund', amount: 151_000 },
+          { accountId: 'op', amount: 350_000 },
+        ],
+      },
+    ]
+    const transfers = [
+      {
+        id: 't1',
+        date: '2026-01-16',
+        fromAccountId: 'op',
+        toAccountId: 'fund',
+        amount: 50_000,
+      },
+    ]
+    const report = buildAccountTypeReport(accounts, snapshots, transfers, settings)
+    expect(report.grandGrowthBase).toBeCloseTo(1_000, 4)
+    expect(report.rows.find((r) => r.kind === 'fund')?.growthPct).toBeCloseTo(1_000 / 125_000, 8)
+    expect(report.growthPct).toBeCloseTo(1_000 / 500_000, 8)
+  })
 })

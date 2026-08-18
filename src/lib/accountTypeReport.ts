@@ -19,7 +19,7 @@ import {
   isGrowthKind,
   normalizeAccountKind,
 } from './accountKinds'
-import { annualizePeriodReturn } from './monthlyReturns'
+import { annualizePeriodReturn, pctOfAllMass } from './monthlyReturns'
 import type {
   Account,
   AccountKind,
@@ -63,7 +63,7 @@ export interface AccountTypeReport {
   baseCurrency: string
   grandTotalBase: number
   grandGrowthBase: number
-  /** Relative growth across all growth kinds (fund/deposit/investment). */
+  /** Relative growth of investments versus all money at start (ex-top-ups). */
   growthPct: number | null
   annualizedPct: number | null
   rows: AccountTypeReportRow[]
@@ -290,30 +290,12 @@ export function buildAccountTypeReport(
   )
 
   const growthRows = rows.filter((r) => isGrowthKind(r.kind))
-  const growthStart = growthRows.reduce((s, r) => s + r.startBalanceBase, 0)
   const growthAmount = growthRows.reduce((s, r) => s + r.growthBase, 0)
-  let growthPct: number | null = null
-  let annualizedPct: number | null = null
-  if (t0 != null && t0 !== t1 && growthRows.length > 0) {
-    const growthAccountIds = new Set(
-      growthRows.flatMap((r) => r.accounts.map((a) => a.accountId)),
-    )
-    const growthAccountsList = active.filter((a) => growthAccountIds.has(a.id))
-    // Boundary flows into the whole growth portfolio (any growth kind).
-    const flows = kindCapitalFlowsForAccounts(
-      growthAccountsList,
-      t0,
-      t1,
-      transfers,
-      accounts,
-      settings,
-      rateBook,
-    )
-    const dietz = modifiedDietzReturn(growthStart, growthAmount, t0, t1, flows)
-    growthPct = dietz.growthPct
-    annualizedPct =
-      growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
-  }
+  const allMassStart = [...byKind.values()].reduce((s, r) => s + r.startBalanceBase, 0)
+  const growthPct =
+    t0 != null && t0 !== t1 ? pctOfAllMass(growthAmount, allMassStart) : null
+  const annualizedPct =
+    growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
 
   return {
     asOfDate: t1,
@@ -326,43 +308,4 @@ export function buildAccountTypeReport(
     annualizedPct,
     rows,
   }
-}
-
-/** Flows into a set of accounts from outside that set. */
-function kindCapitalFlowsForAccounts(
-  subset: Account[],
-  t0: string,
-  t1: string,
-  transfers: Transfer[],
-  accounts: Account[],
-  settings: WalletSettings,
-  rateBook?: RateBook,
-): DatedCapitalFlow[] {
-  const subsetIds = new Set(subset.map((a) => a.id))
-  const map = new Map(accounts.map((a) => [a.id, a]))
-  const byDate = new Map<string, number>()
-
-  for (const t of transfers) {
-    if (t.date <= t0 || t.date > t1) continue
-    const fromIn = subsetIds.has(t.fromAccountId)
-    const toIn = subsetIds.has(t.toAccountId)
-    if (fromIn === toIn) continue
-    const from = map.get(t.fromAccountId)
-    if (!from) continue
-    const amountBase = convertAmount(
-      t.amount,
-      from.currency,
-      settings.baseCurrency,
-      settings,
-      t.date,
-      rateBook,
-    )
-    const signed = toIn && !fromIn ? amountBase : -amountBase
-    byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
-  }
-
-  return [...byDate.entries()]
-    .filter(([, amount]) => amount !== 0)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, amount]) => ({ date, amount }))
 }

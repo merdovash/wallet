@@ -100,7 +100,7 @@ export interface PeriodReturnSummary {
   realAnnualizedPct: number | null
   /** All-accounts net worth at period start (base currency). */
   startTotalAllMass: number
-  /** Growth ÷ all-money start total (period). */
+  /** Investment growth (ex-top-ups) ÷ all-money start total. */
   growthPctOfAllMass: number | null
   /** Annualized growth % relative to entire money mass. */
   annualizedPctOfAllMass: number | null
@@ -158,6 +158,14 @@ export function annualizeMonthlyReturn(monthlyPct: number): number {
 
 /** Do not annualize very short periods — noise would explode in annual terms. */
 export const MIN_ANNUALIZE_DAYS = 30
+
+/** Period % of investment growth (cashflow-adjusted) versus all money at start. */
+export function pctOfAllMass(growth: number, startTotalAllMass: number): number | null {
+  if (!Number.isFinite(growth) || !Number.isFinite(startTotalAllMass) || startTotalAllMass === 0) {
+    return null
+  }
+  return growth / startTotalAllMass
+}
 
 /** Annualize a return observed over `days` calendar days. */
 export function annualizePeriodReturn(periodPct: number, days: number): number | null {
@@ -368,10 +376,9 @@ export function buildPeriodReturn(
   )
   const days = daysBetween(startDate, endDate)
   const startTotalAllMass = totalOnDate(startDate, accounts, snapshots, settings, { rateBook })
-  const growthPctOfAllMass =
-    Number.isFinite(startTotalAllMass) && startTotalAllMass !== 0
-      ? growth / startTotalAllMass
-      : null
+  // Numerator: only fund/deposit/investment growth (top-ups already removed via netFlow).
+  // Denominator: all money at start, not the investment portfolio and not Dietz-weighted capital.
+  const growthPctOfAllMass = pctOfAllMass(growth, startTotalAllMass)
   const annualizedPctOfAllMass =
     growthPctOfAllMass == null || days <= 0
       ? null

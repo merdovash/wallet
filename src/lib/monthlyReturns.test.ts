@@ -190,6 +190,9 @@ describe('monthlyReturns', () => {
     expect(summary?.netFlow).toBe(50_000)
     expect(summary?.growth).toBeCloseTo(1000, 4)
     expect(summary?.growthPct).toBeCloseTo(1000 / 125_000, 8)
+    // All-mass: only the 1_000 earned, over all money (op 50k + dep 100k), not Dietz capital.
+    expect(summary?.startTotalAllMass).toBe(150_000)
+    expect(summary?.growthPctOfAllMass).toBeCloseTo(1000 / 150_000, 8)
   })
 
   it('summarizes overall period return', () => {

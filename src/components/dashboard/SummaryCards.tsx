@@ -1,9 +1,11 @@
 ﻿import { useState } from 'react'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import {
+  annualizePeriodReturn,
   explainAnnualizedPct,
   explainAnnualizedPctOfAllMass,
   explainRealAnnualizedPct,
+  pctOfAllMass,
   type PeriodReturnSummary,
 } from '../../lib/monthlyReturns'
 import { useFxModeStore } from '../../store/fxModeStore'
@@ -69,7 +71,12 @@ export function SummaryCards({
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
 
-  const allMassAnnualized = periodReturn?.annualizedPctOfAllMass
+  const allMassPeriodPct =
+    periodReturn != null ? pctOfAllMass(displayGrowth, periodReturn.startTotalAllMass) : null
+  const allMassAnnualized =
+    allMassPeriodPct == null || periodReturn == null
+      ? null
+      : annualizePeriodReturn(allMassPeriodPct, periodReturn.days)
   const realAnnualized = periodReturn?.realAnnualizedPct
   const allMassColor =
     (allMassAnnualized ?? 0) > 0
@@ -86,7 +93,8 @@ export function SummaryCards({
         : 'text-slate-800 dark:text-slate-200'
 
   const annualizedReason = explainAnnualizedPct(periodReturn)
-  const allMassReason = explainAnnualizedPctOfAllMass(periodReturn)
+  const allMassReason =
+    allMassAnnualized != null ? null : explainAnnualizedPctOfAllMass(periodReturn)
   const realReason = explainRealAnnualizedPct(periodReturn, annualInflationPct)
 
   const clickCardClass =

@@ -83,7 +83,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
             >
               {formatPercent(report.growthPct)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">относительный за период</p>
+            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">от всей массы · без пополнений</p>
           </Card>
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
