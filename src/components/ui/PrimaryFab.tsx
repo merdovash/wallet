@@ -15,6 +15,9 @@ export function PrimaryFab() {
   // Пока открыт чек-ин без override — скрываем FAB (override зарегистрирует Save).
   if (checkInOpen && !override) return null
 
+  // Чек-ин под StackPanel (z-100); Save при редактировании — поверх панели.
+  const zClass = override ? 'z-[110]' : 'z-[90]'
+
   return (
     <button
       type="button"
@@ -22,7 +25,7 @@ export function PrimaryFab() {
       disabled={disabled}
       title={title}
       aria-label={label}
-      className="fixed z-[110] flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 md:right-6"
+      className={`fixed ${zClass} flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 md:right-6`}
     >
       {!override && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
       <span>{label}</span>
