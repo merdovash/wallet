@@ -2,10 +2,10 @@
 import { totalOnDate, snapshotDates } from '../../engine/growthEngine'
 import { formatCurrency, formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { formatTransferLabel } from '../../lib/transferCheckIn'
+import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState } from '../ui/FormControls'
-import { CheckInPanel } from './CheckInPanel'
 import { TransferCreatePanel } from './TransferCreatePanel'
 
 export function SnapshotsPanel() {
@@ -15,9 +15,8 @@ export function SnapshotsPanel() {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
-  const [checkInOpen, setCheckInOpen] = useState(false)
+  const openEdit = useCheckInUiStore((s) => s.openEdit)
   const [transferOpen, setTransferOpen] = useState(false)
-  const [editingSnapshotId, setEditingSnapshotId] = useState<string | null>(null)
 
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const activeCount = useMemo(() => accounts.filter((a) => !a.archived).length, [accounts])
@@ -41,21 +40,6 @@ export function SnapshotsPanel() {
     return map
   }, [transfers])
 
-  function openCreate() {
-    setEditingSnapshotId(null)
-    setCheckInOpen(true)
-  }
-
-  function openEdit(id: string) {
-    setEditingSnapshotId(id)
-    setCheckInOpen(true)
-  }
-
-  function closeCheckIn() {
-    setCheckInOpen(false)
-    setEditingSnapshotId(null)
-  }
-
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -65,25 +49,20 @@ export function SnapshotsPanel() {
             Остатки по датам и переводы между счетами
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setTransferOpen(true)}
-            disabled={activeCount < 2}
-          >
-            Перевод
-          </Button>
-          <Button type="button" onClick={openCreate}>
-            Чек-ин
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setTransferOpen(true)}
+          disabled={activeCount < 2}
+        >
+          Перевод
+        </Button>
       </div>
 
       {sortedSnapshots.length === 0 ? (
         <EmptyState
           title="Чек-инов пока нет"
-          description="Нажмите «Чек-ин» для остатков или «Перевод» — тогда создастся чек-ин с обновлёнными суммами."
+          description="Нажмите плавающую кнопку «Чек-ин» для остатков или «Перевод» — тогда создастся чек-ин с обновлёнными суммами."
         />
       ) : (
         <Card className="!p-0">
@@ -153,13 +132,11 @@ export function SnapshotsPanel() {
         </Card>
       )}
 
-      <CheckInPanel open={checkInOpen} onClose={closeCheckIn} snapshotId={editingSnapshotId} />
       <TransferCreatePanel
         open={transferOpen}
         onClose={() => setTransferOpen(false)}
         onCreated={(snapshotId) => {
-          setEditingSnapshotId(snapshotId)
-          setCheckInOpen(true)
+          openEdit(snapshotId)
         }}
       />
     </div>

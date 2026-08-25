@@ -19,6 +19,7 @@ import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountSta
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { parseMoneyInput } from '../../lib/moneyInput'
+import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -217,6 +218,14 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setFormOpen(false)
   }
 
+  useRegisterPrimaryAction(formOpen, {
+    id: 'account-form-save',
+    label: 'Сохранить',
+    onClick: () => {
+      void handleSave()
+    },
+  })
+
   function moveAccount(fromId: string, toId: string) {
     if (fromId === toId) return
     const ids = visible.map((a) => a.id)
@@ -315,11 +324,6 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         open={formOpen}
         title={editingId ? 'Счёт' : 'Новый счёт'}
         onClose={() => setFormOpen(false)}
-        headerActions={
-          <Button type="button" onClick={() => void handleSave()}>
-            Сохранить
-          </Button>
-        }
       >
         <div className="space-y-4">
           <Field label="Название">

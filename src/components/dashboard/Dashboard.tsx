@@ -16,13 +16,12 @@ import { formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { buildPeriodReturn } from '../../lib/monthlyReturns'
 import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
 import { usePeriodRange } from '../../lib/usePeriodRange'
+import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { Button } from '../ui/FormControls'
 import { FxModeToggle } from '../ui/FxModeToggle'
 import { PeriodFilter } from '../ui/PeriodFilter'
-import { CheckInPanel } from '../snapshots/CheckInPanel'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
 import { GrowthChart } from './GrowthChart'
@@ -46,7 +45,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const fxMode = useFxModeStore((s) => s.fxMode)
   const { range: selectedRange } = usePeriodRange()
-  const [checkInOpen, setCheckInOpen] = useState(false)
+  const openCreate = useCheckInUiStore((s) => s.openCreate)
   const [chartSeries, setChartSeries] = useState<'growth' | 'netWorth'>('growth')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [intervalDays, setIntervalDays] = useState(readCheckInIntervalDays)
@@ -127,21 +126,12 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
     )
   }, [accounts, snapshots, settings, rateBook, periodReturn])
 
-  function openCheckIn() {
-    setCheckInOpen(true)
-  }
-
   return (
     <div className="mx-auto max-w-5xl space-y-3">
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="min-w-0 truncate text-lg font-semibold text-slate-900 dark:text-slate-200 sm:text-xl">
-            Дашборд
-          </h1>
-          <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={openCheckIn}>
-            Чек-ин
-          </Button>
-        </div>
+        <h1 className="min-w-0 truncate text-lg font-semibold text-slate-900 dark:text-slate-200 sm:text-xl">
+          Дашборд
+        </h1>
         <PeriodFilter showRange />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <FxModeToggle showLabel={false} compact />
@@ -149,7 +139,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         </div>
       </div>
 
-      <CheckInReminderBanner reminder={reminder} onCheckIn={openCheckIn} />
+      <CheckInReminderBanner reminder={reminder} onCheckIn={openCreate} />
 
       <SummaryCards
         total={total}
@@ -199,11 +189,6 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
           )}
         </>
       )}
-
-      <CheckInPanel
-        open={checkInOpen}
-        onClose={() => setCheckInOpen(false)}
-      />
     </div>
   )
 }
@@ -230,14 +215,18 @@ function CheckInReminderBanner({
       : `Последний ${formatDateDisplay(reminder.latestDate)} · интервал ${formatDaysRu(reminder.intervalDays)}`
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/25">
+    <button
+      type="button"
+      onClick={onCheckIn}
+      className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left dark:border-amber-900/50 dark:bg-amber-950/25"
+    >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">{title}</p>
         <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-200/80">{detail}</p>
       </div>
-      <Button type="button" className="shrink-0 !px-3 !py-1.5 text-sm" onClick={onCheckIn}>
-        Чек-ин
-      </Button>
-    </div>
+      <span className="shrink-0 text-xs font-medium text-amber-800 dark:text-amber-300">
+        Открыть →
+      </span>
+    </button>
   )
 }

@@ -6,17 +6,20 @@ import { Sidebar } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { FloatPanel } from './components/float/FloatPanel'
 import { SnapshotsPanel } from './components/snapshots/SnapshotsPanel'
+import { CheckInPanel } from './components/snapshots/CheckInPanel'
 import { AccountTypesPanel } from './components/types/AccountTypesPanel'
 import { CurrenciesPanel } from './components/currencies/CurrenciesPanel'
 import { MonthlyPanel } from './components/monthly/MonthlyPanel'
 import { DailyGrowthPanel } from './components/daily/DailyGrowthPanel'
 import { CashbackPanel } from './components/cashback/CashbackPanel'
 import { EmptyState } from './components/ui/FormControls'
+import { PrimaryFab } from './components/ui/PrimaryFab'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
 import { isAnalyticsSection } from './lib/navSections'
 import { useAppSection } from './lib/useAppSection'
 import { useAuthStore } from './store/authStore'
+import { useCheckInUiStore } from './store/checkInUiStore'
 import { useRatesStore } from './store/ratesStore'
 import { useWalletStore } from './store/walletStore'
 import type { AnalyticsSection, AppSection } from './types/wallet'
@@ -43,6 +46,9 @@ export default function App() {
   const walletLoading = useWalletStore((s) => s.loading)
   const walletError = useWalletStore((s) => s.error)
   const ensureRates = useRatesStore((s) => s.ensureRates)
+  const checkInOpen = useCheckInUiStore((s) => s.open)
+  const checkInSnapshotId = useCheckInUiStore((s) => s.snapshotId)
+  const closeCheckIn = useCheckInUiStore((s) => s.close)
 
   useEffect(() => {
     void initAuth()
@@ -80,6 +86,8 @@ export default function App() {
 
   const clearFocus = useCallback(() => setFocusAccountId(null), [])
 
+  const showApp = Boolean(user && walletLoaded && !walletError)
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -90,7 +98,7 @@ export default function App() {
           onCollapsedChange={setSidebarCollapsed}
         />
         <main
-          className={`min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] transition-[margin] duration-200 sm:p-4 md:p-6 md:pb-6 ${
+          className={`min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] transition-[margin] duration-200 sm:p-4 md:p-6 md:pb-24 ${
             sidebarCollapsed ? 'md:ml-14' : 'md:ml-56'
           }`}
         >
@@ -113,6 +121,16 @@ export default function App() {
             />
           )}
         </main>
+        {showApp && (
+          <>
+            <PrimaryFab />
+            <CheckInPanel
+              open={checkInOpen}
+              onClose={closeCheckIn}
+              snapshotId={checkInSnapshotId}
+            />
+          </>
+        )}
       </div>
     </div>
   )
