@@ -3,6 +3,7 @@ import type { DailyGrowthFxMode } from '../../engine/growthEngine'
 import {
   formatCurrency,
   formatDateDisplay,
+  formatDateWithWeekday,
   formatPercent,
   signedAmount,
 } from '../../lib/format'
@@ -241,9 +242,7 @@ export function DailyBreakdownPanel({
   const [transfersOpen, setTransfersOpen] = useState(false)
 
   const withoutFx = fxMode === 'withoutFx'
-  const title = endDate
-    ? `День ${formatDateDisplay(endDate)}`
-    : 'Расшифровка дня'
+  const title = endDate ? formatDateWithWeekday(endDate) : 'Расшифровка дня'
 
   const quantityGrowth = periodReturn?.quantityEffectBase ?? periodReturn?.growth ?? 0
   const fxEffect = periodReturn?.growthFx?.fxEffectBase ?? 0

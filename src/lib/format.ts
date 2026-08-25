@@ -109,6 +109,17 @@ export function formatDateDisplay(value: string): string {
   return value
 }
 
+/** ISO date → «15.01.2026, понедельник». */
+export function formatDateWithWeekday(value: string): string {
+  if (!value) return '—'
+  if (!ISO_DATE_RE.test(value)) return value
+  const [y, m, d] = value.split('-').map(Number)
+  const date = new Date(y!, m! - 1, d!)
+  if (Number.isNaN(date.getTime())) return formatIsoToRu(value)
+  const weekday = date.toLocaleDateString('ru-RU', { weekday: 'long' })
+  return `${formatIsoToRu(value)}, ${weekday}`
+}
+
 /** ISO datetime (или дата) → «15.01.2026, 14:30». */
 export function formatDateTimeDisplay(value: string): string {
   if (!value) return '—'

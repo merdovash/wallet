@@ -126,7 +126,9 @@ export function GrowthChart({
           </div>
         )}
         {canOpenDay && (
-          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">Нажмите на точку или дату, чтобы открыть итоги.</p>
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+            Нажмите на точку или дату, чтобы открыть итоги и расшифровку дня.
+          </p>
         )}
         <div className="h-64 w-full sm:h-80">
           <ResponsiveContainer width="100%" height="100%">
