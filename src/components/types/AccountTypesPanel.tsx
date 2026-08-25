@@ -179,6 +179,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                     growthColor={growthColor}
                     balanceColor={balanceColor}
                     baseCurrency={report.baseCurrency}
+                    withoutFx={fxMode === 'withoutFx'}
                     accounts={row.accounts}
                   />
                 )
@@ -233,6 +234,7 @@ function TypeGroup({
   growthColor,
   balanceColor,
   baseCurrency,
+  withoutFx,
   accounts,
 }: {
   open: boolean
@@ -248,6 +250,7 @@ function TypeGroup({
   growthColor: string
   balanceColor: string
   baseCurrency: string
+  withoutFx: boolean
   accounts: {
     accountId: string
     name: string
@@ -349,6 +352,9 @@ function TypeGroup({
                 {acc.currency !== baseCurrency && (
                   <div className={`mt-0.5 text-[11px] ${baseTone}`}>
                     ≈ {signedAmount(acc.growthBase, baseCurrency)}
+                    {withoutFx ? (
+                      <span className="font-normal text-slate-400 dark:text-slate-500"> · Δ×курс</span>
+                    ) : null}
                   </div>
                 )}
               </td>

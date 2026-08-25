@@ -252,6 +252,9 @@ function GrowthMovementsView({
               const growthShown = withoutFx
                 ? (qty?.quantityEffectBase ?? acc.growthBase)
                 : acc.growthBase
+              const nativeGrowth = withoutFx
+                ? (qty?.growthNative ?? acc.endBalance - acc.startBalance)
+                : null
               return (
                 <li key={acc.accountId} className="space-y-1.5 px-3 py-2.5">
                   <div className="flex items-start justify-between gap-3">
@@ -275,6 +278,16 @@ function GrowthMovementsView({
                       value={signedAmount(growthShown, currency)}
                       className={tone(growthShown)}
                     />
+                    {withoutFx &&
+                    nativeGrowth != null &&
+                    acc.currency !== currency &&
+                    Number.isFinite(nativeGrowth) ? (
+                      <MovementChip
+                        label="Δ в валюте"
+                        value={signedAmount(nativeGrowth, acc.currency)}
+                        className={tone(nativeGrowth)}
+                      />
+                    ) : null}
                     <MovementChip
                       label="Переводы"
                       value={signedAmount(acc.transfersBase, currency)}

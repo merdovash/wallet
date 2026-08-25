@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState } from 'react'
 import { buildCurrencyReport } from '../../lib/currencyReport'
 import { formatCurrency, signedAmount } from '../../lib/format'
+import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -26,6 +27,8 @@ interface CurrencyReportTableProps {
   allKindsGrowth?: boolean
   /** Column title for growth / FX difference. */
   growthColumnLabel?: string
+  /** Follow dashboard FX toggle (default). Currencies tab can force withFx. */
+  respectFxMode?: boolean
 }
 
 export function CurrencyReportTable({
@@ -35,13 +38,18 @@ export function CurrencyReportTable({
   foreignOnly = false,
   allKindsGrowth = false,
   growthColumnLabel = 'Прирост',
+  respectFxMode = true,
 }: CurrencyReportTableProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
+  const fxMode = useFxModeStore((s) => s.fxMode)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  const effectiveFxMode = respectFxMode ? fxMode : 'withFx'
+  const withoutFx = effectiveFxMode === 'withoutFx'
 
   const report = useMemo(
     () =>
@@ -49,6 +57,7 @@ export function CurrencyReportTable({
         baseCurrencyLast,
         foreignOnly,
         allKindsGrowth,
+        fxMode: effectiveFxMode,
       }),
     [
       accounts,
@@ -59,6 +68,7 @@ export function CurrencyReportTable({
       baseCurrencyLast,
       foreignOnly,
       allKindsGrowth,
+      effectiveFxMode,
     ],
   )
 
@@ -67,6 +77,8 @@ export function CurrencyReportTable({
   }
 
   const totalAccounts = report.rows.reduce((s, r) => s + r.accountCount, 0)
+  const columnLabel =
+    withoutFx && growthColumnLabel === 'Прирост' ? 'Прирост · без курса' : growthColumnLabel
 
   return (
     <Card className="!p-0">
@@ -108,56 +120,59 @@ export function CurrencyReportTable({
                   Доля
                 </th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium tabular-nums sm:px-4 sm:py-3">
-                  {growthColumnLabel}
+                  {columnLabel}
                 </th>
               </tr>
             </thead>
             <tbody>
-            {report.rows.map((row) => {
-              const open = expanded[row.currency]
-              return (
-                <CurrencyGroup
-                  key={row.currency}
-                  open={!!open}
-                  onToggle={() => toggle(row.currency)}
-                  onOpenAccount={onOpenAccount}
-                  currency={row.currency}
-                  label={row.label}
-                  accountCount={row.accountCount}
-                  balance={row.balance}
-                  balanceBase={row.balanceBase}
-                  share={row.share}
-                  growth={row.growth}
-                  growthBase={row.growthBase}
-                  baseCurrency={report.baseCurrency}
-                  accounts={row.accounts}
-                />
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-200">
-              <td className="px-2 py-2 sm:px-4 sm:py-3">
-                <div>Итого</div>
-                <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
-                  {accountCountLabel(totalAccounts)} · 100%
-                </div>
-              </td>
-              <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">{totalAccounts}</td>
-              <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
-                <div className="lg:hidden">
+              {report.rows.map((row) => {
+                const open = expanded[row.currency]
+                return (
+                  <CurrencyGroup
+                    key={row.currency}
+                    open={!!open}
+                    onToggle={() => toggle(row.currency)}
+                    onOpenAccount={onOpenAccount}
+                    currency={row.currency}
+                    label={row.label}
+                    accountCount={row.accountCount}
+                    balance={row.balance}
+                    balanceBase={row.balanceBase}
+                    share={row.share}
+                    growth={row.growth}
+                    growthBase={row.growthBase}
+                    baseCurrency={report.baseCurrency}
+                    withoutFx={withoutFx}
+                    accounts={row.accounts}
+                  />
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 font-semibold text-slate-900 dark:text-slate-200">
+                <td className="px-2 py-2 sm:px-4 sm:py-3">
+                  <div>Итого</div>
+                  <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">
+                    {accountCountLabel(totalAccounts)} · 100%
+                  </div>
+                </td>
+                <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">
+                  {totalAccounts}
+                </td>
+                <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
+                  <div className="lg:hidden">
+                    {formatCurrency(report.grandTotalBase, report.baseCurrency)}
+                  </div>
+                  <div className="hidden text-slate-400 dark:text-slate-500 lg:block">—</div>
+                </td>
+                <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums lg:table-cell">
                   {formatCurrency(report.grandTotalBase, report.baseCurrency)}
-                </div>
-                <div className="hidden text-slate-400 dark:text-slate-500 lg:block">—</div>
-              </td>
-              <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums lg:table-cell">
-                {formatCurrency(report.grandTotalBase, report.baseCurrency)}
-              </td>
-              <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">100%</td>
-              <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
-                {signedAmount(report.grandGrowthBase, report.baseCurrency)}
-              </td>
-            </tr>
+                </td>
+                <td className="hidden whitespace-nowrap px-4 py-3 tabular-nums md:table-cell">100%</td>
+                <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
+                  {signedAmount(report.grandGrowthBase, report.baseCurrency)}
+                </td>
+              </tr>
             </tfoot>
           </table>
         </div>
@@ -185,6 +200,7 @@ function CurrencyGroup({
   growth,
   growthBase,
   baseCurrency,
+  withoutFx,
   accounts,
 }: {
   open: boolean
@@ -199,6 +215,7 @@ function CurrencyGroup({
   growth: number
   growthBase: number
   baseCurrency: string
+  withoutFx: boolean
   accounts: {
     accountId: string
     name: string
@@ -208,6 +225,7 @@ function CurrencyGroup({
     growthBase: number
   }[]
 }) {
+  const showRub = currency !== baseCurrency
   return (
     <>
       <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60">
@@ -217,11 +235,15 @@ function CurrencyGroup({
             onClick={onToggle}
             className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-200"
           >
-            <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
+            <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">
+              {open ? '▾' : '▸'}
+            </span>
             <span className="min-w-0">
               <span className="block truncate">
                 {currency}
-                <span className="ml-1.5 hidden font-normal text-slate-500 dark:text-slate-400 sm:inline">{label}</span>
+                <span className="ml-1.5 hidden font-normal text-slate-500 dark:text-slate-400 sm:inline">
+                  {label}
+                </span>
               </span>
               <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400 md:hidden">
                 {accountCountLabel(accountCount)} · {formatShare(share)}
@@ -234,7 +256,7 @@ function CurrencyGroup({
         </td>
         <td className="truncate px-2 py-2 tabular-nums text-slate-900 dark:text-slate-200 sm:px-4 sm:py-3">
           <div>{formatCurrency(balance, currency)}</div>
-          {currency !== baseCurrency && (
+          {showRub && (
             <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 lg:hidden">
               ≈ {formatCurrency(balanceBase, baseCurrency)}
             </div>
@@ -248,16 +270,22 @@ function CurrencyGroup({
         </td>
         <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-3">
           <div className={growthTone(growth)}>{signedAmount(growth, currency)}</div>
-          {currency !== baseCurrency && (
+          {showRub && (
             <div className={`mt-0.5 text-xs ${growthTone(growthBase)}`}>
               ≈ {signedAmount(growthBase, baseCurrency)}
+              {withoutFx ? (
+                <span className="font-normal text-slate-400 dark:text-slate-500"> · Δ×курс</span>
+              ) : null}
             </div>
           )}
         </td>
       </tr>
       {open &&
         accounts.map((acc) => (
-          <tr key={acc.accountId} className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/80">
+          <tr
+            key={acc.accountId}
+            className="border-b border-slate-50 bg-slate-50 dark:bg-slate-800/80"
+          >
             <td className="px-2 py-2 pl-7 sm:px-4 sm:py-2 sm:pl-10">
               <button
                 type="button"
@@ -270,7 +298,7 @@ function CurrencyGroup({
             <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
             <td className="truncate px-2 py-2 tabular-nums text-slate-700 dark:text-slate-300 sm:px-4 sm:py-2">
               <div>{formatCurrency(acc.balance, currency)}</div>
-              {currency !== baseCurrency && (
+              {showRub && (
                 <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 lg:hidden">
                   ≈ {formatCurrency(acc.balanceBase, baseCurrency)}
                 </div>
@@ -282,9 +310,12 @@ function CurrencyGroup({
             <td className="hidden px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
             <td className="truncate px-2 py-2 tabular-nums sm:px-4 sm:py-2">
               <div className={growthTone(acc.growth)}>{signedAmount(acc.growth, currency)}</div>
-              {currency !== baseCurrency && (
+              {showRub && (
                 <div className={`mt-0.5 text-xs ${growthTone(acc.growthBase)}`}>
                   ≈ {signedAmount(acc.growthBase, baseCurrency)}
+                  {withoutFx ? (
+                    <span className="font-normal text-slate-400 dark:text-slate-500"> · Δ×курс</span>
+                  ) : null}
                 </div>
               )}
             </td>

@@ -3,8 +3,10 @@ import {
   accountGrowth,
   accountGrowthBase,
   balanceOnDate,
+  convertAmount,
   netWorthAmount,
   snapshotDates,
+  type GrowthFxMode,
   type RateBook,
 } from '../engine/growthEngine'
 import { resolvePivotForDate } from './cbrRates'
@@ -56,8 +58,11 @@ export function buildCurrencyReport(
     foreignOnly?: boolean
     /** When true, growth includes operational/cash/credit — not only fund/deposit/investment. */
     allKindsGrowth?: boolean
+    /** withoutFx: growthBase = native growth × end-date rate (no FX revaluation). */
+    fxMode?: GrowthFxMode
   },
 ): CurrencyReport {
+  const fxMode = opts?.fxMode ?? 'withFx'
   const dates = snapshotDates(snapshots)
   const t0 = dates[0] ?? null
   const t1 = dates[dates.length - 1] ?? null
@@ -115,16 +120,25 @@ export function buildCurrencyReport(
       pivot,
     )
     const growthBase = countGrowth
-      ? (accountGrowthBase(
-          account.id,
-          t0!,
-          t1,
-          snapshots,
-          transfers,
-          accounts,
-          settings,
-          rateBook,
-        ) ?? 0)
+      ? fxMode === 'withoutFx'
+        ? convertAmount(
+            growth,
+            account.currency,
+            settings.baseCurrency,
+            settings,
+            t1,
+            rateBook,
+          )
+        : (accountGrowthBase(
+            account.id,
+            t0!,
+            t1,
+            snapshots,
+            transfers,
+            accounts,
+            settings,
+            rateBook,
+          ) ?? 0)
       : 0
 
     const bucket = byCurrency.get(account.currency) ?? {

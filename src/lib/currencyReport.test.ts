@@ -110,6 +110,14 @@ describe('buildCurrencyReport', () => {
     expect(usd.growthBase).toBeCloseTo(80, 4)
     expect(usd.growthBase).toBeGreaterThan(0)
     expect(usd.growth).toBeLessThan(0)
+
+    const withoutFx = buildCurrencyReport(accounts, snapshots, [], settings, rateBook, {
+      fxMode: 'withoutFx',
+    })
+    const usdQty = withoutFx.rows.find((r) => r.currency === 'USD')!
+    expect(usdQty.growth).toBe(-1)
+    // withoutFx: −1 USD × end rate 120 = −120 RUB (FX revaluation excluded)
+    expect(usdQty.growthBase).toBeCloseTo(-120, 4)
   })
 
   it('counts operational foreign accounts when allKindsGrowth', () => {

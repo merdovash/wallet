@@ -129,6 +129,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
         foreignOnly
         allKindsGrowth
         growthColumnLabel="Курсовая разница"
+        respectFxMode={false}
       />
 
       <CurrencyFxBreakdownPanel
