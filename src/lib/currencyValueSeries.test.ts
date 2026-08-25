@@ -75,6 +75,26 @@ describe('buildCurrencyValueSeries', () => {
     expect(currencies).toEqual(['RUB', 'USD'])
   })
 
+  it('orders currencies by latest base balance descending', () => {
+    const accounts = [
+      account({ id: 'u', name: 'USD', currency: 'USD' }),
+      account({ id: 'e', name: 'EUR', currency: 'EUR' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'u', amount: 5 },
+          { accountId: 'e', amount: 20 },
+        ],
+      },
+    ]
+
+    const { currencies } = buildCurrencyValueSeries(accounts, snapshots, settings)
+    expect(currencies).toEqual(['EUR', 'USD'])
+  })
+
   it('tracks foreign credit cards as negative debt, not available limit', () => {
     const accounts = [
       account({

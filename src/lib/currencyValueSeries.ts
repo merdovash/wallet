@@ -242,22 +242,22 @@ export function buildCurrencyValueSeries(
     return date >= opts.range.startDate && date <= opts.range.endDate
   })
   const active = accounts.filter((a) => !a.archived)
-  const currencies = [
+  const currencySet = [
     ...new Set(
       active
         .map((a) => a.currency)
         .filter((c) => (foreignOnly ? c !== settings.baseCurrency : true)),
     ),
-  ].sort((a, b) => a.localeCompare(b))
+  ]
 
-  if (dates.length === 0 || currencies.length === 0) {
-    return { currencies, points: [] }
+  if (dates.length === 0 || currencySet.length === 0) {
+    return { currencies: currencySet.sort((a, b) => a.localeCompare(b)), points: [] }
   }
 
   const points: CurrencyValuePoint[] = dates.map((date) => {
     const pivot = pivotForDate(date, settings, rateBook)
     const values: Record<string, number> = {}
-    for (const currency of currencies) {
+    for (const currency of currencySet) {
       let sum = 0
       for (const account of active) {
         if (account.currency !== currency) continue
@@ -276,6 +276,11 @@ export function buildCurrencyValueSeries(
     }
     return { date, values }
   })
+
+  const last = points[points.length - 1]
+  const currencies = [...currencySet].sort(
+    (a, b) => (last?.values[b] ?? 0) - (last?.values[a] ?? 0) || a.localeCompare(b),
+  )
 
   return { currencies, points }
 }

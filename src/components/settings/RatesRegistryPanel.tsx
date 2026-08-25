@@ -7,8 +7,6 @@ import { Button, DateInput, Field } from '../ui/FormControls'
 import { StackPanel } from '../ui/StackPanel'
 import { VirtualList } from '../ui/VirtualList'
 
-const PRIORITY_CODES = ['USD', 'EUR', 'USDT', 'CNY', 'GBP', 'BYN', 'AMD', 'GEL', 'THB']
-
 const ROW_HEIGHT = 48
 const LIST_MAX_HEIGHT = 420
 
@@ -17,38 +15,13 @@ interface RatesRegistryPanelProps {
   onClose: () => void
   byDate: Record<string, Record<string, number>>
   baseCurrency: string
+  /** Wallet currencies only, already sorted by current balance. */
   currenciesInUse: string[]
 }
 
-function significantCodes(
-  byDate: Record<string, Record<string, number>>,
-  baseCurrency: string,
-  currenciesInUse: string[],
-): string[] {
-  const present = new Set<string>()
-  for (const pivot of Object.values(byDate)) {
-    for (const code of Object.keys(pivot)) present.add(code)
-  }
-
-  const preferred = [...currenciesInUse, ...PRIORITY_CODES].filter(
-    (code, index, arr) => arr.indexOf(code) === index,
-  )
-
-  const ordered = preferred.filter(
-    (code) => code !== 'RUB' && code !== baseCurrency && present.has(code),
-  )
-
-  for (const [alias, target] of Object.entries(CURRENCY_ALIASES)) {
-    if (
-      alias !== baseCurrency &&
-      !ordered.includes(alias) &&
-      (present.has(alias) || present.has(target))
-    ) {
-      ordered.push(alias)
-    }
-  }
-
-  return ordered
+/** Columns: foreign wallet currencies in the order passed (by balance). */
+function significantCodes(baseCurrency: string, currenciesInUse: string[]): string[] {
+  return currenciesInUse.filter((code) => code !== 'RUB' && code !== baseCurrency)
 }
 
 function rateInBase(
@@ -83,8 +56,8 @@ export function RatesRegistryPanel({
 
   const dates = useMemo(() => Object.keys(byDate).sort().reverse(), [byDate])
   const columns = useMemo(
-    () => significantCodes(byDate, baseCurrency, currenciesInUse),
-    [byDate, baseCurrency, currenciesInUse],
+    () => significantCodes(baseCurrency, currenciesInUse),
+    [baseCurrency, currenciesInUse],
   )
 
   async function handleLoadDate() {

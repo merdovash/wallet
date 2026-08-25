@@ -7,6 +7,7 @@ import {
   writeCheckInIntervalDays,
 } from '../../lib/checkInReminder'
 import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
+import { currenciesWithWalletsByBalance } from '../../lib/currenciesWithWallets'
 import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
 import {
   formatInflationPercentInput,
@@ -22,6 +23,7 @@ import { RatesRegistryPanel } from './RatesRegistryPanel'
 export function SettingsPanel() {
   const settings = useWalletStore((s) => s.settings)
   const accounts = useWalletStore((s) => s.accounts)
+  const snapshots = useWalletStore((s) => s.snapshots)
   const setSettings = useWalletStore((s) => s.setSettings)
   const { mode: themeMode, setMode: setThemeMode } = useTheme()
   const byDate = useRatesStore((s) => s.byDate)
@@ -53,11 +55,10 @@ export function SettingsPanel() {
   const rateDates = useMemo(() => Object.keys(byDate).sort().reverse(), [byDate])
   const effectiveRateDate = latestRateDate ?? rateDates[0] ?? null
 
-  const currenciesInUse = useMemo(() => {
-    const set = new Set<string>([settings.baseCurrency])
-    for (const account of accounts) set.add(account.currency)
-    return [...set].sort()
-  }, [accounts, settings.baseCurrency])
+  const currenciesInUse = useMemo(
+    () => currenciesWithWalletsByBalance(accounts, snapshots, settings, byDate),
+    [accounts, snapshots, settings, byDate],
+  )
 
   useEffect(() => {
     void ensureRates([today])
