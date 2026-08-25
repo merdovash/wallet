@@ -63,7 +63,11 @@ export interface AccountTypeReport {
   baseCurrency: string
   grandTotalBase: number
   grandGrowthBase: number
-  /** Relative growth of investments versus all money at start (ex-top-ups). */
+  /** Growth ÷ invest accounts (fund/deposit/investment) at start. */
+  growthPctInvest: number | null
+  /** Growth ÷ all money at start (ex-top-ups in numerator). */
+  growthPctOfAllMass: number | null
+  /** @deprecated use growthPctOfAllMass — kept as alias for older call sites */
   growthPct: number | null
   annualizedPct: number | null
   rows: AccountTypeReportRow[]
@@ -127,6 +131,8 @@ function emptyReport(
     baseCurrency,
     grandTotalBase: 0,
     grandGrowthBase: 0,
+    growthPctInvest: null,
+    growthPctOfAllMass: null,
     growthPct: null,
     annualizedPct: null,
     rows: [],
@@ -292,11 +298,14 @@ export function buildAccountTypeReport(
 
   const growthRows = rows.filter((r) => isGrowthKind(r.kind))
   const growthAmount = growthRows.reduce((s, r) => s + r.growthBase, 0)
+  const investStart = growthRows.reduce((s, r) => s + r.startBalanceBase, 0)
   const allMassStart = [...byKind.values()].reduce((s, r) => s + r.startBalanceBase, 0)
-  const growthPct =
+  const growthPctInvest =
+    t0 != null && t0 !== t1 ? pctOfAllMass(growthAmount, investStart) : null
+  const growthPctOfAllMass =
     t0 != null && t0 !== t1 ? pctOfAllMass(growthAmount, allMassStart) : null
   const annualizedPct =
-    growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
+    growthPctInvest == null || days <= 0 ? null : annualizePeriodReturn(growthPctInvest, days)
 
   return {
     asOfDate: t1,
@@ -305,7 +314,9 @@ export function buildAccountTypeReport(
     baseCurrency: settings.baseCurrency,
     grandTotalBase,
     grandGrowthBase,
-    growthPct,
+    growthPctInvest,
+    growthPctOfAllMass,
+    growthPct: growthPctOfAllMass,
     annualizedPct,
     rows,
   }

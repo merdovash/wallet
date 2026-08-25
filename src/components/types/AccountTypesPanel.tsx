@@ -89,16 +89,13 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
             >
               {signedAmount(report.grandGrowthBase, report.baseCurrency)}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">фонд · вклад · инвестиции</p>
-          </Card>
-          <Card className="!p-2.5 sm:!p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост %</p>
-            <p
-              className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.growthPct)}`}
-            >
-              {formatPercent(report.growthPct)}
+            <p className={`mt-1 text-[10px] font-semibold tabular-nums ${pctTone(report.growthPctInvest)}`}>
+              {formatPercent(report.growthPctInvest)}
+              <span className="font-normal text-slate-500 dark:text-slate-400"> инвест</span>
+              {' · '}
+              {formatPercent(report.growthPctOfAllMass)}
+              <span className="font-normal text-slate-500 dark:text-slate-400"> от всего</span>
             </p>
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">от всей массы · без пополнений</p>
           </Card>
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
@@ -108,7 +105,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
               {formatPercent(report.annualizedPct)}
             </p>
             <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-              {report.days > 0 ? `${report.days} дн.` : '—'}
+              {report.days > 0 ? `${report.days} дн. · от инвест` : '—'}
             </p>
           </Card>
         </div>

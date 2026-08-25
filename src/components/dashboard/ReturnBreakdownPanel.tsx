@@ -11,7 +11,7 @@ import type {
   PeriodReturnSummary,
   PeriodReturnTransferLine,
 } from '../../lib/monthlyReturns'
-import { annualizePeriodReturn, pctOfAllMass } from '../../lib/monthlyReturns'
+import { pctOfAllMass } from '../../lib/monthlyReturns'
 import { StackPanel } from '../ui/StackPanel'
 import { fxModeLabel } from '../ui/FxModeToggle'
 
@@ -19,7 +19,6 @@ export type ReturnBreakdownFocus =
   | 'growth'
   | 'growthPct'
   | 'annualizedPct'
-  | 'annualizedPctOfAllMass'
   | 'topUp'
   | null
 
@@ -52,17 +51,15 @@ export function ReturnBreakdownPanel({
   const withoutFx = fxMode === 'withoutFx'
   const title =
     titleOverride ??
-    (focus === 'annualizedPctOfAllMass'
-      ? 'Расчёт: годовых от всей массы'
-      : focus === 'annualizedPct'
-        ? 'Расчёт: в годовых'
-        : focus === 'growth'
-          ? withoutFx
-            ? 'Расшифровка: прирост без курса'
-            : 'Расшифровка: прирост'
-          : focus === 'topUp'
-            ? 'Расшифровка: чистый поток'
-            : 'Расчёт: прирост %')
+    (focus === 'annualizedPct'
+      ? 'Расчёт: в годовых'
+      : focus === 'growth'
+        ? withoutFx
+          ? 'Расшифровка: прирост без курса'
+          : 'Расшифровка: прирост'
+        : focus === 'topUp'
+          ? 'Расшифровка: чистый поток'
+          : 'Расчёт: прирост %')
 
   const includedSorted = periodReturn
     ? [...periodReturn.includedAccounts].sort((a, b) => {
@@ -126,7 +123,9 @@ function GrowthMovementsView({
   const displayGrowth = withoutFx
     ? (periodReturn.quantityEffectBase ?? periodReturn.growth)
     : periodReturn.growth
-  const displayPct = withoutFx
+  const investPct = pctOfAllMass(displayGrowth, periodReturn.startTotal)
+  const allMassPct = pctOfAllMass(displayGrowth, periodReturn.startTotalAllMass)
+  const dietzPct = withoutFx
     ? (periodReturn.quantityEffectPct ?? periodReturn.growthPct)
     : periodReturn.growthPct
   const totalGrowth = accounts.reduce((s, a) => {
@@ -176,26 +175,24 @@ function GrowthMovementsView({
           emphasize
         />
         <Row
-          label="Прирост %"
-          value={formatPercent(displayPct)}
-          valueClassName={tone(displayPct ?? 0)}
-          hint="Modified Dietz"
+          label="Прирост % от инвест"
+          value={formatPercent(investPct)}
+          valueClassName={tone(investPct ?? 0)}
+          hint={`прирост ÷ инвест-счета на начало (${formatCurrency(periodReturn.startTotal, currency)})`}
           emphasize
         />
         <Row
-          label="Относительный к общей массе"
-          value={formatPercent(
-            withoutFx && periodReturn.startTotalAllMass
-              ? displayGrowth / periodReturn.startTotalAllMass
-              : periodReturn.growthPctOfAllMass,
-            3,
-          )}
-          valueClassName={tone(
-            (withoutFx && periodReturn.startTotalAllMass
-              ? displayGrowth / periodReturn.startTotalAllMass
-              : periodReturn.growthPctOfAllMass) ?? 0,
-          )}
-          hint={`прирост инвестиций без пополнений ÷ вся сумма денег (${formatCurrency(periodReturn.startTotalAllMass, currency)})`}
+          label="Прирост % от всего"
+          value={formatPercent(allMassPct)}
+          valueClassName={tone(allMassPct ?? 0)}
+          hint={`прирост ÷ весь остаток на начало (${formatCurrency(periodReturn.startTotalAllMass, currency)})`}
+          emphasize
+        />
+        <Row
+          label="Modified Dietz %"
+          value={formatPercent(dietzPct)}
+          valueClassName={tone(dietzPct ?? 0)}
+          hint="с учётом взвешенных пополнений"
         />
         {!withoutFx ? (
           <Row
@@ -440,10 +437,8 @@ function PercentBreakdownView({
   const displayPct = withoutFx
     ? (periodReturn.quantityEffectPct ?? periodReturn.growthPct)
     : periodReturn.growthPct
-  const showAllMass = focus === 'annualizedPctOfAllMass'
+  const investPct = pctOfAllMass(displayGrowth, periodReturn.startTotal)
   const allMassPct = pctOfAllMass(displayGrowth, periodReturn.startTotalAllMass)
-  const allMassAnnualized =
-    allMassPct == null ? null : annualizePeriodReturn(allMassPct, periodReturn.days)
   const boundaryTransfers = periodReturn.transferMovements.filter((t) => t.crossesGrowthBoundary)
   const [transfersOpen, setTransfersOpen] = useState(false)
   const canOpenTransfers = focus === 'topUp' && boundaryTransfers.length > 0
@@ -458,14 +453,11 @@ function PercentBreakdownView({
         }`}
       >
         <p className="font-semibold">
-          {showAllMass ? 'Годовых от всей массы' : 'Обычный процент прироста'}
-          {' · '}
-          {fxModeLabel(fxMode)}
+          Процент прироста · {fxModeLabel(fxMode)}
         </p>
         <p className="mt-1">
-          {showAllMass
-            ? `Числитель — только прирост фонда / вклада / инвестиций (${periodReturn.accountCount} сч.), без пополнений. Знаменатель — вся сумма денег на начало, не только инвестиции.`
-            : `Считается только от фондов, вкладов и инвестиций — ${periodReturn.accountCount} счёт(а). Наличка, оперативные и кредитки в капитал и процент не входят.`}
+          Числитель — прирост фонда / вклада / инвестиций ({periodReturn.accountCount} сч.), без
+          пополнений. Два знаменателя: сумма инвест-счетов и весь остаток на начало.
         </p>
         <p className="mt-1">
           {withoutFx
@@ -481,9 +473,14 @@ function PercentBreakdownView({
         />
         <Row label="Дней" value={String(periodReturn.days)} />
         <Row
-          label="Капитал портфеля на начало"
+          label="Инвест-счета на начало"
           value={formatCurrency(periodReturn.startTotal, currency)}
-          hint="только фонды, вклады и инвестиции"
+          hint="фонды, вклады и инвестиции"
+        />
+        <Row
+          label="Весь остаток на начало"
+          value={formatCurrency(periodReturn.startTotalAllMass, currency)}
+          hint="все счета, включая оперативные / наличку / кредит"
         />
         <Row
           label="Капитал портфеля на конец"
@@ -493,104 +490,73 @@ function PercentBreakdownView({
           label="Чистый поток"
           value={signedAmount(periodReturn.netFlow, currency)}
           hint={
-            showAllMass
-              ? 'пополнения в числитель доходности от массы не входят'
-              : canOpenTransfers
-                ? 'нажмите сумму, чтобы открыть список переводов'
-                : 'переводы в/из портфеля роста (доход/расход не входят)'
+            canOpenTransfers
+              ? 'нажмите сумму, чтобы открыть список переводов'
+              : 'переводы в/из портфеля роста (доход/расход не входят)'
           }
           emphasize={focus === 'topUp'}
           onValueClick={canOpenTransfers ? () => setTransfersOpen((v) => !v) : undefined}
           valueOpen={transfersOpen}
         />
-        {!showAllMass ? (
-          <Row
-            label="Взвешенный капитал"
-            value={formatCurrency(periodReturn.weightedCapital, currency)}
-            hint="начало + потоки × доля оставшихся дней"
-          />
-        ) : null}
+        <Row
+          label="Взвешенный капитал"
+          value={formatCurrency(periodReturn.weightedCapital, currency)}
+          hint="начало + потоки × доля оставшихся дней"
+        />
         <Row
           label="Прирост"
           value={signedAmount(displayGrowth, currency)}
-          hint={
-            showAllMass
-              ? 'фонд / вклад / инвестиции: конец − начало − пополнения'
-              : withoutFx
-                ? 'Σ (дельта × курс дня)'
-                : 'конец − начало − поток'
-          }
+          hint={withoutFx ? 'Σ (дельта × курс дня)' : 'конец − начало − поток'}
         />
-        {!showAllMass ? (
-          <>
-            <Row
-              label="Прирост %"
-              value={formatPercent(displayPct)}
-              hint="прирост ÷ взвешенный капитал портфеля (Modified Dietz)"
-              emphasize={focus === 'growthPct'}
-            />
-            <Row
-              label="TWR"
-              value={formatPercent(periodReturn.twrPct)}
-              hint="∏(1+rᵢ)−1 по под-периодам между чек-инами"
-              emphasize={focus === 'growthPct'}
-            />
-            <Row
-              label="В годовых"
-              value={formatPercent(periodReturn.annualizedPct)}
-              hint={
-                periodReturn.days > 0
-                  ? `(1 + прирост%) ^ (365 ÷ ${periodReturn.days}) − 1`
-                  : undefined
-              }
-              emphasize={focus === 'annualizedPct'}
-            />
-            <Row
-              label="TWR, в годовых"
-              value={formatPercent(periodReturn.twrAnnualizedPct)}
-              hint={
-                periodReturn.days > 0
-                  ? `(1 + TWR) ^ (365 ÷ ${periodReturn.days}) − 1`
-                  : undefined
-              }
-              emphasize={focus === 'annualizedPct'}
-            />
-          </>
-        ) : (
-          <>
-            <Row
-              label="Вся масса на начало"
-              value={formatCurrency(periodReturn.startTotalAllMass, currency)}
-              hint="все счета, включая оперативные / наличку / кредит"
-            />
-            <Row
-              label="Прирост % от массы"
-              value={formatPercent(allMassPct)}
-              hint="прирост инвестиций (без пополнений) ÷ вся сумма денег"
-              emphasize
-            />
-            <Row
-              label="Годовых от массы"
-              value={formatPercent(allMassAnnualized)}
-              hint={
-                periodReturn.days > 0
-                  ? `(1 + прирост%_от_массы) ^ (365 ÷ ${periodReturn.days}) − 1`
-                  : undefined
-              }
-              emphasize
-            />
-          </>
-        )}
+        <Row
+          label="Прирост % от инвест"
+          value={formatPercent(investPct)}
+          hint="прирост ÷ инвест-счета на начало"
+          emphasize={focus === 'growthPct'}
+        />
+        <Row
+          label="Прирост % от всего"
+          value={formatPercent(allMassPct)}
+          hint="прирост ÷ весь остаток на начало"
+          emphasize={focus === 'growthPct'}
+        />
+        <Row
+          label="Modified Dietz %"
+          value={formatPercent(displayPct)}
+          hint="прирост ÷ взвешенный капитал портфеля"
+          emphasize={focus === 'growthPct'}
+        />
+        <Row
+          label="TWR"
+          value={formatPercent(periodReturn.twrPct)}
+          hint="∏(1+rᵢ)−1 по под-периодам между чек-инами"
+          emphasize={focus === 'growthPct'}
+        />
+        <Row
+          label="В годовых"
+          value={formatPercent(periodReturn.annualizedPct)}
+          hint={
+            periodReturn.days > 0
+              ? `(1 + Dietz%) ^ (365 ÷ ${periodReturn.days}) − 1`
+              : undefined
+          }
+          emphasize={focus === 'annualizedPct'}
+        />
+        <Row
+          label="TWR, в годовых"
+          value={formatPercent(periodReturn.twrAnnualizedPct)}
+          hint={
+            periodReturn.days > 0
+              ? `(1 + TWR) ^ (365 ÷ ${periodReturn.days}) − 1`
+              : undefined
+          }
+          emphasize={focus === 'annualizedPct'}
+        />
       </dl>
 
-      {(focus === 'annualizedPct' || focus === 'annualizedPctOfAllMass') &&
-      periodReturn.benchmarks ? (
+      {focus === 'annualizedPct' && periodReturn.benchmarks ? (
         <BenchmarksSection
-          portfolioAnnualizedPct={
-            focus === 'annualizedPctOfAllMass'
-              ? allMassAnnualized
-              : periodReturn.annualizedPct
-          }
+          portfolioAnnualizedPct={periodReturn.annualizedPct}
           benchmarks={periodReturn.benchmarks}
           days={periodReturn.days}
         />
@@ -678,16 +644,6 @@ function PercentBreakdownView({
           lines={[
             'Сначала считается прирост% за период только по фондам/вкладам/инвестициям (Modified Dietz).',
             `годовых = (1 + прирост%)^(365/${periodReturn.days || 'N'}) − 1`,
-          ]}
-        />
-      )}
-      {focus === 'annualizedPctOfAllMass' && (
-        <FormulaBlock
-          title="Формула годовых от массы"
-          lines={[
-            'прирост = прирост фонда / вклада / инвестиций без пополнений',
-            'прирост%_от_массы = прирост ÷ вся_сумма_денег_на_начало',
-            `годовых_от_массы = (1 + прирост%_от_массы)^(365/${periodReturn.days || 'N'}) − 1.`,
           ]}
         />
       )}

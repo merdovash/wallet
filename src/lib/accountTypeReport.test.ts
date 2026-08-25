@@ -95,6 +95,8 @@ describe('buildAccountTypeReport', () => {
     expect(dep?.growthBase).toBe(500)
     expect(dep?.growthPct).toBeCloseTo(0.01, 8)
     expect(report.growthPct).toBeCloseTo(0.01, 8)
+    expect(report.growthPctInvest).toBeCloseTo(0.01, 8)
+    expect(report.growthPctOfAllMass).toBeCloseTo(0.01, 8)
     expect(report.annualizedPct).not.toBeNull()
   })
 
@@ -133,6 +135,8 @@ describe('buildAccountTypeReport', () => {
     const report = buildAccountTypeReport(accounts, snapshots, transfers, settings)
     expect(report.grandGrowthBase).toBeCloseTo(1_000, 4)
     expect(report.rows.find((r) => r.kind === 'fund')?.growthPct).toBeCloseTo(1_000 / 125_000, 8)
+    expect(report.growthPctInvest).toBeCloseTo(1_000 / 100_000, 8)
+    expect(report.growthPctOfAllMass).toBeCloseTo(1_000 / 500_000, 8)
     expect(report.growthPct).toBeCloseTo(1_000 / 500_000, 8)
   })
 

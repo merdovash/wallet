@@ -1,9 +1,7 @@
 ﻿import { useState } from 'react'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import {
-  annualizePeriodReturn,
   explainAnnualizedPct,
-  explainAnnualizedPctOfAllMass,
   explainRealAnnualizedPct,
   pctOfAllMass,
   type PeriodReturnSummary,
@@ -21,13 +19,7 @@ interface SummaryCardsProps {
   annualInflationPct?: number | null
 }
 
-type BreakdownFocus =
-  | 'growth'
-  | 'growthPct'
-  | 'annualizedPct'
-  | 'annualizedPctOfAllMass'
-  | 'topUp'
-  | null
+type BreakdownFocus = 'growth' | 'growthPct' | 'annualizedPct' | 'topUp' | null
 
 const cardClass = '!p-2'
 const labelClass = 'text-[10px] leading-tight text-slate-500 dark:text-slate-400'
@@ -47,9 +39,15 @@ export function SummaryCards({
   const displayGrowth = withoutFx
     ? (periodReturn?.quantityEffectBase ?? growth)
     : growth
-  const displayGrowthPct = withoutFx
-    ? (periodReturn?.quantityEffectPct ?? null)
-    : (periodReturn?.growthPct ?? null)
+
+  /** Прирост ÷ сумма инвест-счетов (фонд/вклад/инвестиции) на начало периода. */
+  const investPct =
+    periodReturn != null ? pctOfAllMass(displayGrowth, periodReturn.startTotal) : null
+  /** Прирост ÷ весь остаток на начало периода. */
+  const allMassPct =
+    periodReturn != null
+      ? pctOfAllMass(displayGrowth, periodReturn.startTotalAllMass)
+      : null
 
   const growthColor =
     displayGrowth > 0
@@ -65,26 +63,13 @@ export function SummaryCards({
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
   const pctColor =
-    (displayGrowthPct ?? 0) > 0
+    (investPct ?? 0) > 0
       ? 'text-emerald-700 dark:text-emerald-400'
-      : (displayGrowthPct ?? 0) < 0
+      : (investPct ?? 0) < 0
         ? 'text-red-600'
         : 'text-slate-800 dark:text-slate-200'
 
-  const allMassPeriodPct =
-    periodReturn != null ? pctOfAllMass(displayGrowth, periodReturn.startTotalAllMass) : null
-  const allMassAnnualized =
-    allMassPeriodPct == null || periodReturn == null
-      ? null
-      : annualizePeriodReturn(allMassPeriodPct, periodReturn.days)
   const realAnnualized = periodReturn?.realAnnualizedPct
-  const allMassColor =
-    (allMassAnnualized ?? 0) > 0
-      ? 'text-emerald-700 dark:text-emerald-400'
-      : (allMassAnnualized ?? 0) < 0
-        ? 'text-red-600'
-        : 'text-slate-800 dark:text-slate-200'
-
   const realColor =
     (realAnnualized ?? 0) > 0
       ? 'text-emerald-700 dark:text-emerald-400'
@@ -93,8 +78,6 @@ export function SummaryCards({
         : 'text-slate-800 dark:text-slate-200'
 
   const annualizedReason = explainAnnualizedPct(periodReturn)
-  const allMassReason =
-    allMassAnnualized != null ? null : explainAnnualizedPctOfAllMass(periodReturn)
   const realReason = explainRealAnnualizedPct(periodReturn, annualInflationPct)
 
   const clickCardClass =
@@ -116,7 +99,11 @@ export function SummaryCards({
             </p>
             <p className={`${valueClass} ${growthColor}`}>{signedAmount(displayGrowth, currency)}</p>
             <p className={`mt-0.5 text-[10px] font-semibold tabular-nums leading-tight ${pctColor}`}>
-              {formatPercent(displayGrowthPct)}
+              {formatPercent(investPct)}
+              <span className="font-normal text-slate-500 dark:text-slate-400"> инвест</span>
+              {' · '}
+              {formatPercent(allMassPct)}
+              <span className="font-normal text-slate-500 dark:text-slate-400"> от всего</span>
             </p>
           </Card>
         </button>
@@ -139,22 +126,7 @@ export function SummaryCards({
             />
           </Card>
         </button>
-        <button
-          type="button"
-          onClick={() => setBreakdownFocus('annualizedPctOfAllMass')}
-          className={clickCardClass}
-        >
-          <Card className={cardClass}>
-            <p className={labelClass}>Годовых от массы</p>
-            <AnnualizedMetric
-              value={allMassAnnualized}
-              unavailableReason={allMassReason}
-              valueClassName={allMassColor}
-              compact
-            />
-          </Card>
-        </button>
-        <Card className={cardClass}>
+        <Card className={`${cardClass} col-span-2`}>
           <p className={labelClass}>Реальных годовых</p>
           <AnnualizedMetric
             value={realAnnualized}
