@@ -24,6 +24,33 @@ interface DayTotalsPanelProps {
   accountId?: string | null
 }
 
+function pivotForDate(
+  date: string,
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): Record<string, number> | null {
+  return (
+    (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
+    (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+  )
+}
+
+function toBaseOnDate(
+  amount: number,
+  currency: string,
+  date: string,
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  return toBase(
+    amount,
+    currency,
+    settings.baseCurrency,
+    settings.exchangeRates,
+    pivotForDate(date, settings, rateBook),
+  )
+}
+
 export function DayTotalsPanel({
   open,
   date,
@@ -36,10 +63,12 @@ export function DayTotalsPanel({
   series,
   accountId,
 }: DayTotalsPanelProps) {
-  const point = useMemo(
-    () => (date ? series.find((p) => p.date === date) : undefined),
+  const pointIndex = useMemo(
+    () => (date ? series.findIndex((p) => p.date === date) : -1),
     [date, series],
   )
+  const point = pointIndex >= 0 ? series[pointIndex] : undefined
+  const prevPoint = pointIndex > 0 ? series[pointIndex - 1] : undefined
 
   const snapshot = useMemo(
     () => (date ? snapshots.find((s) => s.date === date) : undefined),
@@ -53,9 +82,7 @@ export function DayTotalsPanel({
 
   const accountRows = useMemo(() => {
     if (!date || mode !== 'total') return []
-    const pivot =
-      (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
-      (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+    const pivot = pivotForDate(date, settings, rateBook)
     return accounts
       .filter((a) => !a.archived && isGrowthAccount(a))
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
@@ -81,7 +108,39 @@ export function DayTotalsPanel({
 
   const detailAccount = accountId ? accounts.find((a) => a.id === accountId) : null
   const accountPoint = point as AccountPoint | undefined
+  const prevAccountPoint = prevPoint as AccountPoint | undefined
   const totalPoint = point as TotalPoint | undefined
+  const prevTotalPoint = prevPoint as TotalPoint | undefined
+
+  const accountDayGrowth = useMemo(() => {
+    if (mode !== 'account' || !accountPoint) return null
+    if (!prevAccountPoint) return accountPoint.growth
+    return accountPoint.growth - prevAccountPoint.growth
+  }, [mode, accountPoint, prevAccountPoint])
+
+  const totalDayGrowth = useMemo(() => {
+    if (mode !== 'total' || !totalPoint) return null
+    if (!prevTotalPoint) return totalPoint.growth
+    return totalPoint.growth - prevTotalPoint.growth
+  }, [mode, totalPoint, prevTotalPoint])
+
+  const accountCurrency = detailAccount?.currency ?? settings.baseCurrency
+  const showAccountBase = Boolean(
+    date && detailAccount && detailAccount.currency !== settings.baseCurrency,
+  )
+
+  const accountBalanceBase =
+    date && accountPoint && showAccountBase
+      ? toBaseOnDate(accountPoint.balance, accountCurrency, date, settings, rateBook)
+      : null
+  const accountGrowthBase =
+    date && accountPoint && showAccountBase
+      ? toBaseOnDate(accountPoint.growth, accountCurrency, date, settings, rateBook)
+      : null
+  const accountDayGrowthBase =
+    date && accountDayGrowth != null && showAccountBase
+      ? toBaseOnDate(accountDayGrowth, accountCurrency, date, settings, rateBook)
+      : null
 
   return (
     <StackPanel
@@ -108,6 +167,18 @@ export function DayTotalsPanel({
                         ? 'down'
                         : 'neutral'
                   }
+                />
+                <Stat
+                  label="Прирост за день"
+                  value={signedAmount(totalDayGrowth ?? 0, settings.baseCurrency)}
+                  tone={
+                    (totalDayGrowth ?? 0) > 0
+                      ? 'up'
+                      : (totalDayGrowth ?? 0) < 0
+                        ? 'down'
+                        : 'neutral'
+                  }
+                  hint={prevTotalPoint ? undefined : 'с первого чек-ина'}
                 />
                 <Stat
                   label="Доход за день"
@@ -158,23 +229,44 @@ export function DayTotalsPanel({
             <div className="grid gap-3 sm:grid-cols-2">
               <Stat
                 label="Остаток"
-                value={formatCurrency(
-                  accountPoint?.balance ?? 0,
-                  detailAccount?.currency ?? settings.baseCurrency,
-                )}
+                value={formatCurrency(accountPoint?.balance ?? 0, accountCurrency)}
+                subValue={
+                  accountBalanceBase != null && Number.isFinite(accountBalanceBase)
+                    ? `≈ ${formatCurrency(accountBalanceBase, settings.baseCurrency)}`
+                    : undefined
+                }
               />
               <Stat
-                label="Прирост (без переводов)"
-                value={signedAmount(
-                  accountPoint?.growth ?? 0,
-                  detailAccount?.currency ?? settings.baseCurrency,
-                )}
+                label="Прирост за день"
+                value={signedAmount(accountDayGrowth ?? 0, accountCurrency)}
+                tone={
+                  (accountDayGrowth ?? 0) > 0
+                    ? 'up'
+                    : (accountDayGrowth ?? 0) < 0
+                      ? 'down'
+                      : 'neutral'
+                }
+                subValue={
+                  accountDayGrowthBase != null && Number.isFinite(accountDayGrowthBase)
+                    ? `≈ ${signedAmount(accountDayGrowthBase, settings.baseCurrency)}`
+                    : undefined
+                }
+                hint={prevAccountPoint ? undefined : 'с первого чек-ина'}
+              />
+              <Stat
+                label="Прирост с начала (без переводов)"
+                value={signedAmount(accountPoint?.growth ?? 0, accountCurrency)}
                 tone={
                   (accountPoint?.growth ?? 0) > 0
                     ? 'up'
                     : (accountPoint?.growth ?? 0) < 0
                       ? 'down'
                       : 'neutral'
+                }
+                subValue={
+                  accountGrowthBase != null && Number.isFinite(accountGrowthBase)
+                    ? `≈ ${signedAmount(accountGrowthBase, settings.baseCurrency)}`
+                    : undefined
                 }
               />
             </div>
@@ -188,18 +280,32 @@ export function DayTotalsPanel({
 function Stat({
   label,
   value,
+  subValue,
+  hint,
   tone = 'neutral',
 }: {
   label: string
   value: string
+  subValue?: string
+  hint?: string
   tone?: 'up' | 'down' | 'neutral'
 }) {
   const toneCls =
-    tone === 'up' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'down' ? 'text-red-600' : 'text-slate-900 dark:text-slate-200'
+    tone === 'up'
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : tone === 'down'
+        ? 'text-red-600'
+        : 'text-slate-900 dark:text-slate-200'
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2">
-      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        {label}
+        {hint ? <span className="font-normal"> · {hint}</span> : null}
+      </p>
       <p className={`mt-0.5 text-base font-semibold tabular-nums ${toneCls}`}>{value}</p>
+      {subValue ? (
+        <p className="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{subValue}</p>
+      ) : null}
     </div>
   )
 }

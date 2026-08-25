@@ -9,15 +9,17 @@
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { creditDebt } from '../../engine/creditFloatEngine'
-import { balanceOnDate, buildAccountSeries, snapshotDates } from '../../engine/growthEngine'
-import { ACCOUNT_COLORS, type Account, type AccountKind } from '../../types/wallet'
+import { balanceOnDate, buildAccountSeries, netWorthAmount, snapshotDates } from '../../engine/growthEngine'
+import type { RateBook } from '../../engine/growthEngine'
+import { ACCOUNT_COLORS, type Account, type AccountKind, type WalletSettings } from '../../types/wallet'
 import type { AccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, normalizeAccountKind } from '../../lib/accountKinds'
 import { buildAccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
-import { CURRENCY_OPTIONS } from '../../lib/currency'
+import { CURRENCY_OPTIONS, toBase } from '../../lib/currency'
+import { resolvePivotForDate } from '../../lib/cbrRates'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
@@ -93,6 +95,42 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     }
     return map
   }, [visible, snapshots])
+
+  const balanceAsOf = useMemo(() => {
+    const dates = snapshotDates(snapshots)
+    return dates[dates.length - 1] ?? todayIsoDate()
+  }, [snapshots])
+
+  const ratePivot = useMemo(
+    () =>
+      resolvePivotForDate(balanceAsOf, rateBook) ??
+      (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null),
+    [balanceAsOf, rateBook, settings.baseCurrency, settings.exchangeRates],
+  )
+
+  const balanceBaseById = useMemo(() => {
+    const map = new Map<string, number | null>()
+    for (const account of visible) {
+      if (account.currency === settings.baseCurrency) {
+        map.set(account.id, null)
+        continue
+      }
+      const bal = balancesById.get(account.id)
+      if (bal == null) {
+        map.set(account.id, null)
+        continue
+      }
+      const base = toBase(
+        netWorthAmount(account, bal),
+        account.currency,
+        settings.baseCurrency,
+        settings.exchangeRates,
+        ratePivot,
+      )
+      map.set(account.id, Number.isFinite(base) ? base : null)
+    }
+    return map
+  }, [visible, balancesById, settings, ratePivot])
 
   const staleById = useMemo(
     () => buildAccountStaleStatuses(accounts, snapshots),
@@ -292,6 +330,8 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 key={account.id}
                 account={account}
                 balance={balancesById.get(account.id) ?? null}
+                balanceBase={balanceBaseById.get(account.id) ?? null}
+                baseCurrency={settings.baseCurrency}
                 stale={staleById.get(account.id)}
                 periodReturn={returnById.get(account.id) ?? null}
                 isDragging={dragId === account.id}
@@ -468,6 +508,14 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                     : (balanceOnDate(detailAccount.id, todayIsoDate(), snapshots) ?? 0)
                 }
                 currency={detailAccount.currency}
+                baseCurrency={settings.baseCurrency}
+                rateBook={rateBook}
+                settings={settings}
+                asOf={
+                  detailSeries.length > 0
+                    ? detailSeries[detailSeries.length - 1]!.date
+                    : todayIsoDate()
+                }
                 linkedName={
                   detailAccount.linkedAccountId
                     ? accounts.find((a) => a.id === detailAccount.linkedAccountId)?.name
@@ -481,6 +529,15 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 <span className="font-medium">
                   {formatCurrency(detailSeries[detailSeries.length - 1]!.balance, detailAccount.currency)}
                 </span>
+                {detailAccount.currency !== settings.baseCurrency && (
+                  <BaseApprox
+                    amount={detailSeries[detailSeries.length - 1]!.balance}
+                    currency={detailAccount.currency}
+                    date={detailSeries[detailSeries.length - 1]!.date}
+                    settings={settings}
+                    rateBook={rateBook}
+                  />
+                )}
               </p>
             )}
             <GrowthChart
@@ -506,21 +563,33 @@ function CreditDetailStats({
   graceMonths,
   available,
   currency,
+  baseCurrency,
+  rateBook,
+  settings,
+  asOf,
   linkedName,
 }: {
   limit: number
   graceMonths: number
   available: number
   currency: string
+  baseCurrency: string
+  rateBook: RateBook
+  settings: WalletSettings
+  asOf: string
   linkedName?: string
 }) {
   const debt = creditDebt(limit, available)
   const graceLabel =
     graceMonths === 1 ? '1 месяц' : graceMonths < 5 ? `${graceMonths} месяца` : `${graceMonths} месяцев`
+  const showBase = currency !== baseCurrency
   return (
     <div className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
       <p>
         Лимит: <span className="font-medium">{formatCurrency(limit, currency)}</span>
+        {showBase && (
+          <BaseApprox amount={limit} currency={currency} date={asOf} settings={settings} rateBook={rateBook} />
+        )}
       </p>
       <p>
         Грейс: <span className="font-medium">{graceLabel}</span>
@@ -529,9 +598,21 @@ function CreditDetailStats({
       <p>
         Доступно:{' '}
         <span className="font-medium">{formatCurrency(available, currency)}</span>
+        {showBase && (
+          <BaseApprox
+            amount={available}
+            currency={currency}
+            date={asOf}
+            settings={settings}
+            rateBook={rateBook}
+          />
+        )}
       </p>
       <p>
         Долг: <span className="font-medium">{formatCurrency(debt, currency)}</span>
+        {showBase && (
+          <BaseApprox amount={debt} currency={currency} date={asOf} settings={settings} rateBook={rateBook} />
+        )}
       </p>
       {linkedName ? (
         <p className="text-slate-500 dark:text-slate-400">Float-кошелёк: {linkedName}</p>
@@ -542,11 +623,39 @@ function CreditDetailStats({
   )
 }
 
+function BaseApprox({
+  amount,
+  currency,
+  date,
+  settings,
+  rateBook,
+}: {
+  amount: number
+  currency: string
+  date: string
+  settings: WalletSettings
+  rateBook: RateBook
+}) {
+  const pivot =
+    resolvePivotForDate(date, rateBook) ??
+    (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+  const base = toBase(amount, currency, settings.baseCurrency, settings.exchangeRates, pivot)
+  if (!Number.isFinite(base)) return null
+  return (
+    <span className="text-slate-500 dark:text-slate-400">
+      {' '}
+      ≈ {formatCurrency(base, settings.baseCurrency)}
+    </span>
+  )
+}
+
 const SWIPE_ACTIONS_WIDTH = 96
 
 interface AccountListItemProps {
   account: Account
   balance: number | null
+  balanceBase?: number | null
+  baseCurrency: string
   stale?: AccountStaleStatus
   periodReturn?: AccountPeriodReturn | null
   isDragging: boolean
@@ -565,6 +674,8 @@ interface AccountListItemProps {
 function AccountListItem({
   account,
   balance,
+  balanceBase = null,
+  baseCurrency,
   stale,
   periodReturn,
   isDragging,
@@ -743,6 +854,11 @@ function AccountListItem({
                 <span className="block text-sm font-medium text-slate-900 dark:text-slate-200">
                   {formatCurrency(balance, account.currency)}
                 </span>
+                {balanceBase != null ? (
+                  <span className="block text-[11px] text-slate-400 dark:text-slate-500">
+                    ≈ {formatCurrency(balanceBase, baseCurrency)}
+                  </span>
+                ) : null}
                 {account.kind === 'credit' && account.creditLimit != null ? (
                   <span className="text-[11px] text-slate-400 dark:text-slate-500">
                     долг {formatCurrency(creditDebt(account.creditLimit, balance), account.currency)}
