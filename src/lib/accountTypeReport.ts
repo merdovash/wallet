@@ -65,7 +65,7 @@ export interface AccountTypeReport {
   grandGrowthBase: number
   /** Growth ÷ invest accounts (fund/deposit/investment) at start. */
   growthPctInvest: number | null
-  /** Growth ÷ all money at start (ex-top-ups in numerator). */
+  /** Growth ÷ all money at start except credit (ex-top-ups in numerator). */
   growthPctOfAllMass: number | null
   /** @deprecated use growthPctOfAllMass — kept as alias for older call sites */
   growthPct: number | null
@@ -299,7 +299,9 @@ export function buildAccountTypeReport(
   const growthRows = rows.filter((r) => isGrowthKind(r.kind))
   const growthAmount = growthRows.reduce((s, r) => s + r.growthBase, 0)
   const investStart = growthRows.reduce((s, r) => s + r.startBalanceBase, 0)
-  const allMassStart = [...byKind.values()].reduce((s, r) => s + r.startBalanceBase, 0)
+  const allMassStart = [...byKind.entries()]
+    .filter(([kind]) => kind !== 'credit')
+    .reduce((s, [, r]) => s + r.startBalanceBase, 0)
   const growthPctInvest =
     t0 != null && t0 !== t1 ? pctOfAllMass(growthAmount, investStart) : null
   const growthPctOfAllMass =

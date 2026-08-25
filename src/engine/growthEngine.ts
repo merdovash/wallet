@@ -468,14 +468,22 @@ export function totalOnDate(
   accounts: Account[],
   snapshots: BalanceSnapshot[],
   settings: WalletSettings,
-  opts?: { includeArchived?: boolean; rateBook?: RateBook; balanceIndex?: BalanceIndex },
+  opts?: {
+    includeArchived?: boolean
+    rateBook?: RateBook
+    balanceIndex?: BalanceIndex
+    /** Exclude credit cards from the total (e.g. all-mass return denominator). */
+    excludeCredit?: boolean
+  },
 ): number {
   const includeArchived = opts?.includeArchived ?? false
+  const excludeCredit = opts?.excludeCredit ?? false
   const index = opts?.balanceIndex ?? buildBalanceIndex(snapshots)
   const pivot = pivotFor(date, settings, opts?.rateBook)
   let total = 0
   for (const account of accounts) {
     if (!includeArchived && account.archived) continue
+    if (excludeCredit && account.kind === 'credit') continue
     const bal = balanceOnDate(account.id, date, snapshots, index)
     if (bal == null) continue
     const nw = netWorthAmount(account, bal)

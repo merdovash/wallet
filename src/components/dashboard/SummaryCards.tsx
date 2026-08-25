@@ -43,7 +43,7 @@ export function SummaryCards({
   /** Прирост ÷ сумма инвест-счетов (фонд/вклад/инвестиции) на начало периода. */
   const investPct =
     periodReturn != null ? pctOfAllMass(displayGrowth, periodReturn.startTotal) : null
-  /** Прирост ÷ весь остаток на начало периода. */
+  /** Прирост ÷ весь остаток на начало периода (без кредитки). */
   const allMassPct =
     periodReturn != null
       ? pctOfAllMass(displayGrowth, periodReturn.startTotalAllMass)

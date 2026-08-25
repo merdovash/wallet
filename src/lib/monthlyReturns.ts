@@ -98,11 +98,11 @@ export interface PeriodReturnSummary {
   annualizedPct: number | null
   /** (1 + годовых) / (1 + инфляция) − 1 */
   realAnnualizedPct: number | null
-  /** All-accounts net worth at period start (base currency). */
+  /** All-accounts net worth at period start, excluding credit cards (base currency). */
   startTotalAllMass: number
-  /** Investment growth (ex-top-ups) ÷ all-money start total. */
+  /** Investment growth (ex-top-ups) ÷ all-money start total (without credit). */
   growthPctOfAllMass: number | null
-  /** Annualized growth % relative to entire money mass. */
+  /** Annualized growth % relative to entire money mass (without credit). */
   annualizedPctOfAllMass: number | null
   /** Number of fund/deposit/investment accounts in the calculation. */
   accountCount: number
@@ -377,9 +377,12 @@ export function buildPeriodReturn(
     flows,
   )
   const days = daysBetween(startDate, endDate)
-  const startTotalAllMass = totalOnDate(startDate, accounts, snapshots, settings, { rateBook })
+  const startTotalAllMass = totalOnDate(startDate, accounts, snapshots, settings, {
+    rateBook,
+    excludeCredit: true,
+  })
   // Numerator: only fund/deposit/investment growth (top-ups already removed via netFlow).
-  // Denominator: all money at start, not the investment portfolio and not Dietz-weighted capital.
+  // Denominator: all money at start except credit cards (not Dietz-weighted capital).
   const growthPctOfAllMass = pctOfAllMass(growth, startTotalAllMass)
   const annualizedPctOfAllMass =
     growthPctOfAllMass == null || days <= 0

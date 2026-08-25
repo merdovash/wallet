@@ -88,7 +88,10 @@ function buildDayRow(
 ): DayRow {
   const interval = dailyGrowthInterval(p.date, checkInDates)
   const massStart = interval
-    ? totalOnDate(interval.startDate, accounts, snapshots, settings, { rateBook })
+    ? totalOnDate(interval.startDate, accounts, snapshots, settings, {
+        rateBook,
+        excludeCredit: true,
+      })
     : 0
   const growthPctOfAllMass =
     Number.isFinite(massStart) && massStart !== 0 ? p.growth / massStart : null

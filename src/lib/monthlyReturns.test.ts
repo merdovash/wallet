@@ -259,9 +259,48 @@ describe('monthlyReturns', () => {
     expect(summary?.growth).toBeCloseTo(10, 8)
     expect(summary?.growthPct).toBeCloseTo(0.1, 8)
     expect(summary?.annualizedPct).toBeCloseTo(annualizePeriodReturn(0.1, 30), 8)
-    // All-mass % uses full net worth as denominator
+    // All-mass % uses full net worth as denominator (cash + op + fund), credit excluded separately
     expect(summary?.startTotalAllMass).toBeCloseTo(15_100, 8)
     expect(summary?.growthPctOfAllMass).toBeCloseTo(10 / 15_100, 8)
+  })
+
+  it('excludes credit debt from all-mass denominator', () => {
+    const accounts = [
+      account({ id: 'fund', name: 'Fund', kind: 'fund' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({
+        id: 'cc',
+        name: 'Credit',
+        kind: 'credit',
+        creditLimit: 100_000,
+      }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 100 },
+          { accountId: 'op', amount: 900 },
+          // available 50k → debt 50k → NW −50_000 if included
+          { accountId: 'cc', amount: 50_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'fund', amount: 110 },
+          { accountId: 'op', amount: 900 },
+          { accountId: 'cc', amount: 50_000 },
+        ],
+      },
+    ]
+    const summary = buildPeriodReturn(accounts, snapshots, settings)
+    expect(summary?.growth).toBeCloseTo(10, 8)
+    // Without credit: 100 + 900 = 1000 (not 1000 − 50_000)
+    expect(summary?.startTotalAllMass).toBeCloseTo(1_000, 8)
+    expect(summary?.growthPctOfAllMass).toBeCloseTo(10 / 1_000, 8)
   })
 
   it('attributes +6 account growth after withdrawal of 16 (100→105→90)', () => {

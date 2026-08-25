@@ -140,6 +140,38 @@ describe('buildAccountTypeReport', () => {
     expect(report.growthPct).toBeCloseTo(1_000 / 500_000, 8)
   })
 
+  it('excludes credit from all-mass % denominator', () => {
+    const accounts: Account[] = [
+      account({ id: 'fund', name: 'Фонд', kind: 'fund' }),
+      account({ id: 'op', name: 'Карта', kind: 'operational' }),
+      account({ id: 'cc', name: 'Кредитка', kind: 'credit', creditLimit: 200_000 }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'fund', amount: 100_000 },
+          { accountId: 'op', amount: 50_000 },
+          { accountId: 'cc', amount: 100_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-31',
+        lines: [
+          { accountId: 'fund', amount: 101_000 },
+          { accountId: 'op', amount: 50_000 },
+          { accountId: 'cc', amount: 100_000 },
+        ],
+      },
+    ]
+    const report = buildAccountTypeReport(accounts, snapshots, [], settings)
+    expect(report.growthPctInvest).toBeCloseTo(1_000 / 100_000, 8)
+    // Without credit debt (−100k): 150k, not 50k
+    expect(report.growthPctOfAllMass).toBeCloseTo(1_000 / 150_000, 8)
+  })
+
   it('limits growth to the selected period', () => {
     const accounts = [account({ id: 'fund', name: 'Фонд', kind: 'fund' })]
     const snapshots: BalanceSnapshot[] = [

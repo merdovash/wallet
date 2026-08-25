@@ -185,7 +185,7 @@ function GrowthMovementsView({
           label="Прирост % от всего"
           value={formatPercent(allMassPct)}
           valueClassName={tone(allMassPct ?? 0)}
-          hint={`прирост ÷ весь остаток на начало (${formatCurrency(periodReturn.startTotalAllMass, currency)})`}
+          hint={`прирост ÷ весь остаток на начало без кредитки (${formatCurrency(periodReturn.startTotalAllMass, currency)})`}
           emphasize
         />
         <Row
@@ -470,7 +470,7 @@ function PercentBreakdownView({
         </p>
         <p className="mt-1">
           Числитель — прирост фонда / вклада / инвестиций ({periodReturn.accountCount} сч.), без
-          пополнений. Два знаменателя: сумма инвест-счетов и весь остаток на начало.
+          пополнений. Два знаменателя: сумма инвест-счетов и весь остаток на начало (без кредитки).
         </p>
         <p className="mt-1">
           {withoutFx
@@ -493,7 +493,7 @@ function PercentBreakdownView({
         <Row
           label="Весь остаток на начало"
           value={formatCurrency(periodReturn.startTotalAllMass, currency)}
-          hint="все счета, включая оперативные / наличку / кредит"
+          hint="все счета кроме кредитки"
         />
         <Row
           label="Капитал портфеля на конец"
@@ -530,7 +530,7 @@ function PercentBreakdownView({
         <Row
           label="Прирост % от всего"
           value={formatPercent(allMassPct)}
-          hint="прирост ÷ весь остаток на начало"
+          hint="прирост ÷ весь остаток на начало без кредитки"
           emphasize={focus === 'growthPct'}
         />
         <Row
