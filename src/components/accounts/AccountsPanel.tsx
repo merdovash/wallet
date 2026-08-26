@@ -25,6 +25,7 @@ import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { PageHeader } from '../ui/PageHeader'
 import { StackPanel } from '../ui/StackPanel'
 import { GrowthChart } from '../dashboard/GrowthChart'
 import { formatCurrency, formatPercent, todayIsoDate } from '../../lib/format'
@@ -259,6 +260,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   useRegisterPrimaryAction(formOpen, {
     id: 'account-form-save',
     label: 'Сохранить',
+    scope: 'panel',
     onClick: () => {
       void handleSave()
     },
@@ -268,6 +270,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     id: 'accounts-add',
     label: 'Добавить счёт',
     title: 'Новый счёт',
+    scope: 'section',
     onClick: openCreate,
   })
 
@@ -310,19 +313,15 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Счета</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Счета"
+        description="Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий."
+        actions={
           <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)}>
             {showArchived ? 'Скрыть архив' : 'Показать архив'}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {visible.length === 0 ? (
         <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." />
@@ -368,6 +367,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         open={formOpen}
         title={editingId ? 'Счёт' : 'Новый счёт'}
         onClose={() => setFormOpen(false)}
+        headerActions={
+          <Button type="button" className="!px-3 !py-1.5" onClick={() => void handleSave()}>
+            Сохранить
+          </Button>
+        }
       >
         <div className="space-y-4">
           <Field label="Название">

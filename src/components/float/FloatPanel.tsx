@@ -6,6 +6,7 @@ import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
+import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
 
 const MONTH_LABEL = new Intl.DateTimeFormat('ru-RU', {
@@ -433,15 +434,11 @@ export function FloatPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Float</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Выгода от беспроцентного кредита на связанном счёте
-          </p>
-        </div>
-        <PeriodFilter showRange />
-      </div>
+      <PageHeader
+        title="Float"
+        description="Выгода от беспроцентного кредита на связанном счёте"
+        actions={<PeriodFilter showRange />}
+      />
 
       {creditAccounts.length === 0 ? (
         <EmptyState

@@ -21,6 +21,7 @@ import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { FxModeToggle } from '../ui/FxModeToggle'
+import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
 import { CreditFloatSummary } from './CreditFloatSummary'
 import { CurrencyReportTable } from './CurrencyReportTable'
@@ -128,16 +129,16 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-3">
-      <div className="space-y-2">
-        <h1 className="min-w-0 truncate text-lg font-semibold text-slate-900 dark:text-slate-200 sm:text-xl">
-          Дашборд
-        </h1>
-        <PeriodFilter showRange />
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <FxModeToggle showLabel={false} compact />
-          <ChartSeriesToggle value={chartSeries} onChange={setChartSeries} />
-        </div>
-      </div>
+      <PageHeader
+        title="Дашборд"
+        actions={
+          <>
+            <PeriodFilter showRange />
+            <FxModeToggle showLabel={false} compact />
+            <ChartSeriesToggle value={chartSeries} onChange={setChartSeries} />
+          </>
+        }
+      />
 
       <CheckInReminderBanner reminder={reminder} onCheckIn={openCreate} />
 

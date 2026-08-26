@@ -4,6 +4,7 @@ import { formatCurrency, formatDateDisplay, formatPercent } from '../../lib/form
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
+import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
 
 export function CashbackPanel() {
@@ -22,15 +23,11 @@ export function CashbackPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Кэшбек</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Эффективная скидка от расходов: начисленный кэшбек к сумме расходов в чек-инах (1 кэшбек = 1 ₽)
-          </p>
-        </div>
-        <PeriodFilter showRange />
-      </div>
+      <PageHeader
+        title="Кэшбек"
+        description="Эффективная скидка от расходов: начисленный кэшбек к сумме расходов в чек-инах (1 кэшбек = 1 ₽)"
+        actions={<PeriodFilter showRange />}
+      />
 
       {!hasCashbackAccounts ? (
         <Card>

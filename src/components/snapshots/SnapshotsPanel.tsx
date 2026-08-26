@@ -6,6 +6,7 @@ import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState } from '../ui/FormControls'
+import { PageHeader } from '../ui/PageHeader'
 import { TransferCreatePanel } from './TransferCreatePanel'
 
 export function SnapshotsPanel() {
@@ -42,27 +43,25 @@ export function SnapshotsPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Чек-ины</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Остатки по датам и переводы между счетами
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => setTransferOpen(true)}
-          disabled={activeCount < 2}
-        >
-          Перевод
-        </Button>
-      </div>
+      <PageHeader
+        title="Чек-ины"
+        description="Остатки по датам и переводы между счетами"
+        actions={
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setTransferOpen(true)}
+            disabled={activeCount < 2}
+          >
+            Перевод
+          </Button>
+        }
+      />
 
       {sortedSnapshots.length === 0 ? (
         <EmptyState
           title="Чек-инов пока нет"
-          description="Нажмите плавающую кнопку «Чек-ин» для остатков или «Перевод» — тогда создастся чек-ин с обновлёнными суммами."
+          description="Нажмите «Чек-ин» для остатков или «Перевод» — тогда создастся чек-ин с обновлёнными суммами."
         />
       ) : (
         <Card className="!p-0">

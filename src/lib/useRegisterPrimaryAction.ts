@@ -4,7 +4,7 @@ import {
   type PrimaryActionOverride,
 } from '../store/primaryActionStore'
 
-/** Пока `active`, FAB показывает это действие вместо чек-ина. */
+/** Пока `active`, переопределяет основное действие (или регистрирует Save панели). */
 export function useRegisterPrimaryAction(
   active: boolean,
   action: Omit<PrimaryActionOverride, 'onClick'> & { onClick: () => void },
@@ -20,11 +20,20 @@ export function useRegisterPrimaryAction(
       label: action.label,
       disabled: action.disabled,
       title: action.title,
+      scope: action.scope,
       onClick: () => onClickRef.current(),
     })
     return () => {
       const current = usePrimaryActionStore.getState().override
       if (current?.id === action.id) setOverride(null)
     }
-  }, [active, action.id, action.label, action.disabled, action.title, setOverride])
+  }, [
+    active,
+    action.id,
+    action.label,
+    action.disabled,
+    action.title,
+    action.scope,
+    setOverride,
+  ])
 }

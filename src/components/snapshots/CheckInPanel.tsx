@@ -490,16 +490,19 @@ export function CheckInPanel({
       ? 'Введите остаток хотя бы для одного счёта'
       : null
 
+  function submitSave() {
+    const form = document.getElementById('check-in-panel-form')
+    if (form instanceof HTMLFormElement) form.requestSubmit()
+    else void handleSave()
+  }
+
   useRegisterPrimaryAction(open && !transferEditor, {
     id: 'check-in-save',
     label: 'Сохранить',
+    scope: 'panel',
     disabled: formAccounts.length === 0,
     title: canSaveHint ?? undefined,
-    onClick: () => {
-      const form = document.getElementById('check-in-panel-form')
-      if (form instanceof HTMLFormElement) form.requestSubmit()
-      else void handleSave()
-    },
+    onClick: submitSave,
   })
 
   return (
@@ -521,20 +524,31 @@ export function CheckInPanel({
         onClose()
       }}
       headerActions={
-        <button
-          type="button"
-          title="Справка"
-          aria-label="Справка"
-          aria-pressed={showHelp}
-          onClick={() => setShowHelp((v) => !v)}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
-            showHelp
-              ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-400'
-              : 'border-slate-300 text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800'
-          }`}
-        >
-          ?
-        </button>
+        <>
+          <button
+            type="button"
+            title="Справка"
+            aria-label="Справка"
+            aria-pressed={showHelp}
+            onClick={() => setShowHelp((v) => !v)}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
+              showHelp
+                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-400'
+                : 'border-slate-300 text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+          >
+            ?
+          </button>
+          <Button
+            type="button"
+            className="!px-3 !py-1.5"
+            disabled={formAccounts.length === 0}
+            title={canSaveHint ?? undefined}
+            onClick={submitSave}
+          >
+            Сохранить
+          </Button>
+        </>
       }
     >
       <form

@@ -11,6 +11,7 @@ import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { CurrencyReportTable } from '../dashboard/CurrencyReportTable'
 import { Card } from '../ui/FormControls'
+import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
 import { CurrencyFxBreakdownPanel } from './CurrencyFxBreakdownPanel'
 import { CurrencyValueChart } from './CurrencyValueChart'
@@ -71,16 +72,16 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Валюты</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+      <PageHeader
+        title="Валюты"
+        description={
+          <>
             Эквивалент иностранных валют в {settings.baseCurrency} (без {settings.baseCurrency})
             {foreignCurrencyCount > 0 ? ` · ${foreignCurrencyCount} вал.` : ''}
-          </p>
-        </div>
-        <PeriodFilter showRange />
-      </div>
+          </>
+        }
+        actions={<PeriodFilter showRange />}
+      />
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <button

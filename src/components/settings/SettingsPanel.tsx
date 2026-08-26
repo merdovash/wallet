@@ -18,6 +18,7 @@ import type { ThemeMode } from '../../lib/theme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, Field, Input, Select } from '../ui/FormControls'
+import { PageHeader } from '../ui/PageHeader'
 import { RatesRegistryPanel } from './RatesRegistryPanel'
 
 export function SettingsPanel() {
@@ -75,12 +76,11 @@ export function SettingsPanel() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">Настройки</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Базовая валюта и курсы ЦБ РФ на дату чек-ина (cbr-xml-daily.ru)
-        </p>
-      </div>
+      <PageHeader
+        title="Настройки"
+        description="Базовая валюта и курсы ЦБ РФ на дату чек-ина (cbr-xml-daily.ru)"
+        showPrimary={false}
+      />
 
       <Card className="space-y-4">
         <Field label="Тема оформления">
