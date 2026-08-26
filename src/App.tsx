@@ -123,7 +123,7 @@ export default function App() {
         </main>
         {showApp && (
           <>
-            <PrimaryFab />
+            <PrimaryFab section={section} />
             <CheckInPanel
               open={checkInOpen}
               onClose={closeCheckIn}

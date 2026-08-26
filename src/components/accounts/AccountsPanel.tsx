@@ -264,6 +264,13 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     },
   })
 
+  useRegisterPrimaryAction(!formOpen, {
+    id: 'accounts-add',
+    label: 'Добавить счёт',
+    title: 'Новый счёт',
+    onClick: openCreate,
+  })
+
   function moveAccount(fromId: string, toId: string) {
     if (fromId === toId) return
     const ids = visible.map((a) => a.id)
@@ -313,9 +320,6 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         <div className="flex items-center gap-2">
           <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)}>
             {showArchived ? 'Скрыть архив' : 'Показать архив'}
-          </Button>
-          <Button type="button" onClick={openCreate}>
-            Добавить
           </Button>
         </div>
       </div>

@@ -1,8 +1,13 @@
 import { usePrimaryActionStore } from '../../store/primaryActionStore'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
+import type { AppSection } from '../../types/wallet'
 
-/** Плавающая кнопка основного действия: чек-ин или переопределение (Сохранить). */
-export function PrimaryFab() {
+interface PrimaryFabProps {
+  section: AppSection
+}
+
+/** Плавающая кнопка основного действия: чек-ин или переопределение (Сохранить / Добавить счёт). */
+export function PrimaryFab({ section }: PrimaryFabProps) {
   const override = usePrimaryActionStore((s) => s.override)
   const openCreate = useCheckInUiStore((s) => s.openCreate)
   const checkInOpen = useCheckInUiStore((s) => s.open)
@@ -12,11 +17,15 @@ export function PrimaryFab() {
   const title = override?.title ?? (override ? undefined : 'Новый чек-ин')
   const onClick = override?.onClick ?? openCreate
 
+  // В настройках FAB не нужен (override на всякий случай оставляем).
+  if (section === 'settings' && !override) return null
+
   // Пока открыт чек-ин без override — скрываем FAB (override зарегистрирует Save).
   if (checkInOpen && !override) return null
 
   // Чек-ин под StackPanel (z-100); Save при редактировании — поверх панели.
   const zClass = override ? 'z-[110]' : 'z-[90]'
+  const showCheckIcon = !override
 
   return (
     <button
@@ -27,7 +36,7 @@ export function PrimaryFab() {
       aria-label={label}
       className={`fixed ${zClass} flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 md:right-6`}
     >
-      {!override && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
+      {showCheckIcon && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
       <span>{label}</span>
     </button>
   )
