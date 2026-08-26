@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
-import { parseMoneyInput } from '../../lib/moneyInput'
+import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
 import { formatTransferLabel } from '../../lib/transferCheckIn'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
@@ -9,8 +9,13 @@ import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
-import { Button, DateInput, Input, MoneyInput, Select } from '../ui/FormControls'
+import { Button, DateInput, Input, MoneyInput } from '../ui/FormControls'
 import { StackPanel } from '../ui/StackPanel'
+import {
+  CheckInTransferPanel,
+  emptyTransferDraft,
+  type CheckInTransferDraft,
+} from './CheckInTransferPanel'
 
 interface CheckInPanelProps {
   open: boolean
@@ -52,6 +57,15 @@ type PendingTransfer = {
   toAccountId: string
   amount: string
   note: string
+}
+
+type TransferEditor =
+  | { mode: 'create'; initial: CheckInTransferDraft }
+  | { mode: 'pending'; key: string; initial: CheckInTransferDraft }
+  | { mode: 'saved'; id: string; initial: CheckInTransferDraft }
+
+function amountToInput(amount: number): string {
+  return formatMoneyInput(String(amount).replace('.', ','))
 }
 
 /** Возвращает данные перевода, если черновик корректно заполнен, иначе null. */
@@ -131,7 +145,8 @@ export function CheckInPanel({
   /** Only manually typed values — empty means «без изменений». */
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
-  const [draftTransfer, setDraftTransfer] = useState<PendingTransfer | null>(null)
+  const [transferEditor, setTransferEditor] = useState<TransferEditor | null>(null)
+  const [scrollToTransferId, setScrollToTransferId] = useState<string | null>(null)
   const [incomeManual, setIncomeManual] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const { rootRef, focusKeyProps } = useRestoreFocusOnResume(open)
@@ -162,7 +177,8 @@ export function CheckInPanel({
       setAmounts({})
     }
     setPendingTransfers([])
-    setDraftTransfer(null)
+    setTransferEditor(null)
+    setScrollToTransferId(null)
     setShowHelp(false)
   }, [open, editing]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on open
 
@@ -214,8 +230,7 @@ export function CheckInPanel({
   }, [formAccounts, amounts, editing, date, snapshots])
 
   const transferInputsForSuggest = useMemo(() => {
-    const drafts = draftTransfer ? [...pendingTransfers, draftTransfer] : pendingTransfers
-    const pending = drafts
+    const pending = pendingTransfers
       .map((t) => parsePendingTransfer(t))
       .filter((t): t is NonNullable<typeof t> => t != null)
     return [
@@ -226,7 +241,18 @@ export function CheckInPanel({
       })),
       ...pending,
     ]
-  }, [dateTransfers, pendingTransfers, draftTransfer])
+  }, [dateTransfers, pendingTransfers])
+
+  useEffect(() => {
+    if (!scrollToTransferId) return
+    const id = scrollToTransferId
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-transfer-anchor="${CSS.escape(id)}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setScrollToTransferId(null)
+    }, 80)
+    return () => window.clearTimeout(timer)
+  }, [scrollToTransferId, pendingTransfers, dateTransfers])
 
   const suggestedCashflow = useMemo(
     () =>
@@ -290,27 +316,66 @@ export function CheckInPanel({
       .filter((l): l is SnapshotLine => l != null)
   }
 
-  function startDraftTransfer() {
-    setDraftTransfer({
-      key: `p-${Date.now()}`,
-      fromAccountId: activeAccounts[0]?.id ?? '',
-      toAccountId: activeAccounts[1]?.id ?? activeAccounts[0]?.id ?? '',
-      amount: '',
-      note: '',
+  function openCreateTransfer() {
+    if (activeAccounts.length < 2) return
+    setTransferEditor({ mode: 'create', initial: emptyTransferDraft(activeAccounts) })
+  }
+
+  function openEditPending(t: PendingTransfer) {
+    setTransferEditor({
+      mode: 'pending',
+      key: t.key,
+      initial: {
+        fromAccountId: t.fromAccountId,
+        toAccountId: t.toAccountId,
+        amount: t.amount,
+        note: t.note,
+      },
     })
   }
 
-  async function commitDraftTransfer() {
-    if (!draftTransfer || !date) return
-    const parsed = parsePendingTransfer(draftTransfer)
+  function openEditSaved(t: Transfer) {
+    setTransferEditor({
+      mode: 'saved',
+      id: t.id,
+      initial: {
+        fromAccountId: t.fromAccountId,
+        toAccountId: t.toAccountId,
+        amount: amountToInput(t.amount),
+        note: t.note ?? '',
+      },
+    })
+  }
+
+  async function handleTransferEditorSave(draft: CheckInTransferDraft) {
+    if (!transferEditor || !date) return
+    const parsed = parsePendingTransfer({ key: 'x', ...draft })
     if (parsed == null) return
 
-    if (editing) {
-      await addTransfer({ date, ...parsed })
-    } else {
-      setPendingTransfers((prev) => [...prev, draftTransfer])
+    if (transferEditor.mode === 'create') {
+      if (editing) {
+        const id = await addTransfer({ date, ...parsed })
+        setScrollToTransferId(id)
+      } else {
+        const key = `p-${Date.now()}`
+        setPendingTransfers((prev) => [...prev, { key, ...draft }])
+        setScrollToTransferId(key)
+      }
+      return
     }
-    setDraftTransfer(null)
+
+    if (transferEditor.mode === 'pending') {
+      const key = transferEditor.key
+      setPendingTransfers((prev) =>
+        prev.map((t) => (t.key === key ? { key, ...draft } : t)),
+      )
+      setScrollToTransferId(key)
+      return
+    }
+
+    await deleteTransfer(transferEditor.id)
+    const id = await addTransfer({ date, ...parsed })
+    setScrollToTransferId(id)
   }
 
   async function handleSave() {
@@ -362,18 +427,12 @@ export function CheckInPanel({
           lines: merged,
           origin: 'manual',
         })
-        // Незакоммиченный черновик перевода сохраняем автоматически.
-        const draft = draftTransfer ? parsePendingTransfer(draftTransfer) : null
-        if (draft != null) {
-          await addTransfer({ date, ...draft })
-        }
         onClose()
         return
       }
 
-      // Незакоммиченный черновик перевода сохраняем вместе с чек-ином.
-      const allPending = draftTransfer ? [...pendingTransfers, draftTransfer] : pendingTransfers
-      const transfersToSave = allPending
+      // Pending transfers are saved together with the check-in.
+      const transfersToSave = pendingTransfers
         .map((t) => parsePendingTransfer(t))
         .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
 
@@ -431,7 +490,7 @@ export function CheckInPanel({
       ? 'Введите остаток хотя бы для одного счёта'
       : null
 
-  useRegisterPrimaryAction(open, {
+  useRegisterPrimaryAction(open && !transferEditor, {
     id: 'check-in-save',
     label: 'Сохранить',
     disabled: formAccounts.length === 0,
@@ -444,6 +503,7 @@ export function CheckInPanel({
   })
 
   return (
+    <>
     <StackPanel
       open={open}
       title={
@@ -453,7 +513,13 @@ export function CheckInPanel({
             ? 'Редактировать чек-ин'
             : 'Чек-ин остатков'
       }
-      onClose={onClose}
+      onClose={() => {
+        if (transferEditor) {
+          setTransferEditor(null)
+          return
+        }
+        onClose()
+      }}
       headerActions={
         <button
           type="button"
@@ -498,6 +564,17 @@ export function CheckInPanel({
             </p>
             <p>Укажите переводы между счетами за день, чтобы они не считались приростом.</p>
           </div>
+        )}
+
+        {!locked && activeAccounts.length >= 2 && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full sm:w-auto"
+            onClick={openCreateTransfer}
+          >
+            Добавить перевод
+          </Button>
         )}
 
         {locked && (
@@ -636,12 +713,8 @@ export function CheckInPanel({
             accounts={activeAccounts}
             savedTransfers={dateTransfers}
             pendingTransfers={pendingTransfers}
-            draft={draftTransfer}
-            focusKeyProps={focusKeyProps}
-            onStartDraft={startDraftTransfer}
-            onDraftChange={setDraftTransfer}
-            onCommitDraft={() => void commitDraftTransfer()}
-            onCancelDraft={() => setDraftTransfer(null)}
+            onEditPending={openEditPending}
+            onEditSaved={openEditSaved}
             onRemovePending={(key) =>
               setPendingTransfers((prev) => prev.filter((t) => t.key !== key))
             }
@@ -657,6 +730,20 @@ export function CheckInPanel({
         </div>
       </form>
     </StackPanel>
+
+    <CheckInTransferPanel
+      open={transferEditor != null}
+      title={
+        transferEditor?.mode === 'create'
+          ? 'Новый перевод'
+          : 'Редактировать перевод'
+      }
+      accounts={activeAccounts}
+      initial={transferEditor?.initial ?? null}
+      onClose={() => setTransferEditor(null)}
+      onSave={handleTransferEditorSave}
+    />
+    </>
   )
 }
 
@@ -664,53 +751,51 @@ function TransfersSection({
   accounts,
   savedTransfers,
   pendingTransfers,
-  draft,
-  focusKeyProps,
-  onStartDraft,
-  onDraftChange,
-  onCommitDraft,
-  onCancelDraft,
+  onEditPending,
+  onEditSaved,
   onRemovePending,
   onDeleteSaved,
 }: {
   accounts: Account[]
   savedTransfers: Transfer[]
   pendingTransfers: PendingTransfer[]
-  draft: PendingTransfer | null
-  focusKeyProps: (key: string) => { 'data-focus-key': string }
-  onStartDraft: () => void
-  onDraftChange: (draft: PendingTransfer | null) => void
-  onCommitDraft: () => void
-  onCancelDraft: () => void
+  onEditPending: (t: PendingTransfer) => void
+  onEditSaved: (t: Transfer) => void
   onRemovePending: (key: string) => void
   onDeleteSaved: (id: string) => void
 }) {
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
-  return (
-    <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
-      <div className="flex items-center justify-between gap-2">
+  if (savedTransfers.length === 0 && pendingTransfers.length === 0) {
+    return (
+      <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Переводы за день</h3>
-        {!draft && accounts.length >= 2 && (
-          <Button type="button" variant="secondary" className="!px-2.5 !py-1.5 !text-xs" onClick={onStartDraft}>
-            Добавить
-          </Button>
-        )}
-      </div>
-      {savedTransfers.length === 0 && pendingTransfers.length === 0 && !draft && (
         <p className="text-sm text-slate-500 dark:text-slate-400">Переводов нет</p>
-      )}
+      </div>
+    )
+  }
 
+  return (
+    <div className="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Переводы за день</h3>
       <ul className="space-y-2">
         {savedTransfers.map((t) => (
           <li
             key={t.id}
-            className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-sm"
+            data-transfer-anchor={t.id}
+            className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60"
           >
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-200">{formatTransferLabel(t, accounts)}</p>
+            <button
+              type="button"
+              className="min-w-0 flex-1 text-left"
+              onClick={() => onEditSaved(t)}
+            >
+              <p className="font-medium text-slate-900 dark:text-slate-200">
+                {formatTransferLabel(t, accounts)}
+              </p>
               {t.note ? <p className="text-xs text-slate-500 dark:text-slate-400">{t.note}</p> : null}
-            </div>
+              <p className="mt-0.5 text-[11px] text-blue-600 dark:text-blue-400">Изменить</p>
+            </button>
             <button
               type="button"
               className="shrink-0 text-xs text-red-600 hover:underline"
@@ -726,9 +811,14 @@ function TransfersSection({
           return (
             <li
               key={t.key}
-              className="flex items-start justify-between gap-2 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+              data-transfer-anchor={t.key}
+              className="flex items-start justify-between gap-2 rounded-lg border border-dashed border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
             >
-              <div>
+              <button
+                type="button"
+                className="min-w-0 flex-1 text-left"
+                onClick={() => onEditPending(t)}
+              >
                 <p className="font-medium text-slate-900 dark:text-slate-200">
                   {from?.name ?? '—'} → {to?.name ?? '—'}
                 </p>
@@ -737,7 +827,8 @@ function TransfersSection({
                   {t.note ? ` · ${t.note}` : ''}
                   {' · '}будет сохранён с чек-ином
                 </p>
-              </div>
+                <p className="mt-0.5 text-[11px] text-blue-600 dark:text-blue-400">Изменить</p>
+              </button>
               <button
                 type="button"
                 className="shrink-0 text-xs text-red-600 hover:underline"
@@ -749,62 +840,6 @@ function TransfersSection({
           )
         })}
       </ul>
-
-      {draft && (
-        <div className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-          <InlineRow label="Откуда">
-            <Select
-              value={draft.fromAccountId}
-              onChange={(e) => onDraftChange({ ...draft, fromAccountId: e.target.value })}
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({a.currency})
-                </option>
-              ))}
-            </Select>
-          </InlineRow>
-          <InlineRow label="Куда">
-            <Select
-              value={draft.toAccountId}
-              onChange={(e) => onDraftChange({ ...draft, toAccountId: e.target.value })}
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({a.currency})
-                </option>
-              ))}
-            </Select>
-          </InlineRow>
-          <InlineRow
-            label={`Сумма, ${accountMap.get(draft.fromAccountId)?.currency ?? ''}`}
-          >
-            <MoneyInput
-              value={draft.amount}
-              onChange={(value) => onDraftChange({ ...draft, amount: value })}
-              allowNegative={false}
-              placeholder="0"
-              {...focusKeyProps('transfer-amount')}
-            />
-          </InlineRow>
-          <InlineRow label="Комментарий">
-            <Input
-              value={draft.note}
-              onChange={(e) => onDraftChange({ ...draft, note: e.target.value })}
-              placeholder="Необязательно"
-              {...focusKeyProps('transfer-note')}
-            />
-          </InlineRow>
-          <div className="flex gap-2 pt-1">
-            <Button type="button" onClick={onCommitDraft}>
-              Добавить перевод
-            </Button>
-            <Button type="button" variant="secondary" onClick={onCancelDraft}>
-              Отмена
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
