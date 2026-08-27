@@ -4,13 +4,12 @@ import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
 import { formatTransferLabel } from '../../lib/transferCheckIn'
-import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
 import { Button, DateInput, Input, MoneyInput } from '../ui/FormControls'
-import { StackPanel } from '../ui/StackPanel'
+import { EntityEditPanel } from '../ui/EntityEditPanel'
 import {
   CheckInTransferPanel,
   emptyTransferDraft,
@@ -496,19 +495,11 @@ export function CheckInPanel({
     else void handleSave()
   }
 
-  useRegisterPrimaryAction(open && !transferEditor, {
-    id: 'check-in-save',
-    label: 'Сохранить',
-    scope: 'panel',
-    disabled: formAccounts.length === 0,
-    title: canSaveHint ?? undefined,
-    onClick: submitSave,
-  })
-
   return (
     <>
-    <StackPanel
+    <EntityEditPanel
       open={open}
+      saveActive={!transferEditor}
       title={
         locked
           ? 'Перевод'
@@ -523,32 +514,25 @@ export function CheckInPanel({
         }
         onClose()
       }}
-      headerActions={
-        <>
-          <button
-            type="button"
-            title="Справка"
-            aria-label="Справка"
-            aria-pressed={showHelp}
-            onClick={() => setShowHelp((v) => !v)}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
-              showHelp
-                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-400'
-                : 'border-slate-300 text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800'
-            }`}
-          >
-            ?
-          </button>
-          <Button
-            type="button"
-            className="!px-3 !py-1.5"
-            disabled={formAccounts.length === 0}
-            title={canSaveHint ?? undefined}
-            onClick={submitSave}
-          >
-            Сохранить
-          </Button>
-        </>
+      onSave={submitSave}
+      saveDisabled={formAccounts.length === 0}
+      saveTitle={canSaveHint ?? undefined}
+      saveActionId="check-in-save"
+      headerExtras={
+        <button
+          type="button"
+          title="Справка"
+          aria-label="Справка"
+          aria-pressed={showHelp}
+          onClick={() => setShowHelp((v) => !v)}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
+            showHelp
+              ? 'border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-400'
+              : 'border-slate-300 text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800'
+          }`}
+        >
+          ?
+        </button>
       }
     >
       <form
@@ -743,7 +727,7 @@ export function CheckInPanel({
         )}
         </div>
       </form>
-    </StackPanel>
+    </EntityEditPanel>
 
     <CheckInTransferPanel
       open={transferEditor != null}

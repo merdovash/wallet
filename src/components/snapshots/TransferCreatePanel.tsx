@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
-import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { DateInput, Field, Input, MoneyInput, Select, Button } from '../ui/FormControls'
-import { StackPanel } from '../ui/StackPanel'
+import { DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { EntityEditPanel } from '../ui/EntityEditPanel'
 
 interface TransferCreatePanelProps {
   open: boolean
@@ -76,31 +75,14 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     (parseMoneyInput(amount) ?? 0) > 0 &&
     activeAccounts.length >= 2
 
-  useRegisterPrimaryAction(open, {
-    id: 'transfer-form-save',
-    label: 'Сохранить',
-    scope: 'panel',
-    disabled: !canSave || saving,
-    onClick: () => {
-      void handleSave()
-    },
-  })
-
   return (
-    <StackPanel
+    <EntityEditPanel
       open={open}
       title="Новый перевод"
       onClose={onClose}
-      headerActions={
-        <Button
-          type="button"
-          className="!px-3 !py-1.5"
-          disabled={!canSave || saving}
-          onClick={() => void handleSave()}
-        >
-          Сохранить
-        </Button>
-      }
+      onSave={handleSave}
+      saveDisabled={!canSave || saving}
+      saveActionId="transfer-form-save"
     >
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -140,6 +122,6 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" />
         </Field>
       </div>
-    </StackPanel>
+    </EntityEditPanel>
   )
 }

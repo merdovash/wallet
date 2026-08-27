@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { parseMoneyInput } from '../../lib/moneyInput'
-import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import type { Account } from '../../types/wallet'
-import { Button, Field, Input, MoneyInput, Select } from '../ui/FormControls'
-import { StackPanel } from '../ui/StackPanel'
+import { Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { EntityEditPanel } from '../ui/EntityEditPanel'
 
 export type CheckInTransferDraft = {
   fromAccountId: string
@@ -83,31 +82,14 @@ export function CheckInTransferPanel({
     }
   }
 
-  useRegisterPrimaryAction(open, {
-    id: 'check-in-transfer-save',
-    label: 'Сохранить',
-    scope: 'panel',
-    disabled: !canSave || saving,
-    onClick: () => {
-      void handleSave()
-    },
-  })
-
   return (
-    <StackPanel
+    <EntityEditPanel
       open={open}
       title={title}
       onClose={onClose}
-      headerActions={
-        <Button
-          type="button"
-          className="!px-3 !py-1.5"
-          disabled={!canSave || saving}
-          onClick={() => void handleSave()}
-        >
-          Сохранить
-        </Button>
-      }
+      onSave={handleSave}
+      saveDisabled={!canSave || saving}
+      saveActionId="check-in-transfer-save"
     >
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -143,6 +125,6 @@ export function CheckInTransferPanel({
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" />
         </Field>
       </div>
-    </StackPanel>
+    </EntityEditPanel>
   )
 }

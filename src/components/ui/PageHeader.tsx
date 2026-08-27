@@ -4,35 +4,6 @@ import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { usePrimaryActionStore } from '../../store/primaryActionStore'
 import type { AppSection } from '../../types/wallet'
 
-export function usePrimaryAction(section: AppSection) {
-  const override = usePrimaryActionStore((s) => s.override)
-  const openCreate = useCheckInUiStore((s) => s.openCreate)
-  const checkInOpen = useCheckInUiStore((s) => s.open)
-
-  const panelOverride = override?.scope === 'panel' ? override : null
-  const sectionOverride = override && override.scope !== 'panel' ? override : null
-
-  const label = sectionOverride?.label ?? 'Чек-ин'
-  const disabled = sectionOverride?.disabled ?? false
-  const title = sectionOverride?.title ?? (sectionOverride ? undefined : 'Новый чек-ин')
-  const onClick = sectionOverride?.onClick ?? openCreate
-  const showCheckIcon = !sectionOverride
-
-  const hidden =
-    panelOverride != null ||
-    (section === 'settings' && !sectionOverride) ||
-    (checkInOpen && !sectionOverride)
-
-  return {
-    hidden,
-    label,
-    disabled,
-    title,
-    onClick,
-    showCheckIcon,
-  }
-}
-
 function CheckIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -52,44 +23,85 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
+function useSectionPrimary(section: AppSection) {
+  const override = usePrimaryActionStore((s) => s.override)
+  const openCreate = useCheckInUiStore((s) => s.openCreate)
+  const checkInOpen = useCheckInUiStore((s) => s.open)
+
+  const sectionOverride = override && override.scope !== 'panel' ? override : null
+
+  const label = sectionOverride?.label ?? 'Чек-ин'
+  const disabled = sectionOverride?.disabled ?? false
+  const title = sectionOverride?.title ?? (sectionOverride ? undefined : 'Новый чек-ин')
+  const onClick = sectionOverride?.onClick ?? openCreate
+  const showCheckIcon = !sectionOverride
+
+  const hidden =
+    (section === 'settings' && !sectionOverride) || (checkInOpen && !sectionOverride)
+
+  return { hidden, label, disabled, title, onClick, showCheckIcon }
+}
+
 interface PrimaryActionButtonProps {
   section: AppSection
-  /** Mobile floating button vs desktop toolbar control. */
+  /** Mobile floating button vs desktop page-header control. */
   variant: 'fab' | 'toolbar'
   className?: string
 }
 
 export function PrimaryActionButton({ section, variant, className = '' }: PrimaryActionButtonProps) {
-  const action = usePrimaryAction(section)
-  if (action.hidden) return null
+  const override = usePrimaryActionStore((s) => s.override)
+  const panelOverride = override?.scope === 'panel' ? override : null
+  const sectionPrimary = useSectionPrimary(section)
 
   if (variant === 'fab') {
+    // Панель редактирования: FAB = Сохранить (поверх sheet).
+    if (panelOverride) {
+      return (
+        <button
+          type="button"
+          onClick={panelOverride.onClick}
+          disabled={panelOverride.disabled}
+          title={panelOverride.title}
+          aria-label={panelOverride.label}
+          className={`fixed z-[110] flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:hidden ${className}`}
+        >
+          <span>{panelOverride.label}</span>
+        </button>
+      )
+    }
+
+    if (sectionPrimary.hidden) return null
+
     return (
       <button
         type="button"
-        onClick={action.onClick}
-        disabled={action.disabled}
-        title={action.title}
-        aria-label={action.label}
+        onClick={sectionPrimary.onClick}
+        disabled={sectionPrimary.disabled}
+        title={sectionPrimary.title}
+        aria-label={sectionPrimary.label}
         className={`fixed z-[90] flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:hidden ${className}`}
       >
-        {action.showCheckIcon && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
-        <span>{action.label}</span>
+        {sectionPrimary.showCheckIcon && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
+        <span>{sectionPrimary.label}</span>
       </button>
     )
   }
 
+  // Toolbar: только десктоп, не на странице в адаптиве; при открытой edit-панели скрыт.
+  if (panelOverride || sectionPrimary.hidden) return null
+
   return (
     <button
       type="button"
-      onClick={action.onClick}
-      disabled={action.disabled}
-      title={action.title}
-      aria-label={action.label}
+      onClick={sectionPrimary.onClick}
+      disabled={sectionPrimary.disabled}
+      title={sectionPrimary.title}
+      aria-label={sectionPrimary.label}
       className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
-      {action.showCheckIcon && <CheckIcon className="h-4 w-4 shrink-0" aria-hidden />}
-      <span>{action.label}</span>
+      {sectionPrimary.showCheckIcon && <CheckIcon className="h-4 w-4 shrink-0" aria-hidden />}
+      <span>{sectionPrimary.label}</span>
     </button>
   )
 }
@@ -104,12 +116,12 @@ interface PageHeaderProps {
   description?: ReactNode
   /** Secondary controls — on desktop sit to the left of the primary action. */
   actions?: ReactNode
-  /** Show section primary (чек-ин / добавить счёт). Default true. */
+  /** Show section primary (чек-ин / добавить счёт). Default true. Desktop only. */
   showPrimary?: boolean
   className?: string
 }
 
-/** Заголовок раздела: на десктопе primary справа, остальные кнопки слева от неё. */
+/** Заголовок раздела: на десктопе primary справа; в адаптиве primary только в FAB. */
 export function PageHeader({
   title,
   description,

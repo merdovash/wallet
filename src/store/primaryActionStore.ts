@@ -8,7 +8,7 @@ export interface PrimaryActionOverride {
   title?: string
   /**
    * section — заменяет основное действие страницы (напр. «Добавить счёт»).
-   * panel — только «Сохранить» в шапке StackPanel (не в toolbar/FAB).
+   * panel — «Сохранить» в EntityEditPanel: FAB на мобиле, кнопка в шапке на десктопе.
    */
   scope?: 'section' | 'panel'
 }

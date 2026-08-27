@@ -25,6 +25,7 @@ import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { PageHeader } from '../ui/PageHeader'
 import { StackPanel } from '../ui/StackPanel'
 import { GrowthChart } from '../dashboard/GrowthChart'
@@ -257,15 +258,6 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setFormOpen(false)
   }
 
-  useRegisterPrimaryAction(formOpen, {
-    id: 'account-form-save',
-    label: 'Сохранить',
-    scope: 'panel',
-    onClick: () => {
-      void handleSave()
-    },
-  })
-
   useRegisterPrimaryAction(!formOpen, {
     id: 'accounts-add',
     label: 'Добавить счёт',
@@ -363,15 +355,12 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         </Card>
       )}
 
-      <StackPanel
+      <EntityEditPanel
         open={formOpen}
         title={editingId ? 'Счёт' : 'Новый счёт'}
         onClose={() => setFormOpen(false)}
-        headerActions={
-          <Button type="button" className="!px-3 !py-1.5" onClick={() => void handleSave()}>
-            Сохранить
-          </Button>
-        }
+        onSave={handleSave}
+        saveActionId="account-form-save"
       >
         <div className="space-y-4">
           <Field label="Название">
@@ -476,7 +465,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
             </Button>
           )}
         </div>
-      </StackPanel>
+      </EntityEditPanel>
 
       <StackPanel
         open={!!detailAccount}
