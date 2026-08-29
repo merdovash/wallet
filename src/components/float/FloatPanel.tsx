@@ -2,6 +2,7 @@
 import type { CreditFloatDayRow } from '../../engine/creditFloatEngine'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
+import { daysInPeriod } from '../../lib/floatPeriod'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
@@ -386,17 +387,37 @@ export function FloatPanel() {
         }
       }
     }
-    return [...byMonth.values()]
-      .map((row) => ({
-        ...row,
-        floatSharePct:
-          row.linkedGrowthBase !== 0 ? row.earnedBase / row.linkedGrowthBase : null,
-      }))
-      .filter((row) => {
-        if (!range) return true
-        return row.month >= range.startDate.slice(0, 7) && row.month <= range.endDate.slice(0, 7)
-      })
-      .sort((a, b) => b.month.localeCompare(a.month))
+    const allMonths = [...byMonth.values()].map((row) => ({
+      ...row,
+      floatSharePct:
+        row.linkedGrowthBase !== 0 ? row.earnedBase / row.linkedGrowthBase : null,
+    }))
+
+    const sliced = !range
+      ? allMonths
+      : allMonths
+          .map((row) => {
+            const days = daysInPeriod(row.days, range)
+            if (days.length === 0) return null
+            const linkedGrowthBase = days.reduce((s, d) => s + d.linkedGrowthBase, 0)
+            const earnedBase = days.reduce((s, d) => s + d.earnedBase, 0)
+            const baseGrowthBase = days.reduce((s, d) => s + d.baseGrowthBase, 0)
+            const creditGrowthBase = days.reduce((s, d) => s + d.creditGrowthBase, 0)
+            const interestGrowthBase = days.reduce((s, d) => s + d.interestGrowthBase, 0)
+            return {
+              ...row,
+              days,
+              linkedGrowthBase,
+              earnedBase,
+              baseGrowthBase,
+              creditGrowthBase,
+              interestGrowthBase,
+              floatSharePct: linkedGrowthBase !== 0 ? earnedBase / linkedGrowthBase : null,
+            }
+          })
+          .filter((row): row is MonthAgg => row != null)
+
+    return sliced.sort((a, b) => b.month.localeCompare(a.month))
   }, [summary.cards, range])
 
   const totals = useMemo(() => {
@@ -423,11 +444,8 @@ export function FloatPanel() {
   }, [months])
 
   const currency = settings.baseCurrency
-  const earnedColor = earnTone(summary.totalEarnedBase)
-  const cumulativeInterestBase = summary.cards.reduce(
-    (sum, c) => sum + c.cumulativeInterestBase,
-    0,
-  )
+  const earnedColor = earnTone(totals.earnedBase)
+  const cumulativeInterestBase = totals.interestGrowthBase
 
   function toggleMonth(month: string) {
     setExpanded((prev) => ({ ...prev, [month]: !prev[month] }))
@@ -455,7 +473,7 @@ export function FloatPanel() {
               <p
                 className={`mt-0.5 text-base font-semibold tabular-nums sm:mt-1 sm:text-xl ${earnedColor}`}
               >
-                {signedAmount(summary.totalEarnedBase, currency)}
+                {signedAmount(totals.earnedBase, currency)}
               </p>
               <p className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-xs">
                 Накопление по дням изменений связанного счёта
