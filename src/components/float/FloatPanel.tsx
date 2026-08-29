@@ -5,6 +5,7 @@ import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../..
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { Card, EmptyState } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
@@ -433,7 +434,7 @@ export function FloatPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4" {...dataQa('float-page')}>
       <PageHeader
         title="Float"
         description="Выгода от беспроцентного кредита на связанном счёте"
@@ -444,11 +445,12 @@ export function FloatPanel() {
         <EmptyState
           title="Нет кредиток"
           description="Добавьте счёт типа «Кредитка» с лимитом, сроком грейса и связанным кошельком."
+          dataQa="float-empty"
         />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            <Card className="!p-2.5 sm:!p-3">
+            <Card className="!p-2.5 sm:!p-3" dataQa="widget-float-benefit">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Выгода float</p>
               <p
                 className={`mt-0.5 text-base font-semibold tabular-nums sm:mt-1 sm:text-xl ${earnedColor}`}
@@ -464,7 +466,7 @@ export function FloatPanel() {
                 </p>
               ) : null}
             </Card>
-            <Card className="!p-2.5 sm:!p-3">
+            <Card className="!p-2.5 sm:!p-3" dataQa="widget-float-debt">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Долг по кредиткам</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:mt-1 sm:text-xl">
                 {formatCurrency(
@@ -475,7 +477,7 @@ export function FloatPanel() {
             </Card>
           </div>
 
-          <Card className="!p-3 sm:!p-4">
+          <Card className="!p-3 sm:!p-4" dataQa="widget-float-breakdown">
             <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
               Расшифровка
             </h2>
@@ -511,7 +513,7 @@ export function FloatPanel() {
             </dl>
           </Card>
 
-          <Card className="!p-3 sm:!p-4">
+          <Card className="!p-3 sm:!p-4" dataQa="table-float-months">
             <h2 className="mb-1 text-sm font-semibold text-slate-800 dark:text-slate-200">По месяцам</h2>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
               Откройте месяц: по каждому дню — формулы корзин. Наведите на число (на телефоне —
@@ -540,6 +542,7 @@ export function FloatPanel() {
                         onClick={() => toggleMonth(row.month)}
                         className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left"
                         aria-expanded={open}
+                        {...dataQa(`float-month-${row.month}`)}
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-200">

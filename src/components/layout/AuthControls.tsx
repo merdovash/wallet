@@ -1,4 +1,5 @@
 import { useAuthStore } from '../../store/authStore'
+import { dataQa } from '../../lib/dataQa'
 import { Button } from '../ui/FormControls'
 
 /** Portal apex URL for SSO login. */
@@ -19,8 +20,12 @@ export function AuthControls() {
 
   if (user) {
     return (
-      <div className="space-y-2">
-        <p className="truncate px-1 text-xs text-slate-500 dark:text-slate-400" title={user.email}>
+      <div className="space-y-2" {...dataQa('auth')}>
+        <p
+          className="truncate px-1 text-xs text-slate-500 dark:text-slate-400"
+          title={user.email}
+          {...dataQa('auth-email')}
+        >
           {user.email}
         </p>
         <Button
@@ -29,6 +34,7 @@ export function AuthControls() {
           disabled={loading}
           onClick={() => void logout()}
           className="w-full"
+          dataQa="auth-logout"
         >
           Выйти
         </Button>
@@ -41,6 +47,7 @@ export function AuthControls() {
       <a
         href={portalUrl}
         className="flex w-full items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+        {...dataQa('auth-login')}
       >
         Войти через Portal
       </a>
@@ -48,7 +55,7 @@ export function AuthControls() {
   }
 
   return (
-    <p className="px-1 text-xs text-slate-500 dark:text-slate-400">
+    <p className="px-1 text-xs text-slate-500 dark:text-slate-400" {...dataQa('auth-portal-missing')}>
       Задайте VITE_PORTAL_URL для входа через хаб-портал.
     </p>
   )

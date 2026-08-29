@@ -1,5 +1,6 @@
 import { ANALYTICS_NAV_ITEMS } from '../../lib/navSections'
 import { sectionToPath } from '../../lib/appRoutes'
+import { dataQa } from '../../lib/dataQa'
 import type { AnalyticsSection } from '../../types/wallet'
 import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
@@ -10,7 +11,7 @@ interface AnalyticsPanelProps {
 
 export function AnalyticsPanel({ onOpenSection }: AnalyticsPanelProps) {
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4" {...dataQa('analytics-page')}>
       <PageHeader
         title="Аналитика"
         description="Подробные отчёты по дням, типам счетов, валютам и кредитному float"
@@ -26,6 +27,7 @@ export function AnalyticsPanel({ onOpenSection }: AnalyticsPanelProps) {
                 e.preventDefault()
                 onOpenSection(item.id)
               }}
+              {...dataQa(`analytics-nav-${item.id}`)}
               className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-blue-300 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
             >
               <span className="min-w-0">

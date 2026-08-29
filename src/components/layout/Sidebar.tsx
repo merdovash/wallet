@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState, type SVGProps } from 'react'
 import { sectionToPath } from '../../lib/appRoutes'
+import { dataQa } from '../../lib/dataQa'
 import {
   ANALYTICS_NAV_ITEMS,
   PRIMARY_NAV_SECTIONS,
@@ -65,8 +66,11 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
 
   return (
     <div className="shrink-0 md:contents">
-      <aside className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pb-[env(safe-area-inset-bottom,0px)] md:hidden">
-        <nav className="flex items-stretch gap-0.5 overflow-x-auto px-1 py-1.5">
+      <aside
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pb-[env(safe-area-inset-bottom,0px)] md:hidden"
+        {...dataQa('nav-mobile')}
+      >
+        <nav className="flex items-stretch gap-0.5 overflow-x-auto px-1 py-1.5" {...dataQa('nav-mobile-tabs')}>
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
@@ -74,6 +78,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             aria-label="Открыть меню"
             aria-expanded={mobileMenuOpen}
             className="flex min-w-[3rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            {...dataQa('nav-menu')}
           >
             <MenuIcon className="h-5 w-5" aria-hidden />
             <span className="text-[10px] font-medium leading-none">Меню</span>
@@ -89,6 +94,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
                 isActive={primaryActive === id}
                 mode="icon"
                 onChange={selectSection}
+                qaSurface="mobile"
               />
             )
           })}
@@ -96,17 +102,19 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
       </aside>
 
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[55] md:hidden">
+        <div className="fixed inset-0 z-[55] md:hidden" {...dataQa('nav-drawer-root')}>
           <button
             type="button"
             className="absolute inset-0 bg-slate-900/40"
             aria-label="Закрыть меню"
             onClick={() => setMobileMenuOpen(false)}
+            {...dataQa('nav-drawer-backdrop')}
           />
           <aside
             className="absolute inset-y-0 left-0 flex w-[min(18rem,85vw)] flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl"
             style={{ animation: 'mobile-drawer-in 180ms ease-out' }}
             aria-label="Навигация"
+            {...dataQa('nav-drawer')}
           >
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
               <PortalHomeLink />
@@ -114,6 +122,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
                 className="rounded-lg px-2 py-1 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                {...dataQa('nav-drawer-close')}
               >
                 Закрыть
               </button>
@@ -126,6 +135,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
                 onAnalyticsOpenChange={setAnalyticsOpen}
                 onChange={selectSection}
                 collapsed={false}
+                qaSurface="drawer"
               />
             </nav>
             <div className="shrink-0 space-y-2 border-t border-slate-200 dark:border-slate-700 p-3">
@@ -140,6 +150,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
         className={`absolute inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-md transition-[width] duration-200 md:flex ${
           collapsed ? 'w-14' : 'w-56'
         }`}
+        {...dataQa('nav-desktop')}
       >
         <div
           className={`shrink-0 border-b border-slate-100 dark:border-slate-800 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}
@@ -158,6 +169,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             onAnalyticsOpenChange={setAnalyticsOpen}
             onChange={onChange}
             collapsed={collapsed}
+            qaSurface="desktop"
           />
         </nav>
 
@@ -169,6 +181,7 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             className="flex w-full items-center justify-center rounded-lg px-2 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
             title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
             aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            {...dataQa('nav-collapse')}
           >
             <CollapseIcon className={`h-5 w-5 transition ${collapsed ? 'rotate-180' : ''}`} />
           </button>
@@ -186,6 +199,7 @@ function PrimaryNavList({
   onAnalyticsOpenChange,
   onChange,
   collapsed,
+  qaSurface,
 }: {
   active: AppSection
   primaryActive: AppSection
@@ -193,6 +207,7 @@ function PrimaryNavList({
   onAnalyticsOpenChange: (open: boolean) => void
   onChange: (id: AppSection) => void
   collapsed: boolean
+  qaSurface: 'desktop' | 'drawer'
 }) {
   return (
     <>
@@ -209,6 +224,7 @@ function PrimaryNavList({
                     Icon={Icon}
                     isActive={primaryActive === id}
                     mode="full"
+                    qaSurface={qaSurface}
                     onChange={(next) => {
                       onAnalyticsOpenChange(true)
                       onChange(next)
@@ -225,6 +241,7 @@ function PrimaryNavList({
                       ? 'text-blue-700 dark:text-blue-300'
                       : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                   }`}
+                  {...dataQa(`nav-analytics-toggle-${qaSurface}`)}
                 >
                   <ChevronIcon
                     className={`h-4 w-4 transition ${analyticsOpen ? 'rotate-90' : ''}`}
@@ -245,6 +262,7 @@ function PrimaryNavList({
                         mode="full"
                         onChange={onChange}
                         compact
+                        qaSurface={qaSurface}
                       />
                     )
                   })}
@@ -263,6 +281,7 @@ function PrimaryNavList({
             isActive={primaryActive === id}
             mode={collapsed ? 'icon' : 'full'}
             onChange={onChange}
+            qaSurface={qaSurface}
           />
         )
       })}
@@ -277,6 +296,7 @@ function AppVersion({ collapsed = false }: { collapsed?: boolean }) {
         collapsed ? 'px-0' : 'px-1'
       }`}
       title={`Версия ${__APP_VERSION__}`}
+      {...dataQa('app-version')}
     >
       {collapsed ? `v${__APP_VERSION__}` : `версия ${__APP_VERSION__}`}
     </p>
@@ -292,6 +312,7 @@ function PortalHomeLink({ collapsed = false }: { collapsed?: boolean }) {
       className={`flex items-center gap-2 rounded-lg text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 ${
         collapsed ? 'justify-center p-1.5' : 'px-1 py-0.5'
       }`}
+      {...dataQa('nav-portal-home')}
     >
       <HomeIcon className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
       {!collapsed && <span className="text-sm font-semibold text-slate-900 dark:text-slate-200">Портал</span>}
@@ -307,6 +328,7 @@ function NavButton({
   mode,
   onChange,
   compact = false,
+  qaSurface,
 }: {
   id: AppSection
   label: string
@@ -315,6 +337,7 @@ function NavButton({
   mode: 'icon' | 'full'
   onChange: (id: AppSection) => void
   compact?: boolean
+  qaSurface: 'mobile' | 'desktop' | 'drawer'
 }) {
   const base =
     mode === 'icon'
@@ -336,6 +359,8 @@ function NavButton({
       title={label}
       aria-current={isActive ? 'page' : undefined}
       className={`${base} ${activeCls}`}
+      {...dataQa(`nav-${id}`)}
+      data-qa-surface={qaSurface}
     >
       <Icon className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} shrink-0`} aria-hidden />
       {mode === 'icon' ? (

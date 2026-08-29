@@ -47,8 +47,8 @@ export function CreditFloatSummary() {
         : 'text-slate-800 dark:text-slate-200'
 
   return (
-    <div className="grid grid-cols-2 gap-1.5">
-      <Card className="!p-2">
+    <div className="grid grid-cols-2 gap-1.5" data-qa="widget-float">
+      <Card className="!p-2" dataQa="widget-float-earned">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Выгода float</p>
         <p className={`mt-0.5 text-sm font-semibold tabular-nums leading-tight ${earnedColor}`}>
           {signedAmount(summary.totalEarnedBase, currency)}
@@ -57,7 +57,7 @@ export function CreditFloatSummary() {
           Накопительно по дням: доля долга + % на закреплённый доход
         </p>
       </Card>
-      <Card className="!p-2">
+      <Card className="!p-2" dataQa="widget-float-debt">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Долг по кредиткам</p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-slate-900 dark:text-slate-200">
           {formatCurrency(

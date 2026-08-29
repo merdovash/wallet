@@ -78,7 +78,7 @@ export function ReturnBreakdownPanel({
     : []
 
   return (
-    <StackPanel open={open} title={title} onClose={onClose}>
+    <StackPanel open={open} title={title} onClose={onClose} dataQa="return-breakdown">
       {!periodReturn ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Недостаточно данных: нужны минимум два чек-ина и счета типа накопления (фонд), вклад
@@ -764,6 +764,7 @@ function Row({
           <button
             type="button"
             onClick={onValueClick}
+            data-qa="return-transfers-toggle"
             className="inline-flex items-center gap-1 rounded-md underline decoration-dotted underline-offset-2 hover:text-blue-700 dark:hover:text-blue-400"
           >
             {value}

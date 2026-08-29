@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { dataQa } from '../../lib/dataQa'
 
 interface StackPanelProps {
   open: boolean
@@ -8,12 +9,21 @@ interface StackPanelProps {
   children: ReactNode
   /** Extra controls in the header, shown before «Закрыть» (e.g. Save). */
   headerActions?: ReactNode
+  /** Prefix for data-qa on the sheet (`{id}`, `{id}-close`, `{id}-backdrop`). */
+  dataQa?: string
 }
 
 const DISMISS_DRAG_PX = 72
 
 /** Нижняя стековая панель (sheet) поверх контента. */
-export function StackPanel({ open, title, onClose, children, headerActions }: StackPanelProps) {
+export function StackPanel({
+  open,
+  title,
+  onClose,
+  children,
+  headerActions,
+  dataQa: qaId = 'panel',
+}: StackPanelProps) {
   const openedAtRef = useRef(0)
   const dragStartYRef = useRef<number | null>(null)
   const dragOffsetRef = useRef(0)
@@ -98,11 +108,12 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
   }
 
   return createPortal(
-    <div className="fixed inset-0 isolate z-[100]">
+    <div className="fixed inset-0 isolate z-[100]" {...dataQa(`${qaId}-root`)}>
       <div
         className="absolute inset-0 z-0 bg-slate-900/40"
         aria-hidden
         onClick={handleBackdropClick}
+        {...dataQa(`${qaId}-backdrop`)}
       />
       <div
         role="dialog"
@@ -110,15 +121,20 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
         aria-label={title}
         className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-b-0 border-slate-200 bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-2xl dark:border-slate-700 dark:bg-slate-900"
         style={sheetStyle}
+        {...dataQa(qaId)}
       >
         <div className="flex shrink-0 flex-col items-center border-b border-slate-100 dark:border-slate-800">
           <div
             className="mt-2 h-1 w-10 shrink-0 cursor-grab touch-none rounded-full bg-slate-300 active:cursor-grabbing"
             aria-hidden
             onPointerDown={onDragHandlePointerDown}
+            {...dataQa(`${qaId}-handle`)}
           />
           <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900 dark:text-slate-200">
+            <h2
+              className="min-w-0 flex-1 truncate text-lg font-semibold text-slate-900 dark:text-slate-200"
+              {...dataQa(`${qaId}-title`)}
+            >
               {title}
             </h2>
             <div className="relative z-20 flex shrink-0 items-center gap-2">
@@ -127,13 +143,17 @@ export function StackPanel({ open, title, onClose, children, headerActions }: St
                 type="button"
                 className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 onClick={onClose}
+                {...dataQa(`${qaId}-close`)}
               >
                 Закрыть
               </button>
             </div>
           </div>
         </div>
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
+        <div
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4"
+          {...dataQa(`${qaId}-body`)}
+        >
           {children}
         </div>
       </div>

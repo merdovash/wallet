@@ -3,6 +3,7 @@ import { formatDateDisplay } from '../../lib/format'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { usePeriodStore } from '../../store/periodStore'
 import { DateInput } from './FormControls'
+import { dataQa } from '../../lib/dataQa'
 
 interface PeriodFilterProps {
   className?: string
@@ -44,11 +45,15 @@ export function PeriodFilter({ className = '', showRange = false }: PeriodFilter
   }
 
   return (
-    <div className={`flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1 ${className}`}>
+    <div
+      className={`flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1 ${className}`}
+      {...dataQa('period-filter')}
+    >
       <div
         role="group"
         aria-label="Период"
         className="inline-flex max-w-full min-w-0 flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900"
+        {...dataQa('period-chips')}
       >
         {DASHBOARD_PERIOD_OPTIONS.map((option) => (
           <button
@@ -62,6 +67,7 @@ export function PeriodFilter({ className = '', showRange = false }: PeriodFilter
                 ? 'bg-blue-600 text-white'
                 : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
+            {...dataQa(`period-${option.key}`)}
           >
             <span className="sm:hidden">{option.shortLabel}</span>
             <span className="hidden sm:inline">{option.label}</span>
@@ -77,14 +83,16 @@ export function PeriodFilter({ className = '', showRange = false }: PeriodFilter
               ? 'bg-blue-600 text-white'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
           }`}
+          {...dataQa('period-custom')}
         >
           Свои
         </button>
       </div>
       {custom && firstDate && lastDate ? (
-        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5" {...dataQa('period-custom-range')}>
           <DateInput
             aria-label="Начало периода"
+            dataQa="period-start"
             value={customStart || firstDate}
             min={firstDate}
             max={lastDate}
@@ -97,6 +105,7 @@ export function PeriodFilter({ className = '', showRange = false }: PeriodFilter
           <span className="text-[10px] text-slate-400 dark:text-slate-500">→</span>
           <DateInput
             aria-label="Конец периода"
+            dataQa="period-end"
             value={customEnd || lastDate}
             min={firstDate}
             max={lastDate}

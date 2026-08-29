@@ -9,6 +9,7 @@ import { formatCurrency, formatPercent, formatShortDate, signedAmount, todayIsoD
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { CurrencyReportTable } from '../dashboard/CurrencyReportTable'
 import { Card } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
@@ -71,7 +72,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
         : 'text-slate-800 dark:text-slate-200'
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4" {...dataQa('currencies-page')}>
       <PageHeader
         title="Валюты"
         description={
@@ -89,6 +90,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
           onClick={() => setBreakdownOpen(true)}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           title="Показать расшифровку курсовой разницы"
+          {...dataQa('widget-fx-abs')}
         >
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Курсовая разница</p>
@@ -107,6 +109,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
           onClick={() => setBreakdownOpen(true)}
           className="rounded-xl text-left transition hover:ring-2 hover:ring-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           title="Показать расшифровку курсовой разницы"
+          {...dataQa('widget-fx-pct')}
         >
           <Card className="!p-2.5 sm:!p-3">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Курсовая разница %</p>

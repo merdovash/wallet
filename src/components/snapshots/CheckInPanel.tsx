@@ -8,6 +8,7 @@ import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
+import { dataQa } from '../../lib/dataQa'
 import { Button, DateInput, Input, MoneyInput } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import {
@@ -499,6 +500,7 @@ export function CheckInPanel({
     <>
     <EntityEditPanel
       open={open}
+      dataQa="check-in"
       saveActive={!transferEditor}
       title={
         locked
@@ -524,6 +526,7 @@ export function CheckInPanel({
           title="Справка"
           aria-label="Справка"
           aria-pressed={showHelp}
+          {...dataQa('check-in-help')}
           onClick={() => setShowHelp((v) => !v)}
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition ${
             showHelp
@@ -538,6 +541,7 @@ export function CheckInPanel({
       <form
         id="check-in-panel-form"
         className="space-y-4"
+        {...dataQa('check-in-form')}
         onSubmit={(e) => {
           e.preventDefault()
           void handleSave()
@@ -569,6 +573,7 @@ export function CheckInPanel({
             type="button"
             variant="secondary"
             className="w-full sm:w-auto"
+            dataQa="check-in-add-transfer"
             onClick={openCreateTransfer}
           >
             Добавить перевод
@@ -595,6 +600,7 @@ export function CheckInPanel({
               value={date}
               onChange={setDate}
               disabled={locked}
+              dataQa="check-in-date"
               {...focusKeyProps('date')}
             />
           </InlineRow>
@@ -603,6 +609,7 @@ export function CheckInPanel({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Необязательно"
+              dataQa="check-in-note"
               {...focusKeyProps('note')}
             />
           </InlineRow>
@@ -619,6 +626,7 @@ export function CheckInPanel({
                 }}
                 allowNegative={false}
                 placeholder={incomeHint}
+                dataQa="check-in-income"
                 {...focusKeyProps('income')}
               />
             </label>
@@ -634,6 +642,7 @@ export function CheckInPanel({
                 }}
                 allowNegative={false}
                 placeholder={expenseHint}
+                dataQa="check-in-expense"
                 {...focusKeyProps('expense')}
               />
             </label>
@@ -643,6 +652,7 @@ export function CheckInPanel({
               <button
                 type="button"
                 className="text-blue-600 hover:underline"
+                {...dataQa('check-in-restore-auto')}
                 onClick={() => setIncomeManual(false)}
               >
                 Вернуть автозаполнение дохода и расхода
@@ -679,6 +689,7 @@ export function CheckInPanel({
                         disabled
                         readOnly
                         className="w-32 shrink-0 sm:w-40 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300"
+                        dataQa={`check-in-amount-${account.id}`}
                       />
                     ) : (
                       <MoneyInput
@@ -688,6 +699,7 @@ export function CheckInPanel({
                         }
                         placeholder={hints[account.id] ?? '0'}
                         className="w-32 shrink-0 sm:w-40"
+                        dataQa={`check-in-amount-${account.id}`}
                         {...focusKeyProps(`amount-${account.id}`)}
                       />
                     )}
@@ -721,7 +733,7 @@ export function CheckInPanel({
         )}
 
         {editing && (
-          <Button type="button" variant="danger" onClick={() => void handleDelete()}>
+          <Button type="button" variant="danger" dataQa="check-in-delete" onClick={() => void handleDelete()}>
             {locked ? 'Удалить перевод' : 'Удалить чек-ин'}
           </Button>
         )}
@@ -786,6 +798,7 @@ function TransfersSection({
             <button
               type="button"
               className="min-w-0 flex-1 text-left"
+              {...dataQa(`check-in-transfer-${t.id}`)}
               onClick={() => onEditSaved(t)}
             >
               <p className="font-medium text-slate-900 dark:text-slate-200">
@@ -797,6 +810,7 @@ function TransfersSection({
             <button
               type="button"
               className="shrink-0 text-xs text-red-600 hover:underline"
+              {...dataQa(`check-in-transfer-delete-${t.id}`)}
               onClick={() => onDeleteSaved(t.id)}
             >
               Удалить
@@ -815,6 +829,7 @@ function TransfersSection({
               <button
                 type="button"
                 className="min-w-0 flex-1 text-left"
+                {...dataQa(`check-in-pending-${t.key}`)}
                 onClick={() => onEditPending(t)}
               >
                 <p className="font-medium text-slate-900 dark:text-slate-200">
@@ -830,6 +845,7 @@ function TransfersSection({
               <button
                 type="button"
                 className="shrink-0 text-xs text-red-600 hover:underline"
+                {...dataQa(`check-in-pending-remove-${t.key}`)}
                 onClick={() => onRemovePending(t.key)}
               >
                 Убрать

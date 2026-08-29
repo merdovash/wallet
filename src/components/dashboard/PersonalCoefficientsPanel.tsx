@@ -27,20 +27,20 @@ export function PersonalCoefficientsPanel({ coefficients }: PersonalCoefficients
   if (!hasData) return null
 
   return (
-    <div className="grid grid-cols-2 gap-1.5">
-      <Card className="!p-2">
+    <div className="grid grid-cols-2 gap-1.5" data-qa="widget-coefficients">
+      <Card className="!p-2" dataQa="widget-savings-rate">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Норма сбережений</p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-slate-900 dark:text-slate-200">
           {formatRatio(coefficients.savingsRate)}
         </p>
       </Card>
-      <Card className="!p-2">
+      <Card className="!p-2" dataQa="widget-liquidity">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Подушка ликвидности</p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-slate-900 dark:text-slate-200">
           {formatMonths(coefficients.liquidityCushionMonths)}
         </p>
       </Card>
-      <Card className="!p-2">
+      <Card className="!p-2" dataQa="widget-debt-load">
         <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Долговая нагрузка</p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-slate-900 dark:text-slate-200">
           {formatRatio(coefficients.debtLoad)}

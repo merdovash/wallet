@@ -17,6 +17,7 @@ import { useTheme } from '../../lib/useTheme'
 import type { ThemeMode } from '../../lib/theme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { Button, Card, Field, Input, Select } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
 import { RatesRegistryPanel } from './RatesRegistryPanel'
@@ -75,7 +76,7 @@ export function SettingsPanel() {
           : 'Курсы ещё не загружены'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4" {...dataQa('settings-page')}>
       <PageHeader
         title="Настройки"
         description="Базовая валюта и курсы ЦБ РФ на дату чек-ина (cbr-xml-daily.ru)"
@@ -87,6 +88,7 @@ export function SettingsPanel() {
           <Select
             value={themeMode}
             onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+            dataQa="settings-theme"
           >
             <option value="system">Как в системе</option>
             <option value="light">Светлая</option>
@@ -99,6 +101,7 @@ export function SettingsPanel() {
         <Field label="Интервал чек-инов">
           <Select
             value={String(checkInIntervalDays)}
+            dataQa="settings-interval"
             onChange={(e) => {
               const next = Number(e.target.value)
               writeCheckInIntervalDays(next)
@@ -121,6 +124,7 @@ export function SettingsPanel() {
         <Field label="Базовая валюта">
           <Select
             value={settings.baseCurrency}
+            dataQa="settings-base-currency"
             onChange={(e) => {
               void setSettings({ baseCurrency: e.target.value })
             }}
@@ -137,6 +141,7 @@ export function SettingsPanel() {
             type="text"
             inputMode="decimal"
             placeholder="например 8"
+            dataQa="settings-inflation"
             value={inflationText}
             onChange={(e) => setInflationText(e.target.value)}
             onBlur={() => {
@@ -153,6 +158,7 @@ export function SettingsPanel() {
             type="text"
             inputMode="decimal"
             placeholder="например 16"
+            dataQa="settings-key-rate"
             value={keyRateText}
             onChange={(e) => setKeyRateText(e.target.value)}
             onBlur={() => {
@@ -166,7 +172,7 @@ export function SettingsPanel() {
         </Field>
       </Card>
 
-      <Card className="space-y-4">
+      <Card className="space-y-4" dataQa="settings-rates">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Курсы ЦБ</h2>
@@ -192,6 +198,7 @@ export function SettingsPanel() {
               variant="secondary"
               disabled={rateDates.length === 0}
               onClick={() => setRegistryOpen(true)}
+              dataQa="settings-rates-registry"
             >
               Реестр
             </Button>
@@ -200,6 +207,7 @@ export function SettingsPanel() {
               variant="secondary"
               disabled={status === 'loading'}
               onClick={() => void refreshDate(today)}
+              dataQa="settings-rates-refresh"
             >
               Обновить
             </Button>
@@ -216,11 +224,11 @@ export function SettingsPanel() {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               1 единица → {settings.baseCurrency} (сегодня)
             </h3>
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" {...dataQa('settings-rates-list')}>
               {currenciesInUse.map((code) => {
                 if (code === settings.baseCurrency) {
                   return (
-                    <li key={code} className="flex justify-between px-3 py-2 text-sm">
+                    <li key={code} className="flex justify-between px-3 py-2 text-sm" {...dataQa(`settings-rate-${code}`)}>
                       <span>
                         {code} — {currencyLabel(code)}
                       </span>
@@ -231,7 +239,7 @@ export function SettingsPanel() {
                 const rub = pivot[code]
                 if (rub == null) {
                   return (
-                    <li key={code} className="flex justify-between px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+                    <li key={code} className="flex justify-between px-3 py-2 text-sm text-slate-400 dark:text-slate-500" {...dataQa(`settings-rate-${code}`)}>
                       <span>
                         {code} — {currencyLabel(code)}
                       </span>
@@ -244,7 +252,7 @@ export function SettingsPanel() {
                     ? rub
                     : rub / (pivot[settings.baseCurrency] ?? 1)
                 return (
-                  <li key={code} className="flex justify-between px-3 py-2 text-sm">
+                  <li key={code} className="flex justify-between px-3 py-2 text-sm" {...dataQa(`settings-rate-${code}`)}>
                     <span>
                       {code} — {currencyLabel(code)}
                     </span>

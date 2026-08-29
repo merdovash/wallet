@@ -90,13 +90,14 @@ export function CheckInTransferPanel({
       onSave={handleSave}
       saveDisabled={!canSave || saving}
       saveActionId="check-in-transfer-save"
+      dataQa="check-in-transfer"
     >
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Перевод относится к дате чек-ина. Сумма — в валюте счёта «откуда».
         </p>
         <Field label="Откуда">
-          <Select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+          <Select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} dataQa="check-in-transfer-from">
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} ({a.currency})
@@ -105,7 +106,7 @@ export function CheckInTransferPanel({
           </Select>
         </Field>
         <Field label="Куда">
-          <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+          <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} dataQa="check-in-transfer-to">
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} ({a.currency})
@@ -119,10 +120,11 @@ export function CheckInTransferPanel({
             onChange={setAmount}
             allowNegative={false}
             placeholder="0"
+            dataQa="check-in-transfer-amount"
           />
         </Field>
         <Field label="Комментарий">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" dataQa="check-in-transfer-note" />
         </Field>
       </div>
     </EntityEditPanel>

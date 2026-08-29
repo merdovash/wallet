@@ -33,10 +33,10 @@ export function MonthlyReturnsTable() {
   const risk = useMemo(() => buildMonthlyRiskMetrics(rows), [rows])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-qa="table-monthly">
       {rows.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Card className="px-4 py-3">
+          <Card className="px-4 py-3" dataQa="widget-volatility">
             <p className="text-xs text-slate-500 dark:text-slate-400">Волатильность месяцев</p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-200">
               {formatPercent(risk.volatilityPct)}
@@ -45,7 +45,7 @@ export function MonthlyReturnsTable() {
               σ помесячных доходностей
             </p>
           </Card>
-          <Card className="px-4 py-3">
+          <Card className="px-4 py-3" dataQa="widget-drawdown">
             <p className="text-xs text-slate-500 dark:text-slate-400">Макс. просадка</p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-red-600">
               {formatPercent(risk.maxDrawdownPct == null ? null : -risk.maxDrawdownPct)}
@@ -54,7 +54,7 @@ export function MonthlyReturnsTable() {
               по кумулятивному индексу
             </p>
           </Card>
-          <Card className="px-4 py-3">
+          <Card className="px-4 py-3" dataQa="widget-positive-months">
             <p className="text-xs text-slate-500 dark:text-slate-400">Плюсовые месяцы</p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-200">
               {risk.positiveMonthsRatio == null
@@ -85,7 +85,7 @@ export function MonthlyReturnsTable() {
         </div>
       ) : (
         <div className="overflow-x-hidden">
-          <table className="w-full table-fixed text-xs sm:text-sm">
+          <table className="w-full table-fixed text-xs sm:text-sm" data-qa="table-monthly-returns">
             <colgroup>
               <col className="w-[38%] sm:w-[34%]" />
               <col className="hidden md:table-column md:w-[22%]" />
@@ -115,7 +115,7 @@ export function MonthlyReturnsTable() {
                       ? 'text-red-600'
                       : 'text-slate-700 dark:text-slate-300'
                 return (
-                  <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800">
+                  <tr key={row.yearMonth} className="border-b border-slate-100 dark:border-slate-800" data-qa={`monthly-row-${row.yearMonth}`}>
                     <td className="px-2 py-2 font-medium text-slate-900 dark:text-slate-200 sm:px-4 sm:py-3">
                       <div className="truncate">{row.label}</div>
                       <div className="mt-0.5 truncate text-[11px] font-normal text-slate-500 dark:text-slate-400 md:hidden">

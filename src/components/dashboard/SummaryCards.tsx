@@ -86,13 +86,13 @@ export function SummaryCards({
   return (
     <>
       <div className="grid grid-cols-2 gap-1.5">
-        <Card className={cardClass}>
+        <Card className={cardClass} dataQa="widget-balance">
           <p className={labelClass}>Остаток</p>
           <p className={`${valueClass} text-slate-900 dark:text-slate-200`}>
             {formatCurrency(total, currency)}
           </p>
         </Card>
-        <button type="button" onClick={() => setBreakdownFocus('growth')} className={clickCardClass}>
+        <button type="button" onClick={() => setBreakdownFocus('growth')} className={clickCardClass} data-qa="widget-growth">
           <Card className={cardClass}>
             <p className={labelClass}>
               Прирост{withoutFx ? ' · без курса' : ''}
@@ -107,7 +107,7 @@ export function SummaryCards({
             </p>
           </Card>
         </button>
-        <button type="button" onClick={() => setBreakdownFocus('topUp')} className={clickCardClass}>
+        <button type="button" onClick={() => setBreakdownFocus('topUp')} className={clickCardClass} data-qa="widget-cashflow">
           <Card className={cardClass}>
             <p className={labelClass}>Чистый поток</p>
             <p className={`${valueClass} ${topUpColor}`}>
@@ -115,7 +115,7 @@ export function SummaryCards({
             </p>
           </Card>
         </button>
-        <button type="button" onClick={() => setBreakdownFocus('annualizedPct')} className={clickCardClass}>
+        <button type="button" onClick={() => setBreakdownFocus('annualizedPct')} className={clickCardClass} data-qa="widget-annualized">
           <Card className={cardClass}>
             <p className={labelClass}>В годовых</p>
             <AnnualizedMetric
@@ -126,7 +126,7 @@ export function SummaryCards({
             />
           </Card>
         </button>
-        <Card className={`${cardClass} col-span-2`}>
+        <Card className={`${cardClass} col-span-2`} dataQa="widget-real-annualized">
           <p className={labelClass}>Реальных годовых</p>
           <AnnualizedMetric
             value={realAnnualized}

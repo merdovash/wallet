@@ -18,6 +18,8 @@ export interface EntityEditPanelProps {
   saveActive?: boolean
   /** Extra header controls before Save (e.g. help). */
   headerExtras?: ReactNode
+  /** data-qa prefix for the sheet; Save gets `{id}-save`. */
+  dataQa?: string
   children: ReactNode
 }
 
@@ -37,6 +39,7 @@ export function EntityEditPanel({
   saveActionId = 'entity-edit-save',
   saveActive = true,
   headerExtras,
+  dataQa = 'entity-edit',
   children,
 }: EntityEditPanelProps) {
   useRegisterPrimaryAction(open && saveActive, {
@@ -55,6 +58,7 @@ export function EntityEditPanel({
       open={open}
       title={title}
       onClose={onClose}
+      dataQa={dataQa}
       headerActions={
         <>
           {headerExtras}
@@ -63,6 +67,7 @@ export function EntityEditPanel({
             className="!hidden !px-3 !py-1.5 md:!inline-flex"
             disabled={saveDisabled}
             title={saveTitle}
+            dataQa={`${dataQa}-save`}
             onClick={() => void onSave()}
           >
             {saveLabel}

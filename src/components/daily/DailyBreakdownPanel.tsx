@@ -97,7 +97,7 @@ function AccountLineBase({
   currency: string
 }) {
   return (
-    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
+    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800" data-qa={`daily-account-${acc.accountId}`}>
       <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">{acc.name}</p>
       <div className="mt-1 flex min-w-min items-end justify-start gap-1 overflow-x-auto">
         <FormulaCell
@@ -144,7 +144,7 @@ function AccountLineWithFxSplit({
   const composed = qty + rateFx + timing
 
   return (
-    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
+    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800" data-qa={`daily-account-${acc.accountId}`}>
       <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">
         {acc.name}
         <span className="ml-1.5 text-[10px] font-normal text-slate-400 dark:text-slate-500">
@@ -205,7 +205,7 @@ function AccountLineQuantityOnly({
   baseCurrency: string
 }) {
   return (
-    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800">
+    <li className="border-b border-slate-100 px-2 py-1.5 last:border-0 dark:border-slate-800" data-qa={`daily-account-${fx.accountId}`}>
       <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-200">
         {fx.name}
         <span className="ml-1.5 text-[10px] font-normal text-slate-400 dark:text-slate-500">
@@ -284,6 +284,7 @@ export function DailyBreakdownPanel({
       <button
         type="button"
         onClick={() => setTransfersOpen((v) => !v)}
+        data-qa="daily-transfers-toggle"
         className={`inline-flex items-center gap-0.5 underline decoration-dotted underline-offset-2 hover:text-blue-700 dark:hover:text-blue-400 ${className}`}
       >
         {signedAmount(amount, currency)}
@@ -295,7 +296,7 @@ export function DailyBreakdownPanel({
   }
 
   return (
-    <StackPanel open={open} title={title} onClose={onClose}>
+    <StackPanel open={open} title={title} onClose={onClose} dataQa="daily-breakdown">
       {!periodReturn ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Недостаточно данных для расшифровки этого интервала.
@@ -465,6 +466,7 @@ export function DailyBreakdownPanel({
               <button
                 type="button"
                 onClick={() => setAccountsOpen((v) => !v)}
+                data-qa="daily-accounts-toggle"
                 className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-300"
               >
                 <span>По счетам · {accountCount}</span>
@@ -511,6 +513,7 @@ export function DailyBreakdownPanel({
                 <button
                   type="button"
                   onClick={() => setTransfersOpen(false)}
+                  data-qa="daily-transfers-hide"
                   className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 >
                   Скрыть

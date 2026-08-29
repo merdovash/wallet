@@ -174,6 +174,7 @@ export function DayTotalsPanel({
         open={open && !!date}
         title={date ? formatDateDisplay(date) : 'Итоги'}
         onClose={handleClose}
+        dataQa="day-totals"
       >
         {date && (
           <div className="space-y-4">
@@ -183,6 +184,7 @@ export function DayTotalsPanel({
                   <button
                     type="button"
                     onClick={() => setBreakdownOpen(true)}
+                    data-qa="day-totals-breakdown"
                     className="flex w-full items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-left text-sm font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
                   >
                     <span>Расшифровка дня</span>
@@ -236,10 +238,11 @@ export function DayTotalsPanel({
                   {accountRows.length === 0 ? (
                     <p className="text-sm text-slate-500 dark:text-slate-400">Нет остатков на эту дату.</p>
                   ) : (
-                    <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-qa="table-day-accounts">
                       {accountRows.map((row) => (
                         <li
                           key={row.id}
+                          data-qa={`day-account-${row.id}`}
                           className="flex items-start justify-between gap-3 px-3 py-2 text-sm"
                         >
                           <span className="min-w-0">

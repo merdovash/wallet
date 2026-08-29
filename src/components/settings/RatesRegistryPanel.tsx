@@ -105,7 +105,7 @@ export function RatesRegistryPanel({
   const listHeight = Math.min(LIST_MAX_HEIGHT, Math.max(ROW_HEIGHT * 3, dates.length * ROW_HEIGHT))
 
   return (
-    <StackPanel open={open} title="Реестр курсов ЦБ" onClose={onClose}>
+    <StackPanel open={open} title="Реестр курсов ЦБ" onClose={onClose} dataQa="rates-registry">
       <div className="space-y-3">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800/60">
           <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
@@ -113,13 +113,14 @@ export function RatesRegistryPanel({
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <Field label="Дата" className="min-w-[9rem] flex-1">
-              <DateInput value={loadDate} onChange={setLoadDate} disabled={busy} />
+              <DateInput value={loadDate} onChange={setLoadDate} disabled={busy} dataQa="rates-registry-date" />
             </Field>
             <Button
               type="button"
               onClick={() => void handleLoadDate()}
               disabled={busy || !loadDate}
               className="shrink-0"
+              dataQa="rates-registry-load"
             >
               {busy ? 'Загрузка…' : 'Загрузить'}
             </Button>
@@ -148,10 +149,11 @@ export function RatesRegistryPanel({
               height={listHeight}
               getKey={(date) => date}
               className="rounded-lg border border-slate-200 dark:border-slate-700"
+              dataQa="table-rates"
               renderItem={(date) => {
                 const pivot = byDate[date] ?? {}
                 return (
-                  <div className="flex h-full flex-col justify-center gap-0.5 border-b border-slate-100 px-2.5 dark:border-slate-800 sm:px-3">
+                  <div className="flex h-full flex-col justify-center gap-0.5 border-b border-slate-100 px-2.5 dark:border-slate-800 sm:px-3" data-qa={`rates-row-${date}`}>
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-[11px] font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:text-xs">
                         {formatDateDisplay(date)}

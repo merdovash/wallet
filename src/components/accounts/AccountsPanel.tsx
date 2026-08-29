@@ -33,6 +33,7 @@ import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { PageHeader } from '../ui/PageHeader'
@@ -297,21 +298,21 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4" {...dataQa('accounts-page')}>
       <PageHeader
         title="Счета"
         description="Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий."
         actions={
-          <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)}>
+          <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)} dataQa="accounts-show-archived">
             {showArchived ? 'Скрыть архив' : 'Показать архив'}
           </Button>
         }
       />
 
       {visible.length === 0 ? (
-        <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." />
+        <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." dataQa="accounts-empty" />
       ) : (
-        <Card className="!p-0">
+        <Card className="!p-0" dataQa="accounts-list">
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {visible.map((account) => (
               <AccountListItem
@@ -354,10 +355,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         onClose={() => setFormOpen(false)}
         onSave={handleSave}
         saveActionId="account-form-save"
+        dataQa="account-form"
       >
         <div className="space-y-4">
           <Field label="Название">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Накопительный" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Накопительный" dataQa="account-name" />
           </Field>
           <Field label="Тип">
             <Select
@@ -367,6 +369,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 setKind(next)
                 if (next === 'cashback') setCurrency(CASHBACK_CURRENCY)
               }}
+              dataQa="account-kind"
             >
               {ACCOUNT_KINDS.map((k) => (
                 <option key={k} value={k}>
@@ -380,6 +383,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               value={kind === 'cashback' ? CASHBACK_CURRENCY : currency}
               onChange={(e) => setCurrency(e.target.value)}
               disabled={kind === 'cashback'}
+              dataQa="account-currency"
             >
               {CURRENCY_OPTIONS.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -396,10 +400,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                   onChange={setCreditLimit}
                   allowNegative={false}
                   placeholder="300000"
+                  dataQa="account-credit-limit"
                 />
               </Field>
               <Field label="Беспроцентный период">
-                <Select value={graceMonths} onChange={(e) => setGraceMonths(e.target.value)}>
+                <Select value={graceMonths} onChange={(e) => setGraceMonths(e.target.value)} dataQa="account-grace">
                   {[1, 2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={String(n)}>
                       {n}{' '}
@@ -412,6 +417,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 <Select
                   value={linkedAccountId}
                   onChange={(e) => setLinkedAccountId(e.target.value)}
+                  dataQa="account-linked"
                 >
                   <option value="">Не выбран</option>
                   {linkCandidates.map((a) => (
@@ -437,6 +443,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                   className={`h-8 w-8 rounded-full border-2 ${color === c ? 'border-slate-900' : 'border-transparent'}`}
                   style={{ backgroundColor: c }}
                   aria-label={c}
+                  {...dataQa(`account-color-${c}`)}
                 />
               ))}
             </div>
@@ -445,6 +452,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
             <Button
               type="button"
               variant="danger"
+              dataQa="account-delete"
               onClick={() => {
                 if (confirm('Удалить счёт и связанные данные?')) {
                   void deleteAccount(editingId).then(() => {
@@ -540,6 +548,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
       onClose={onClose}
       onSave={handleSave}
       saveActionId="account-today-check-in"
+      dataQa="account-detail"
       saveDisabled={saveDisabled}
       saveTitle={
         archived
@@ -574,6 +583,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
                 value={todayAmount}
                 onChange={setTodayAmount}
                 placeholder={currentBalance != null ? amountToInput(currentBalance) : '0'}
+                dataQa="account-today-amount"
                 {...focusKeyProps('today-amount')}
               />
             </Field>
@@ -867,6 +877,7 @@ function AccountListItem({
     <li
       onDragOver={onDragOver}
       onDrop={onDrop}
+      {...dataQa(`account-row-${account.id}`)}
       className={`relative overflow-hidden sm:flex sm:items-center sm:gap-2 sm:overflow-visible sm:px-4 sm:py-3 ${
         isDragging ? 'opacity-40' : ''
       } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''} ${
@@ -878,6 +889,7 @@ function AccountListItem({
           title="Изменить"
           aria-label={`Изменить ${account.name}`}
           onClick={onEdit}
+          {...dataQa(`account-edit-${account.id}`)}
         >
           <PencilIcon className="h-4 w-4" />
         </AccountIconButton>
@@ -885,6 +897,7 @@ function AccountListItem({
           title={account.archived ? 'Вернуть из архива' : 'В архив'}
           aria-label={account.archived ? `Вернуть ${account.name} из архива` : `Архивировать ${account.name}`}
           onClick={onArchive}
+          {...dataQa(`account-archive-${account.id}`)}
         >
           {account.archived ? (
             <UnarchiveIcon className="h-4 w-4" />
@@ -911,12 +924,14 @@ function AccountListItem({
           className="flex h-9 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-600 dark:text-slate-400 active:cursor-grabbing"
           title="Перетащить"
           aria-label={`Перетащить ${account.name}`}
+          {...dataQa(`account-drag-${account.id}`)}
         >
           <DragHandleIcon className="h-4 w-4" />
         </div>
         <button
           type="button"
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          {...dataQa(`account-open-${account.id}`)}
           onClick={() => {
             if (suppressClick.current) return
             onOpenDetail()

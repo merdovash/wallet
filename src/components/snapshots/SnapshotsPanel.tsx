@@ -5,6 +5,7 @@ import { formatTransferLabel } from '../../lib/transferCheckIn'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
 import { TransferCreatePanel } from './TransferCreatePanel'
@@ -42,7 +43,7 @@ export function SnapshotsPanel() {
   }, [transfers])
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4" {...dataQa('snapshots-page')}>
       <PageHeader
         title="Чек-ины"
         description="Остатки по датам и переводы между счетами"
@@ -52,6 +53,7 @@ export function SnapshotsPanel() {
             variant="secondary"
             onClick={() => setTransferOpen(true)}
             disabled={activeCount < 2}
+            dataQa="transfer-create"
           >
             Перевод
           </Button>
@@ -62,9 +64,10 @@ export function SnapshotsPanel() {
         <EmptyState
           title="Чек-инов пока нет"
           description="Нажмите «Чек-ин» для остатков или «Перевод» — тогда создастся чек-ин с обновлёнными суммами."
+          dataQa="snapshots-empty"
         />
       ) : (
-        <Card className="!p-0">
+        <Card className="!p-0" dataQa="snapshots-list">
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {sortedSnapshots.map((snap) => {
               const snapTotal = totalOnDate(snap.date, accounts, snapshots, settings, {
@@ -73,11 +76,12 @@ export function SnapshotsPanel() {
               const dayTransfers = transfersByDate.get(snap.date) ?? []
               const isTransfer = snap.origin === 'transfer'
               return (
-                <li key={snap.id}>
+                <li key={snap.id} {...dataQa(`snapshot-row-${snap.id}`)}>
                   <button
                     type="button"
                     onClick={() => openEdit(snap.id)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    {...dataQa(`snapshot-open-${snap.id}`)}
                   >
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">

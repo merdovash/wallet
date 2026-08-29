@@ -20,17 +20,19 @@ import {
   moneySignificantCount,
   normalizeMoneyInput,
 } from '../../lib/moneyInput'
+import { dataQaFromProps, type DataQaProps } from '../../lib/dataQa'
 
 interface FieldProps {
   label: string
   children: ReactNode
   error?: string
   className?: string
+  dataQa?: string
 }
 
-export function Field({ label, children, error, className = '' }: FieldProps) {
+export function Field({ label, children, error, className = '', dataQa }: FieldProps) {
   return (
-    <label className={`block min-w-0 max-w-full space-y-1 ${className}`}>
+    <label className={`block min-w-0 max-w-full space-y-1 ${className}`} {...dataQaFromProps(dataQa)}>
       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
       {children}
       {error && <span className="text-xs text-red-600">{error}</span>}
@@ -38,22 +40,24 @@ export function Field({ label, children, error, className = '' }: FieldProps) {
   )
 }
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  function Input(props, ref) {
-    const { className = '', ...rest } = props
-    const widthClass =
-      className.includes('w-') || className.includes('flex-1') || className.includes('flex-')
-        ? ''
-        : 'w-full'
-    return (
-      <input
-        ref={ref}
-        {...rest}
-        className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-900 dark:text-slate-200 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
-      />
-    )
-  },
-)
+export const Input = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & DataQaProps
+>(function Input(props, ref) {
+  const { className = '', dataQa, ...rest } = props
+  const widthClass =
+    className.includes('w-') || className.includes('flex-1') || className.includes('flex-')
+      ? ''
+      : 'w-full'
+  return (
+    <input
+      ref={ref}
+      {...rest}
+      {...dataQaFromProps(dataQa)}
+      className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm text-slate-900 dark:text-slate-200 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-white dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
+    />
+  )
+})
 
 interface MoneyInputProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -63,11 +67,12 @@ interface MoneyInputProps extends Omit<
   onChange: (value: string) => void
   /** Allow leading minus (default true). */
   allowNegative?: boolean
+  dataQa?: string
 }
 
 /** Text input with thousand separators (triads) for easier entry. */
 export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function MoneyInput(
-  { value, onChange, allowNegative = true, className = '', onFocus, onBlur, ...rest },
+  { value, onChange, allowNegative = true, className = '', onFocus, onBlur, dataQa, ...rest },
   ref,
 ) {
   const localRef = useRef<HTMLInputElement>(null)
@@ -98,6 +103,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
   return (
     <Input
       {...rest}
+      {...dataQaFromProps(dataQa)}
       ref={setRefs}
       type="text"
       inputMode="decimal"
@@ -119,6 +125,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
 interface DateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> {
   value: string
   onChange: (iso: string) => void
+  dataQa?: string
 }
 
 export function DateInput({
@@ -129,6 +136,7 @@ export function DateInput({
   disabled,
   min,
   max,
+  dataQa,
   ...rest
 }: DateInputProps) {
   const autoId = useId()
@@ -208,7 +216,7 @@ export function DateInput({
   const pickerValue = value && isValidIsoDate(value) ? value : ''
 
   return (
-    <div className={`relative flex min-w-0 items-stretch ${widthClass}`}>
+    <div className={`relative flex min-w-0 items-stretch ${widthClass}`} {...dataQaFromProps(dataQa)}>
       <input
         {...rest}
         ref={textInputRef}
@@ -226,6 +234,7 @@ export function DateInput({
         onChange={handleChange}
         onBlur={handleBlur}
         className="min-w-0 flex-1 rounded-l-lg border border-r-0 border-slate-300 dark:border-slate-600 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 dark:disabled:bg-slate-800 dark:bg-slate-800/60"
+        {...dataQaFromProps(dataQa ? `${dataQa}-text` : undefined)}
       />
       <button
         type="button"
@@ -234,6 +243,7 @@ export function DateInput({
         title="Выбрать дату"
         aria-label="Выбрать дату"
         className="inline-flex shrink-0 items-center justify-center rounded-r-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800/60 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 disabled:opacity-50"
+        {...dataQaFromProps(dataQa ? `${dataQa}-picker` : undefined)}
       >
         <CalendarIcon className="h-4 w-4" />
       </button>
@@ -265,8 +275,8 @@ function CalendarIcon({ className }: { className?: string }) {
   )
 }
 
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className = '', ...rest } = props
+export function Select(props: SelectHTMLAttributes<HTMLSelectElement> & DataQaProps) {
+  const { className = '', dataQa, ...rest } = props
   const widthClass =
     className.includes('w-') || className.includes('flex-1') || className.includes('flex-')
       ? ''
@@ -274,6 +284,7 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...rest}
+      {...dataQaFromProps(dataQa)}
       className={`min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${widthClass} ${className}`}
     />
   )
@@ -281,8 +292,9 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 
 export function Button({
   variant = 'primary',
+  dataQa,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' } & DataQaProps) {
   const variants = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary:
@@ -292,22 +304,45 @@ export function Button({
   return (
     <button
       {...props}
+      {...dataQaFromProps(dataQa)}
       className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${variants[variant]} ${props.className ?? ''}`}
     />
   )
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  dataQa,
+}: {
+  children: ReactNode
+  className?: string
+  dataQa?: string
+}) {
   return (
-    <div className={`min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-5 ${className}`}>
+    <div
+      className={`min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-5 ${className}`}
+      {...dataQaFromProps(dataQa)}
+    >
       {children}
     </div>
   )
 }
 
-export function EmptyState({ title, description }: { title: string; description: string }) {
+export function EmptyState({
+  title,
+  description,
+  dataQa,
+}: {
+  title: string
+  description: string
+  dataQa?: string
+}) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/60 px-6 py-10 text-center">
+    <div
+      className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/60 px-6 py-10 text-center"
+      {...dataQaFromProps(dataQa)}
+    >
       <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
     </div>

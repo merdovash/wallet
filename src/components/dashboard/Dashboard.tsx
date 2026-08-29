@@ -20,6 +20,7 @@ import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { FxModeToggle } from '../ui/FxModeToggle'
 import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
@@ -128,7 +129,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   }, [accounts, snapshots, settings, rateBook, periodReturn])
 
   return (
-    <div className="mx-auto max-w-5xl space-y-3">
+    <div className="mx-auto max-w-5xl space-y-3" {...dataQa('dashboard')}>
       <PageHeader
         title="Дашборд"
         actions={
@@ -154,6 +155,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         data={series}
         currency={settings.baseCurrency}
         mode="total"
+        dataQa="chart-dashboard"
         seriesKind={chartSeries}
         onSeriesKindChange={setChartSeries}
         hideSeriesToggle
@@ -168,6 +170,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
           type="button"
           onClick={() => setShowAdvanced(true)}
           className="w-full rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800/50"
+          {...dataQa('widget-more')}
         >
           Показать дополнительные виджеты
         </button>
@@ -184,6 +187,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
               type="button"
               onClick={() => setShowAdvanced(false)}
               className="text-xs text-slate-500 hover:underline dark:text-slate-400"
+              {...dataQa('widget-more-hide')}
             >
               Скрыть дополнительные виджеты
             </button>
@@ -220,6 +224,7 @@ function CheckInReminderBanner({
       type="button"
       onClick={onCheckIn}
       className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left dark:border-amber-900/50 dark:bg-amber-950/25"
+      {...dataQa('check-in-reminder')}
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">{title}</p>

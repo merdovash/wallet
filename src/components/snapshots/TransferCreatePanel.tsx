@@ -83,6 +83,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
       onSave={handleSave}
       saveDisabled={!canSave || saving}
       saveActionId="transfer-form-save"
+      dataQa="transfer-create"
     >
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -90,10 +91,10 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           только удалить перевод или весь чек-ин.
         </p>
         <Field label="Дата">
-          <DateInput value={date} onChange={setDate} />
+          <DateInput value={date} onChange={setDate} dataQa="transfer-create-date" />
         </Field>
         <Field label="Откуда">
-          <Select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+          <Select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)} dataQa="transfer-create-from">
             {activeAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} ({a.currency})
@@ -102,7 +103,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           </Select>
         </Field>
         <Field label="Куда">
-          <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+          <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} dataQa="transfer-create-to">
             {activeAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} ({a.currency})
@@ -116,10 +117,11 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
             onChange={setAmount}
             allowNegative={false}
             placeholder="0"
+            dataQa="transfer-create-amount"
           />
         </Field>
         <Field label="Комментарий">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" dataQa="transfer-create-note" />
         </Field>
       </div>
     </EntityEditPanel>

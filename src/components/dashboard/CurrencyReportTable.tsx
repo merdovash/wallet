@@ -81,7 +81,7 @@ export function CurrencyReportTable({
     withoutFx && growthColumnLabel === 'Прирост' ? 'Прирост · без курса' : growthColumnLabel
 
   return (
-    <Card className="!p-0">
+    <Card className="!p-0" dataQa="table-currencies">
       <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 dark:border-slate-800 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Счета</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">{accountCountLabel(accountCount)}</p>
@@ -95,7 +95,7 @@ export function CurrencyReportTable({
         </div>
       ) : (
         <div className="overflow-x-hidden">
-          <table className="w-full table-fixed text-xs sm:text-sm">
+          <table className="w-full table-fixed text-xs sm:text-sm" data-qa="table-currencies-body">
             <colgroup>
               <col className="w-[36%] sm:w-[28%]" />
               <col className="hidden md:table-column md:w-[10%]" />
@@ -233,6 +233,7 @@ function CurrencyGroup({
           <button
             type="button"
             onClick={onToggle}
+            data-qa={`currency-row-${currency}`}
             className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-200"
           >
             <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">
@@ -290,6 +291,7 @@ function CurrencyGroup({
               <button
                 type="button"
                 onClick={() => onOpenAccount(acc.accountId)}
+                data-qa={`currency-account-${acc.accountId}`}
                 className="text-left text-slate-700 dark:text-slate-300 hover:text-blue-700 hover:underline"
               >
                 {acc.name}

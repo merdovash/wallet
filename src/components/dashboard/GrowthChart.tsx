@@ -15,6 +15,7 @@ import { chartActiveDot, chartDot, chartTooltipStyles, getChartTheme } from '../
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { useTheme } from '../../lib/useTheme'
 import type { Account, AccountPoint, BalanceSnapshot, TotalPoint, WalletSettings } from '../../types/wallet'
+import { dataQa } from '../../lib/dataQa'
 import { Card } from '../ui/FormControls'
 import { DayTotalsPanel } from './DayTotalsPanel'
 
@@ -36,6 +37,7 @@ interface GrowthChartProps {
   settings?: WalletSettings
   rateBook?: RateBook
   accountId?: string | null
+  dataQa?: string
 }
 
 export function GrowthChart({
@@ -51,6 +53,7 @@ export function GrowthChart({
   settings,
   rateBook,
   accountId = null,
+  dataQa: qaId,
 }: GrowthChartProps) {
   const { mode: themeMode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(), [themeMode])
@@ -68,7 +71,7 @@ export function GrowthChart({
 
   if (rows.length === 0) {
     return (
-      <Card>
+      <Card dataQa={qaId ?? `chart-${mode}`}>
         <p className="text-sm text-slate-500 dark:text-slate-400">Пока нет точек для графика — сделайте первый чек-ин.</p>
       </Card>
     )
@@ -96,13 +99,14 @@ export function GrowthChart({
 
   return (
     <>
-      <Card className="!p-3 sm:!p-4">
+      <Card className="!p-3 sm:!p-4" dataQa={qaId ?? `chart-${mode}`}>
         {canToggleSeries && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900" {...dataQa('chart-series')}>
               <button
                 type="button"
                 onClick={() => onSeriesKindChange?.('growth')}
+                {...dataQa('chart-series-growth')}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                   seriesKind === 'growth'
                     ? 'bg-blue-600 text-white'
@@ -114,6 +118,7 @@ export function GrowthChart({
               <button
                 type="button"
                 onClick={() => onSeriesKindChange?.('netWorth')}
+                {...dataQa('chart-series-net-worth')}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                   seriesKind === 'netWorth'
                     ? 'bg-blue-600 text-white'

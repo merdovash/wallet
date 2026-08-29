@@ -1,4 +1,5 @@
 import type { GrowthFxMode } from '../../engine/growthEngine'
+import { dataQa } from '../../lib/dataQa'
 import { useFxModeStore } from '../../store/fxModeStore'
 
 interface FxModeToggleProps {
@@ -24,7 +25,7 @@ export function FxModeToggle({
     : 'rounded-md px-2.5 py-1 text-xs font-medium transition'
 
   return (
-    <div className={`${showLabel ? 'space-y-1' : ''} ${className}`}>
+    <div className={`${showLabel ? 'space-y-1' : ''} ${className}`} {...dataQa('fx-toggle')}>
       {showLabel ? (
         <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Курс</p>
       ) : null}
@@ -37,6 +38,7 @@ export function FxModeToggle({
               ? 'bg-blue-600 text-white'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
           }`}
+          {...dataQa('fx-with')}
         >
           {withLabel}
         </button>
@@ -48,6 +50,7 @@ export function FxModeToggle({
               ? 'bg-blue-600 text-white'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
           }`}
+          {...dataQa('fx-without')}
         >
           {withoutLabel}
         </button>

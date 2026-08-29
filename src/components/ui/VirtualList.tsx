@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { dataQaFromProps } from '../../lib/dataQa'
 
 interface VirtualListProps<T> {
   items: T[]
@@ -8,6 +9,7 @@ interface VirtualListProps<T> {
   height: number
   overscan?: number
   className?: string
+  dataQa?: string
   /** Stable key for each item. */
   getKey: (item: T, index: number) => string
   renderItem: (item: T, index: number) => ReactNode
@@ -22,6 +24,7 @@ export function VirtualList<T>({
   height,
   overscan = 4,
   className = '',
+  dataQa,
   getKey,
   renderItem,
 }: VirtualListProps<T>) {
@@ -54,6 +57,7 @@ export function VirtualList<T>({
       onScroll={onScroll}
       className={`overflow-y-auto overscroll-contain ${className}`}
       style={{ height, WebkitOverflowScrolling: 'touch' }}
+      {...dataQaFromProps(dataQa)}
     >
       <div style={{ height: totalHeight, position: 'relative' }}>
         <div style={{ transform: `translateY(${offsetY}px)` } satisfies CSSProperties}>

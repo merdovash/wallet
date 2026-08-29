@@ -26,6 +26,7 @@ import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useWalletStore } from '../../store/walletStore'
+import { dataQa } from '../../lib/dataQa'
 import { DailyBreakdownPanel } from './DailyBreakdownPanel'
 import { Card, EmptyState } from '../ui/FormControls'
 import { FxModeToggle } from '../ui/FxModeToggle'
@@ -179,7 +180,7 @@ export function DailyGrowthPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4" {...dataQa('daily-page')}>
       <PageHeader
         title="По дням"
         description="Прирост портфеля роста между чек-инами · фонд / вклад / инвестиции"
@@ -196,6 +197,7 @@ export function DailyGrowthPanel() {
           <EmptyState
             title="Недостаточно чек-инов"
             description="Нужны минимум два чек-ина, чтобы показать прирост по дням."
+            dataQa="daily-empty"
           />
         </Card>
       ) : chartRows.length === 0 ? (
@@ -205,7 +207,7 @@ export function DailyGrowthPanel() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
-            <Card className="!p-2.5 sm:!p-3">
+            <Card className="!p-2.5 sm:!p-3" dataQa="widget-daily-sum">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Сумма за период</p>
               <p
                 className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${
@@ -219,7 +221,7 @@ export function DailyGrowthPanel() {
                 {signedAmount(rangeSum, settings.baseCurrency)}
               </p>
             </Card>
-            <Card className="!p-2.5 sm:!p-3">
+            <Card className="!p-2.5 sm:!p-3" dataQa="widget-daily-positive-days">
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Дней с приростом</p>
               <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:text-lg">
                 {chartRows.filter((row) => row.growth > 0).length}
@@ -227,7 +229,7 @@ export function DailyGrowthPanel() {
             </Card>
           </div>
 
-          <Card className="!p-3 sm:!p-4">
+          <Card className="!p-3 sm:!p-4" dataQa="chart-daily">
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Прирост по дням чек-инов</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -293,6 +295,7 @@ export function DailyGrowthPanel() {
                   <button
                     type="button"
                     onClick={() => openDay(row.date)}
+                    {...dataQa(`daily-row-${row.date}`)}
                     className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60 active:bg-slate-100 dark:active:bg-slate-800"
                   >
                     <span className="min-w-0">

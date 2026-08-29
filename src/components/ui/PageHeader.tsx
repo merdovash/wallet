@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
+import { dataQa } from '../../lib/dataQa'
 import { useAppSection } from '../../lib/useAppSection'
 import { useFabKeyboardBottom } from '../../lib/useFabKeyboardBottom'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
@@ -73,6 +74,7 @@ function FabButton({ section, className = '' }: { section: AppSection; className
         aria-label={panelOverride.label}
         style={fabStyle}
         className={`z-[110] ${FAB_CLASS} ${className}`}
+        {...dataQa('fab-save')}
       >
         <span>{panelOverride.label}</span>
       </button>
@@ -90,6 +92,7 @@ function FabButton({ section, className = '' }: { section: AppSection; className
       aria-label={sectionPrimary.label}
       style={fabStyle}
       className={`z-[90] ${FAB_CLASS} ${className}`}
+      {...dataQa('fab')}
     >
       {sectionPrimary.showCheckIcon && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
       <span>{sectionPrimary.label}</span>
@@ -112,6 +115,7 @@ function ToolbarButton({ section, className = '' }: { section: AppSection; class
       title={sectionPrimary.title}
       aria-label={sectionPrimary.label}
       className={`${TOOLBAR_CLASS} ${className}`}
+      {...dataQa('primary-action')}
     >
       {sectionPrimary.showCheckIcon && <CheckIcon className="h-4 w-4 shrink-0" aria-hidden />}
       <span>{sectionPrimary.label}</span>
@@ -152,10 +156,15 @@ export function PageHeader({
   const [section] = useAppSection()
 
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={`space-y-2 ${className}`} {...dataQa('page-header')}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-200">{title}</h1>
+          <h1
+            className="text-xl font-semibold text-slate-900 dark:text-slate-200"
+            {...dataQa('page-title')}
+          >
+            {title}
+          </h1>
           {description ? (
             <div className="text-sm text-slate-500 dark:text-slate-400">{description}</div>
           ) : null}

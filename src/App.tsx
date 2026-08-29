@@ -17,6 +17,7 @@ import { PrimaryFab } from './components/ui/PrimaryFab'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
 import { isAnalyticsSection } from './lib/navSections'
+import { dataQa } from './lib/dataQa'
 import { useAppSection } from './lib/useAppSection'
 import { useAuthStore } from './store/authStore'
 import { useCheckInUiStore } from './store/checkInUiStore'
@@ -89,7 +90,7 @@ export default function App() {
   const showApp = Boolean(user && walletLoaded && !walletError)
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden" {...dataQa('app')}>
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Sidebar
           active={section}
@@ -101,16 +102,20 @@ export default function App() {
           className={`min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] transition-[margin] duration-200 sm:p-4 md:p-6 md:pb-6 ${
             sidebarCollapsed ? 'md:ml-14' : 'md:ml-56'
           }`}
+          {...dataQa(`page-${section}`)}
         >
           {!authInitialized || (user && walletLoading && !walletLoaded) ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Загрузка…</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400" {...dataQa('app-loading')}>
+              Загрузка…
+            </p>
           ) : !user ? (
             <EmptyState
               title="Войдите в аккаунт"
               description="Войдите или зарегистрируйтесь в меню слева."
+              dataQa="app-login-required"
             />
           ) : walletError ? (
-            <EmptyState title="Ошибка загрузки" description={walletError} />
+            <EmptyState title="Ошибка загрузки" description={walletError} dataQa="app-load-error" />
           ) : (
             <SectionContent
               section={section}
@@ -155,6 +160,7 @@ function SectionContent({
         type="button"
         onClick={() => onOpenSection('analytics')}
         className="mb-3 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+        {...dataQa('nav-analytics-back')}
       >
         ← Аналитика
       </button>

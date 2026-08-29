@@ -6,6 +6,7 @@ import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { AccountKind } from '../../types/wallet'
+import { dataQa } from '../../lib/dataQa'
 import { Card, EmptyState } from '../ui/FormControls'
 import { FxModeToggle } from '../ui/FxModeToggle'
 import { PageHeader } from '../ui/PageHeader'
@@ -59,7 +60,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
   const totalAccounts = report.rows.reduce((s, r) => s + r.accountCount, 0)
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4" {...dataQa('types-page')}>
       <PageHeader
         title="По типам"
         description={
@@ -79,13 +80,13 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
 
       {report.rows.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-          <Card className="!p-2.5 sm:!p-3">
+          <Card className="!p-2.5 sm:!p-3" dataQa="widget-types-total">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Итого</p>
             <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:text-lg">
               {formatCurrency(report.grandTotalBase, report.baseCurrency)}
             </p>
           </Card>
-          <Card className="!p-2.5 sm:!p-3">
+          <Card className="!p-2.5 sm:!p-3" dataQa="widget-types-growth">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Прирост</p>
             <p
               className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.grandGrowthBase)}`}
@@ -100,7 +101,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
               <span className="font-normal text-slate-500 dark:text-slate-400"> от всего</span>
             </p>
           </Card>
-          <Card className="!p-2.5 sm:!p-3">
+          <Card className="!p-2.5 sm:!p-3" dataQa="widget-types-annualized">
             <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">В годовых</p>
             <p
               className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${pctTone(report.annualizedPct)}`}
@@ -120,11 +121,12 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
             <EmptyState
               title="Нет данных"
               description="Добавьте счета и сделайте чек-ин, чтобы увидеть сводку по типам."
+              dataQa="types-empty"
             />
           </div>
         ) : (
           <div className="overflow-x-hidden">
-            <table className="w-full table-fixed text-xs sm:text-sm">
+            <table className="w-full table-fixed text-xs sm:text-sm" {...dataQa('table-types')}>
               <colgroup>
                 <col className="w-[34%] sm:w-[26%]" />
                 <col className="hidden md:table-column md:w-[10%]" />
@@ -172,6 +174,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
                       setExpanded((prev) => ({ ...prev, [row.kind]: !prev[row.kind] }))
                     }
                     onOpenAccount={onOpenAccount}
+                    kind={row.kind}
                     label={row.label}
                     accountCount={row.accountCount}
                     balanceBase={row.balanceBase}
@@ -227,6 +230,7 @@ function TypeGroup({
   open,
   onToggle,
   onOpenAccount,
+  kind,
   label,
   accountCount,
   balanceBase,
@@ -243,6 +247,7 @@ function TypeGroup({
   open: boolean
   onToggle: () => void
   onOpenAccount: (accountId: string) => void
+  kind: AccountKind
   label: string
   accountCount: number
   balanceBase: number
@@ -271,6 +276,7 @@ function TypeGroup({
           <button
             type="button"
             onClick={onToggle}
+            data-qa={`type-row-${kind}`}
             className="flex min-w-0 items-start gap-2 text-left font-medium text-slate-900 dark:text-slate-200"
           >
             <span className="inline-block w-3 shrink-0 text-slate-400 dark:text-slate-500">{open ? '▾' : '▸'}</span>
@@ -334,6 +340,7 @@ function TypeGroup({
                 <button
                   type="button"
                   onClick={() => onOpenAccount(acc.accountId)}
+                  data-qa={`type-account-${acc.accountId}`}
                   className="text-left text-slate-700 dark:text-slate-300 hover:text-blue-700 hover:underline"
                 >
                   {acc.name}

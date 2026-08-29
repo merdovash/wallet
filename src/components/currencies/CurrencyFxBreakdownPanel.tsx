@@ -27,7 +27,7 @@ export function CurrencyFxBreakdownPanel({
   baseCurrency,
 }: CurrencyFxBreakdownPanelProps) {
   return (
-    <StackPanel open={open} title="Расшифровка: курсовая разница" onClose={onClose}>
+    <StackPanel open={open} title="Расшифровка: курсовая разница" onClose={onClose} dataQa="currency-fx">
       {!breakdown ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Недостаточно данных: нужны чек-ины и счета в иностранной валюте.
@@ -99,7 +99,7 @@ export function CurrencyFxBreakdownPanel({
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                 {breakdown.accounts.map((acc) => (
-                  <li key={acc.accountId} className="px-3 py-2">
+                  <li key={acc.accountId} className="px-3 py-2" data-qa={`currency-fx-account-${acc.accountId}`}>
                     <div className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-slate-900 dark:text-slate-200">

@@ -50,7 +50,7 @@ export function CurrencyValueChart() {
 
   if (currencies.length === 0) {
     return (
-      <Card>
+      <Card dataQa="chart-currencies">
         <EmptyState
           title="Нет валютных счетов"
           description="Добавьте счёт в валюте, отличной от базовой, чтобы увидеть динамику стоимости."
@@ -61,14 +61,14 @@ export function CurrencyValueChart() {
 
   if (rows.length === 0) {
     return (
-      <Card>
+      <Card dataQa="chart-currencies">
         <p className="text-sm text-slate-500 dark:text-slate-400">Пока нет чек-инов для графика.</p>
       </Card>
     )
   }
 
   return (
-    <Card className="!p-3 sm:!p-4">
+    <Card className="!p-3 sm:!p-4" dataQa="chart-currencies">
       <div className="mb-3">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Стоимость валютных счетов</h2>
         <p className="text-xs text-slate-500 dark:text-slate-400">
