@@ -70,4 +70,16 @@ describe('buildAccountPeriodReturn', () => {
     expect(result?.growthPct).toBeCloseTo(0.1)
     expect(result?.annualizedPct).toBeNull()
   })
+
+  it.each(['operational', 'cash', 'credit', 'cashback'] as const)(
+    'does not return growth percent for %s accounts',
+    (kind) => {
+      const accounts = [account({ id: 'a', kind })]
+      const snapshots: BalanceSnapshot[] = [
+        { id: 's1', date: '2026-01-01', lines: [{ accountId: 'a', amount: 1000 }] },
+        { id: 's2', date: '2026-02-01', lines: [{ accountId: 'a', amount: 1100 }] },
+      ]
+      expect(buildAccountPeriodReturn('a', accounts, snapshots, [], settings)).toBeNull()
+    },
+  )
 })

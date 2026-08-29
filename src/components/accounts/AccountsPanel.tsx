@@ -20,7 +20,7 @@ import type { RateBook } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind, type WalletSettings } from '../../types/wallet'
 import type { AccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
-import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, normalizeAccountKind } from '../../lib/accountKinds'
+import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, isGrowthKind, normalizeAccountKind } from '../../lib/accountKinds'
 import { buildAccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
@@ -568,8 +568,10 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Валюта: {account.currency}.
           {account.kind === 'credit'
-            ? ' На графике — доступный остаток лимита; прирост без переводов.'
-            : ' Зелёная линия — прирост без переводов.'}
+            ? ' На графике — доступный остаток лимита.'
+            : isGrowthKind(normalizeAccountKind(account.kind))
+              ? ' Зелёная линия — прирост без переводов.'
+              : ''}
         </p>
 
         {archived ? (
@@ -661,7 +663,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
           data={detailSeries}
           currency={account.currency}
           mode="account"
-          showGrowthLine={normalizeAccountKind(account.kind) !== 'operational'}
+          showGrowthLine={isGrowthKind(normalizeAccountKind(account.kind))}
           accounts={accounts}
           snapshots={snapshots}
           settings={settings}

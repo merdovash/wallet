@@ -9,6 +9,7 @@ import {
   type RateBook,
 } from '../engine/growthEngine'
 import { annualizePeriodReturn, MIN_ANNUALIZE_DAYS } from './monthlyReturns'
+import { isGrowthKind, normalizeAccountKind } from './accountKinds'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 export interface AccountPeriodReturn {
@@ -91,6 +92,7 @@ export function buildAccountPeriodReturn(
 ): AccountPeriodReturn | null {
   const account = accounts.find((a) => a.id === accountId)
   if (!account) return null
+  if (!isGrowthKind(normalizeAccountKind(account.kind))) return null
   const dates = snapshotDates(snapshots)
   if (dates.length < 2) return null
   const startDate = firstSnapshotDateForAccount(accountId, snapshots)
