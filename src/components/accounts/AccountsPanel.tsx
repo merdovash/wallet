@@ -9,7 +9,13 @@
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 import { creditDebt } from '../../engine/creditFloatEngine'
-import { balanceOnDate, buildAccountSeries, netWorthAmount, snapshotDates } from '../../engine/growthEngine'
+import {
+  balanceOnDate,
+  buildAccountSeries,
+  lastSnapshotDateForAccount,
+  netWorthAmount,
+  snapshotDates,
+} from '../../engine/growthEngine'
 import type { RateBook } from '../../engine/growthEngine'
 import { ACCOUNT_COLORS, type Account, type AccountKind, type WalletSettings } from '../../types/wallet'
 import type { AccountPeriodReturn } from '../../lib/accountPeriodReturn'
@@ -20,16 +26,17 @@ import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountSta
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS, toBase } from '../../lib/currency'
 import { resolvePivotForDate } from '../../lib/cbrRates'
-import { parseMoneyInput } from '../../lib/moneyInput'
+import { planAccountTodayCheckIn } from '../../lib/accountTodayCheckIn'
+import { formatIsoToRu, formatCurrency, formatPercent, todayIsoDate } from '../../lib/format'
+import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
+import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { PageHeader } from '../ui/PageHeader'
-import { StackPanel } from '../ui/StackPanel'
 import { GrowthChart } from '../dashboard/GrowthChart'
-import { formatCurrency, formatPercent, todayIsoDate } from '../../lib/format'
 
 interface AccountsPanelProps {
   focusAccountId?: string | null
@@ -150,23 +157,8 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     return map
   }, [visible, accounts, snapshots, transfers, settings, rateBook])
 
-  const detailAccount = accounts.find((a) => a.id === detailId) ?? null
-  const detailReturn = useMemo(
-    () =>
-      detailId
-        ? buildAccountPeriodReturn(detailId, accounts, snapshots, transfers, settings, rateBook)
-        : null,
-    [detailId, accounts, snapshots, transfers, settings, rateBook],
-  )
-  const detailSeries = useMemo(
-    () =>
-      detailId
-        ? buildAccountSeries(detailId, snapshots, transfers, accounts, settings, rateBook)
-        : [],
-    [detailId, snapshots, transfers, accounts, settings, rateBook],
-  )
-
   function openCreate() {
+    setDetailId(null)
     setEditingId(null)
     setName('')
     setCurrency('RUB')
@@ -181,6 +173,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   function openEdit(id: string) {
     const account = accounts.find((a) => a.id === id)
     if (!account) return
+    setDetailId(null)
     setEditingId(id)
     setName(account.name)
     setCurrency(account.currency)
@@ -467,91 +460,206 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         </div>
       </EntityEditPanel>
 
-      <StackPanel
-        open={!!detailAccount}
-        title={detailAccount?.name ?? 'Счёт'}
-        onClose={() => setDetailId(null)}
+      {detailId ? <AccountDetailPanel accountId={detailId} onClose={() => setDetailId(null)} /> : null}
+    </div>
+  )
+}
+
+function amountToInput(amount: number): string {
+  return formatMoneyInput(String(amount).replace('.', ','))
+}
+
+function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose: () => void }) {
+  const accounts = useWalletStore((s) => s.accounts)
+  const snapshots = useWalletStore((s) => s.snapshots)
+  const transfers = useWalletStore((s) => s.transfers)
+  const settings = useWalletStore((s) => s.settings)
+  const rateBook = useRatesStore((s) => s.byDate)
+  const addSnapshot = useWalletStore((s) => s.addSnapshot)
+  const updateSnapshot = useWalletStore((s) => s.updateSnapshot)
+  const account = accounts.find((a) => a.id === accountId) ?? null
+
+  const today = todayIsoDate()
+  const currentBalance = account ? balanceOnDate(account.id, today, snapshots) : null
+  const [todayAmount, setTodayAmount] = useState(() =>
+    currentBalance != null ? amountToInput(currentBalance) : '',
+  )
+  const [saving, setSaving] = useState(false)
+  const { rootRef, focusKeyProps } = useRestoreFocusOnResume(!!account)
+
+  useEffect(() => {
+    const next = balanceOnDate(accountId, todayIsoDate(), useWalletStore.getState().snapshots)
+    setTodayAmount(next != null ? amountToInput(next) : '')
+  }, [accountId])
+
+  const detailReturn = useMemo(
+    () => buildAccountPeriodReturn(accountId, accounts, snapshots, transfers, settings, rateBook),
+    [accountId, accounts, snapshots, transfers, settings, rateBook],
+  )
+  const detailSeries = useMemo(
+    () => buildAccountSeries(accountId, snapshots, transfers, accounts, settings, rateBook),
+    [accountId, snapshots, transfers, accounts, settings, rateBook],
+  )
+
+  const lastRecordedDate = lastSnapshotDateForAccount(accountId, snapshots)
+  const parsedAmount = parseMoneyInput(todayAmount)
+  const archived = account?.archived === true
+  const saveDisabled = archived || saving || parsedAmount == null
+
+  async function handleSave() {
+    if (!account || archived) return
+    const amount = parseMoneyInput(todayAmount)
+    if (amount == null) {
+      alert('Введите остаток')
+      return
+    }
+    const plan = planAccountTodayCheckIn(account.id, amount, todayIsoDate(), snapshots)
+    setSaving(true)
+    try {
+      if (plan.action === 'create') {
+        await addSnapshot({ date: plan.date, origin: 'manual', lines: plan.lines })
+      } else {
+        await updateSnapshot(plan.snapshotId, { lines: plan.lines })
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось сохранить чек-ин')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!account) return null
+
+  const balanceLabel = account.kind === 'credit' ? 'Доступно на сегодня' : 'Остаток на сегодня'
+  const todayLine = snapshots.find((s) => s.date === today)?.lines.find((l) => l.accountId === account.id)
+
+  return (
+    <EntityEditPanel
+      open
+      title={account.name}
+      onClose={onClose}
+      onSave={handleSave}
+      saveActionId="account-today-check-in"
+      saveDisabled={saveDisabled}
+      saveTitle={
+        archived
+          ? 'Архивный счёт нельзя чекинить'
+          : parsedAmount == null
+            ? 'Введите остаток'
+            : 'Сохранить чек-ин на сегодня'
+      }
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void handleSave()
+        }}
       >
-        {detailAccount && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Валюта: {detailAccount.currency}.
-              {detailAccount.kind === 'credit'
-                ? ' На графике — доступный остаток лимита; прирост без переводов.'
-                : ' Зелёная линия — прирост без переводов.'}
-            </p>
-            {detailReturn?.growthPct != null && (
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                Доходность (Modified Dietz):{' '}
-                <span className="font-medium">{formatPercent(detailReturn.growthPct)}</span>
-                {detailReturn.annualizedPct != null ? (
-                  <>
-                    {' '}
-                    · в годовых{' '}
-                    <span className="font-medium">{formatPercent(detailReturn.annualizedPct)}</span>
-                  </>
-                ) : detailReturn.days < 30 ? (
-                  <span className="text-slate-500 dark:text-slate-400"> · годовые не считаются (&lt; 30 дней)</span>
-                ) : null}
-              </p>
-            )}
-            {detailAccount.kind === 'credit' && detailAccount.creditLimit != null && (
-              <CreditDetailStats
-                limit={detailAccount.creditLimit}
-                graceMonths={detailAccount.graceMonths ?? 3}
-                available={
-                  detailSeries.length > 0
-                    ? detailSeries[detailSeries.length - 1]!.balance
-                    : (balanceOnDate(detailAccount.id, todayIsoDate(), snapshots) ?? 0)
-                }
-                currency={detailAccount.currency}
-                baseCurrency={settings.baseCurrency}
-                rateBook={rateBook}
-                settings={settings}
-                asOf={
-                  detailSeries.length > 0
-                    ? detailSeries[detailSeries.length - 1]!.date
-                    : todayIsoDate()
-                }
-                linkedName={
-                  detailAccount.linkedAccountId
-                    ? accounts.find((a) => a.id === detailAccount.linkedAccountId)?.name
-                    : undefined
-                }
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Валюта: {account.currency}.
+          {account.kind === 'credit'
+            ? ' На графике — доступный остаток лимита; прирост без переводов.'
+            : ' Зелёная линия — прирост без переводов.'}
+        </p>
+
+        {archived ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Архивный счёт: остаток фиксируется только до последней записи.
+          </p>
+        ) : (
+          <div ref={rootRef} className="space-y-1">
+            <Field label={balanceLabel}>
+              <MoneyInput
+                value={todayAmount}
+                onChange={setTodayAmount}
+                placeholder={currentBalance != null ? amountToInput(currentBalance) : '0'}
+                {...focusKeyProps('today-amount')}
               />
-            )}
-            {detailSeries.length > 0 && detailAccount.kind !== 'credit' && (
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                Последний остаток:{' '}
-                <span className="font-medium">
-                  {formatCurrency(detailSeries[detailSeries.length - 1]!.balance, detailAccount.currency)}
-                </span>
-                {detailAccount.currency !== settings.baseCurrency && (
-                  <BaseApprox
-                    amount={detailSeries[detailSeries.length - 1]!.balance}
-                    currency={detailAccount.currency}
-                    date={detailSeries[detailSeries.length - 1]!.date}
-                    settings={settings}
-                    rateBook={rateBook}
-                  />
-                )}
-              </p>
-            )}
-            <GrowthChart
-              data={detailSeries}
-              currency={detailAccount.currency}
-              mode="account"
-              showGrowthLine={normalizeAccountKind(detailAccount.kind) !== 'operational'}
-              accounts={accounts}
-              snapshots={snapshots}
-              settings={settings}
-              rateBook={rateBook}
-              accountId={detailAccount.id}
-            />
+            </Field>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {`Чек-ин на сегодня (${formatIsoToRu(today)}): обновится только этот счёт.`}
+              {account.kind === 'credit' && account.creditLimit != null
+                ? ` Лимит ${formatCurrency(account.creditLimit, account.currency)}.`
+                : null}{' '}
+              {todayLine
+                ? 'Уже есть запись за сегодня — сохранится новое значение.'
+                : lastRecordedDate
+                  ? `Последняя запись: ${formatIsoToRu(lastRecordedDate)}.`
+                  : 'По этому счёту ещё не было чек-инов.'}
+            </p>
           </div>
         )}
-      </StackPanel>
-    </div>
+
+        {detailReturn?.growthPct != null && (
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            Доходность (Modified Dietz):{' '}
+            <span className="font-medium">{formatPercent(detailReturn.growthPct)}</span>
+            {detailReturn.annualizedPct != null ? (
+              <>
+                {' '}
+                · в годовых{' '}
+                <span className="font-medium">{formatPercent(detailReturn.annualizedPct)}</span>
+              </>
+            ) : detailReturn.days < 30 ? (
+              <span className="text-slate-500 dark:text-slate-400">
+                {' '}
+                · годовые не считаются (&lt; 30 дней)
+              </span>
+            ) : null}
+          </p>
+        )}
+        {account.kind === 'credit' && account.creditLimit != null && (
+          <CreditDetailStats
+            limit={account.creditLimit}
+            graceMonths={account.graceMonths ?? 3}
+            available={
+              detailSeries.length > 0
+                ? detailSeries[detailSeries.length - 1]!.balance
+                : (balanceOnDate(account.id, today, snapshots) ?? 0)
+            }
+            currency={account.currency}
+            baseCurrency={settings.baseCurrency}
+            rateBook={rateBook}
+            settings={settings}
+            asOf={detailSeries.length > 0 ? detailSeries[detailSeries.length - 1]!.date : today}
+            linkedName={
+              account.linkedAccountId
+                ? accounts.find((a) => a.id === account.linkedAccountId)?.name
+                : undefined
+            }
+          />
+        )}
+        {detailSeries.length > 0 && account.kind !== 'credit' && (
+          <p className="text-sm text-slate-700 dark:text-slate-300">
+            Последний остаток:{' '}
+            <span className="font-medium">
+              {formatCurrency(detailSeries[detailSeries.length - 1]!.balance, account.currency)}
+            </span>
+            {account.currency !== settings.baseCurrency && (
+              <BaseApprox
+                amount={detailSeries[detailSeries.length - 1]!.balance}
+                currency={account.currency}
+                date={detailSeries[detailSeries.length - 1]!.date}
+                settings={settings}
+                rateBook={rateBook}
+              />
+            )}
+          </p>
+        )}
+        <GrowthChart
+          data={detailSeries}
+          currency={account.currency}
+          mode="account"
+          showGrowthLine={normalizeAccountKind(account.kind) !== 'operational'}
+          accounts={accounts}
+          snapshots={snapshots}
+          settings={settings}
+          rateBook={rateBook}
+          accountId={account.id}
+        />
+      </form>
+    </EntityEditPanel>
   )
 }
 
