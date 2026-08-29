@@ -882,9 +882,7 @@ function AccountListItem({
       {...dataQa(`account-row-${account.id}`)}
       className={`relative overflow-hidden sm:flex sm:items-center sm:gap-2 sm:overflow-visible sm:px-4 sm:py-3 ${
         isDragging ? 'opacity-40' : ''
-      } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''} ${
-        stale?.missingFromLatestCheckIn ? 'bg-amber-50/80 dark:bg-amber-950/20' : ''
-      }`}
+      } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''}`}
     >
       <div className="absolute inset-y-0 right-0 flex items-center gap-1 px-2 sm:static sm:order-last sm:inset-auto sm:shrink-0 sm:px-0">
         <AccountIconButton
@@ -955,17 +953,22 @@ function AccountListItem({
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">{account.currency}</span>
             {!account.archived && stale ? (
-              <span
-                className={`mt-0.5 block text-[11px] ${
-                  stale.missingFromLatestCheckIn
-                    ? 'font-medium text-amber-700 dark:text-amber-400'
-                    : 'text-slate-400 dark:text-slate-500'
-                }`}
-              >
-                {stale.missingFromLatestCheckIn
-                  ? `нет в последнем чек-ине · ${formatStaleDays(stale.daysSinceRecorded)}`
-                  : formatStaleDays(stale.daysSinceRecorded)}
-              </span>
+              stale.missingFromLatestCheckIn ? (
+                <span
+                  className="mt-1 inline-flex max-w-full items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium leading-tight text-amber-800 dark:bg-amber-400/15 dark:text-amber-300"
+                  {...dataQa(`account-stale-${account.id}`)}
+                >
+                  <span className="truncate">
+                    {stale.daysSinceRecorded == null || stale.daysSinceRecorded === 0
+                      ? 'нет в последнем чек-ине'
+                      : `нет в последнем чек-ине · ${formatStaleDays(stale.daysSinceRecorded)}`}
+                  </span>
+                </span>
+              ) : (
+                <span className="mt-0.5 block text-[11px] text-slate-400 dark:text-slate-500">
+                  {formatStaleDays(stale.daysSinceRecorded)}
+                </span>
+              )
             ) : null}
           </span>
           <span className="shrink-0 text-right tabular-nums">
