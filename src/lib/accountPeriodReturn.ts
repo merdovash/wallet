@@ -1,4 +1,5 @@
 import {
+  accountGrowth,
   accountGrowthBase,
   balanceOnDate,
   convertAmount,
@@ -16,8 +17,12 @@ export interface AccountPeriodReturn {
   startDate: string
   endDate: string
   days: number
+  /** Modified Dietz in base currency (includes FX). */
   growthPct: number | null
   annualizedPct: number | null
+  /** Dietz in the account currency, only for foreign-currency accounts. */
+  nativeGrowthPct: number | null
+  nativeAnnualizedPct: number | null
 }
 
 function daysBetween(startDate: string, endDate: string): number {
@@ -64,6 +69,45 @@ function accountCapitalFlows(
         rateBook,
       )
       byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountBase)
+    }
+  }
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, amount]) => ({ date, amount }))
+}
+
+function accountCapitalFlowsNative(
+  accountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const map = new Map(accounts.map((a) => [a.id, a]))
+  const account = map.get(accountId)
+  if (!account) return []
+  const byDate = new Map<string, number>()
+  for (const transfer of transfers) {
+    if (transfer.date.localeCompare(t0) <= 0) continue
+    if (transfer.date.localeCompare(t1) > 0) continue
+    if (transfer.fromAccountId === accountId) {
+      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) - transfer.amount)
+    }
+    if (transfer.toAccountId === accountId) {
+      const from = map.get(transfer.fromAccountId)
+      const fromCurrency = from?.currency ?? account.currency
+      const amountNative = convertAmount(
+        transfer.amount,
+        fromCurrency,
+        account.currency,
+        settings,
+        transfer.date,
+        rateBook,
+      )
+      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountNative)
     }
   }
   return [...byDate.entries()]
@@ -119,5 +163,34 @@ export function buildAccountPeriodReturn(
   const annualizedPct =
     growthPct != null && days >= MIN_ANNUALIZE_DAYS ? annualizePeriodReturn(growthPct, days) : null
 
-  return { startDate, endDate, days, growthPct, annualizedPct }
+  let nativeGrowthPct: number | null = null
+  let nativeAnnualizedPct: number | null = null
+  if (account.currency !== settings.baseCurrency) {
+    const startNative = netWorthAmount(account, startRec)
+    const growthNative =
+      accountGrowth(accountId, startDate, endDate, snapshots, transfers, accounts, settings, rateBook) ??
+      0
+    const nativeFlows = accountCapitalFlowsNative(
+      accountId,
+      startDate,
+      endDate,
+      transfers,
+      accounts,
+      settings,
+      rateBook,
+    )
+    nativeGrowthPct = modifiedDietzReturn(
+      startNative,
+      growthNative,
+      startDate,
+      endDate,
+      nativeFlows,
+    ).growthPct
+    nativeAnnualizedPct =
+      nativeGrowthPct != null && days >= MIN_ANNUALIZE_DAYS
+        ? annualizePeriodReturn(nativeGrowthPct, days)
+        : null
+  }
+
+  return { startDate, endDate, days, growthPct, annualizedPct, nativeGrowthPct, nativeAnnualizedPct }
 }

@@ -985,12 +985,25 @@ function AccountListItem({
                   <span className="text-[11px] text-slate-400 dark:text-slate-500">
                     долг {formatCurrency(creditDebt(account.creditLimit, balance), account.currency)}
                   </span>
-                ) : periodReturn?.growthPct != null ? (
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {formatPercent(periodReturn.growthPct)}
-                    {periodReturn.annualizedPct != null
-                      ? ` · ${formatPercent(periodReturn.annualizedPct)} год.`
-                      : ''}
+                ) : periodReturn?.growthPct != null || periodReturn?.nativeGrowthPct != null ? (
+                  <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                    {periodReturn.growthPct != null ? (
+                      <span className="block" {...dataQa(`account-return-${account.id}`)}>
+                        {formatPercent(periodReturn.growthPct)}
+                        {periodReturn.nativeGrowthPct != null ? ` ${baseCurrency}` : ''}
+                        {periodReturn.annualizedPct != null
+                          ? ` · ${formatPercent(periodReturn.annualizedPct)} год.`
+                          : ''}
+                      </span>
+                    ) : null}
+                    {periodReturn.nativeGrowthPct != null ? (
+                      <span className="block" {...dataQa(`account-return-native-${account.id}`)}>
+                        {formatPercent(periodReturn.nativeGrowthPct)} {account.currency}
+                        {periodReturn.nativeAnnualizedPct != null
+                          ? ` · ${formatPercent(periodReturn.nativeAnnualizedPct)} год.`
+                          : ''}
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
               </>

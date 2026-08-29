@@ -31,6 +31,8 @@ describe('buildAccountPeriodReturn', () => {
     expect(result?.growthPct).toBeCloseTo(0.1)
     expect(result?.days).toBeGreaterThanOrEqual(MIN_ANNUALIZE_DAYS)
     expect(result?.annualizedPct).not.toBeNull()
+    expect(result?.nativeGrowthPct).toBeNull()
+    expect(result?.nativeAnnualizedPct).toBeNull()
   })
 
   it('excludes transfers from account growth percentage', () => {
@@ -82,4 +84,59 @@ describe('buildAccountPeriodReturn', () => {
       expect(buildAccountPeriodReturn('a', accounts, snapshots, [], settings)).toBeNull()
     },
   )
+
+  it('adds native Dietz for a foreign-currency account, excluding FX from native pct', () => {
+    const fxSettings: WalletSettings = {
+      baseCurrency: 'RUB',
+      exchangeRates: { RUB: 1, USD: 80 },
+    }
+    const rateBook = {
+      '2026-01-01': { RUB: 1, USD: 80 },
+      '2026-02-01': { RUB: 1, USD: 90 },
+    }
+    const accounts = [account({ id: 'usd', currency: 'USD' })]
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'usd', amount: 100 }] },
+      { id: 's2', date: '2026-02-01', lines: [{ accountId: 'usd', amount: 110 }] },
+    ]
+    const result = buildAccountPeriodReturn('usd', accounts, snapshots, [], fxSettings, rateBook)
+    expect(result?.nativeGrowthPct).toBeCloseTo(0.1)
+    expect(result?.nativeAnnualizedPct).not.toBeNull()
+    expect(result?.growthPct).toBeCloseTo(1900 / 8000)
+    expect(result?.growthPct).not.toBeCloseTo(0.1, 2)
+  })
+
+  it('excludes native-currency transfers from native growth percentage', () => {
+    const fxSettings: WalletSettings = {
+      baseCurrency: 'RUB',
+      exchangeRates: { RUB: 1, USD: 80 },
+    }
+    const accounts = [
+      account({ id: 'usd', currency: 'USD' }),
+      account({ id: 'op', kind: 'operational', currency: 'USD', name: 'Op' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'usd', amount: 100 },
+          { accountId: 'op', amount: 50 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'usd', amount: 160 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      { id: 't1', date: '2026-01-15', fromAccountId: 'op', toAccountId: 'usd', amount: 50 },
+    ]
+    const result = buildAccountPeriodReturn('usd', accounts, snapshots, transfers, fxSettings)
+    expect(result?.nativeGrowthPct).toBeCloseTo(0.078, 2)
+  })
 })
