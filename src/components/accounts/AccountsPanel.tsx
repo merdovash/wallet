@@ -22,6 +22,7 @@ import type { AccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, isGrowthKind, normalizeAccountKind } from '../../lib/accountKinds'
 import { buildAccountPeriodReturn } from '../../lib/accountPeriodReturn'
+import { buildAccountsPageTotals } from '../../lib/accountsPageTotals'
 import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS, toBase } from '../../lib/currency'
@@ -157,6 +158,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     }
     return map
   }, [visible, accounts, snapshots, transfers, settings, rateBook])
+
+  const pageTotals = useMemo(
+    () => buildAccountsPageTotals(accounts, snapshots, settings, rateBook),
+    [accounts, snapshots, settings, rateBook],
+  )
 
   function openCreate() {
     setDetailId(null)
@@ -312,7 +318,28 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
       {visible.length === 0 ? (
         <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." dataQa="accounts-empty" />
       ) : (
-        <Card className="!p-0" dataQa="accounts-list">
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <Card className="!p-2.5 sm:!p-3" dataQa="widget-accounts-total">
+              <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Всего денег</p>
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-slate-900 dark:text-slate-200 sm:text-lg">
+                {formatCurrency(pageTotals.totalMoneyBase, settings.baseCurrency)}
+              </p>
+            </Card>
+            <Card className="!p-2.5 sm:!p-3" dataQa="widget-accounts-credit">
+              <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Кредит</p>
+              <p
+                className={`mt-0.5 text-base font-semibold tabular-nums sm:text-lg ${
+                  pageTotals.creditDebtBase > 0
+                    ? 'text-red-600'
+                    : 'text-slate-900 dark:text-slate-200'
+                }`}
+              >
+                {formatCurrency(pageTotals.creditDebtBase, settings.baseCurrency)}
+              </p>
+            </Card>
+          </div>
+          <Card className="!p-0" dataQa="accounts-list">
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {visible.map((account) => (
               <AccountListItem
@@ -347,6 +374,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
             ))}
           </ul>
         </Card>
+        </>
       )}
 
       <EntityEditPanel
