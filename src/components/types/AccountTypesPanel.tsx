@@ -267,6 +267,8 @@ function TypeGroup({
     balanceBase: number
     growth: number
     growthBase: number
+    growthPct: number | null
+    annualizedPct: number | null
   }[]
 }) {
   return (
@@ -367,8 +369,35 @@ function TypeGroup({
                     ) : null}
                   </div>
                 )}
+                {acc.growthPct != null ? (
+                  <div className={`mt-0.5 text-[11px] md:hidden ${pctTone(acc.growthPct)}`}>
+                    {formatPercent(acc.growthPct)}
+                    <span className="text-slate-400 dark:text-slate-500">
+                      {' '}
+                      · {formatPercent(acc.annualizedPct)} год.
+                    </span>
+                  </div>
+                ) : null}
               </td>
-              <td className="hidden whitespace-nowrap px-4 py-2 text-slate-400 dark:text-slate-500 md:table-cell">—</td>
+              <td
+                className="hidden whitespace-nowrap px-4 py-2 tabular-nums md:table-cell"
+                data-qa={`type-account-return-${acc.accountId}`}
+              >
+                {acc.growthPct != null ? (
+                  <>
+                    <div className={pctTone(acc.growthPct)}>{formatPercent(acc.growthPct)}</div>
+                    {acc.annualizedPct != null ? (
+                      <div className={`text-xs ${pctTone(acc.annualizedPct)}`}>
+                        {formatPercent(acc.annualizedPct)} год.
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 dark:text-slate-500">—</div>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500">—</span>
+                )}
+              </td>
             </tr>
           )
         })}

@@ -100,6 +100,44 @@ describe('buildAccountTypeReport', () => {
     expect(report.annualizedPct).not.toBeNull()
   })
 
+  it('computes Dietz percent per investment account, not only the kind total', () => {
+    const accounts: Account[] = [
+      account({ id: 'a', name: 'Брокер A', kind: 'investment' }),
+      account({ id: 'b', name: 'Брокер B', kind: 'investment' }),
+      account({ id: 'op', name: 'Карта', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'a', amount: 100_000 },
+          { accountId: 'b', amount: 50_000 },
+          { accountId: 'op', amount: 10_000 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-02-01',
+        lines: [
+          { accountId: 'a', amount: 110_000 },
+          { accountId: 'b', amount: 51_000 },
+          { accountId: 'op', amount: 12_000 },
+        ],
+      },
+    ]
+    const report = buildAccountTypeReport(accounts, snapshots, [], settings)
+    const inv = report.rows.find((r) => r.kind === 'investment')
+    expect(inv?.growthPct).toBeCloseTo(11_000 / 150_000, 8)
+    const accA = inv?.accounts.find((a) => a.accountId === 'a')
+    const accB = inv?.accounts.find((a) => a.accountId === 'b')
+    expect(accA?.growthPct).toBeCloseTo(0.1)
+    expect(accA?.annualizedPct).not.toBeNull()
+    expect(accB?.growthPct).toBeCloseTo(0.02)
+    const op = report.rows.find((r) => r.kind === 'operational')?.accounts[0]
+    expect(op?.growthPct).toBeNull()
+  })
+
   it('takes overall % from all money, excluding top-ups', () => {
     const accounts: Account[] = [
       account({ id: 'fund', name: 'Фонд', kind: 'fund' }),

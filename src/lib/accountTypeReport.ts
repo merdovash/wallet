@@ -38,6 +38,9 @@ export interface AccountTypeReportAccountRow {
   balanceBase: number
   growth: number
   growthBase: number
+  /** Modified Dietz in base for growth kinds; otherwise null. */
+  growthPct: number | null
+  annualizedPct: number | null
 }
 
 export interface AccountTypeReportRow {
@@ -114,6 +117,51 @@ function kindCapitalFlows(
     byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
   }
 
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, amount]) => ({ date, amount }))
+}
+
+function accountCapitalFlows(
+  accountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): DatedCapitalFlow[] {
+  const map = new Map(accounts.map((a) => [a.id, a]))
+  const byDate = new Map<string, number>()
+  for (const transfer of transfers) {
+    if (transfer.date.localeCompare(t0) <= 0) continue
+    if (transfer.date.localeCompare(t1) > 0) continue
+    const from = map.get(transfer.fromAccountId)
+    const to = map.get(transfer.toAccountId)
+    if (transfer.fromAccountId === accountId && from) {
+      const amountBase = convertAmount(
+        transfer.amount,
+        from.currency,
+        settings.baseCurrency,
+        settings,
+        transfer.date,
+        rateBook,
+      )
+      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) - amountBase)
+    }
+    if (transfer.toAccountId === accountId && to) {
+      const amountBase = convertAmount(
+        transfer.amount,
+        to.currency,
+        settings.baseCurrency,
+        settings,
+        transfer.date,
+        rateBook,
+      )
+      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountBase)
+    }
+  }
   return [...byDate.entries()]
     .filter(([, amount]) => amount !== 0)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -239,6 +287,23 @@ export function buildAccountTypeReport(
             ) ?? 0)
         : 0
 
+    let growthPct: number | null = null
+    let annualizedPct: number | null = null
+    if (t0 != null && t0 !== t1 && isGrowthKind(kind)) {
+      const flows = accountCapitalFlows(
+        account.id,
+        t0,
+        t1,
+        transfers,
+        accounts,
+        settings,
+        rateBook,
+      )
+      growthPct = modifiedDietzReturn(startBalanceBase, growthBase, t0, t1, flows).growthPct
+      annualizedPct =
+        growthPct == null || days <= 0 ? null : annualizePeriodReturn(growthPct, days)
+    }
+
     const bucket = byKind.get(kind) ?? {
       balanceBase: 0,
       startBalanceBase: 0,
@@ -256,6 +321,8 @@ export function buildAccountTypeReport(
       balanceBase,
       growth,
       growthBase,
+      growthPct,
+      annualizedPct,
     })
     byKind.set(kind, bucket)
   }
