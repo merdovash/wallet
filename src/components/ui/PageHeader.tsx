@@ -8,6 +8,9 @@ import type { AppSection } from '../../types/wallet'
 const FAB_CLASS =
   'fixed flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:hidden'
 
+const TOOLBAR_CLASS =
+  'hidden md:inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
+
 function CheckIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -108,7 +111,7 @@ function ToolbarButton({ section, className = '' }: { section: AppSection; class
       disabled={sectionPrimary.disabled}
       title={sectionPrimary.title}
       aria-label={sectionPrimary.label}
-      className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`${TOOLBAR_CLASS} ${className}`}
     >
       {sectionPrimary.showCheckIcon && <CheckIcon className="h-4 w-4 shrink-0" aria-hidden />}
       <span>{sectionPrimary.label}</span>
@@ -161,11 +164,7 @@ export function PageHeader({
         <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 md:flex-1">
           {actions}
           {showPrimary ? (
-            <PrimaryActionButton
-              section={section}
-              variant="toolbar"
-              className="hidden md:inline-flex"
-            />
+            <PrimaryActionButton section={section} variant="toolbar" />
           ) : null}
         </div>
       </div>

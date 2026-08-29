@@ -39,10 +39,12 @@ FAB рисуется только когда пользователь вошёл
 
 | | Мобиле (`< md`) | Десктоп (`≥ md`) |
 |---|-----------------|------------------|
-| Где | FAB, `fixed`, правый нижний угол | Кнопка в `PageHeader` или в шапке `EntityEditPanel` |
-| Primary на странице | скрыт | виден справа |
+| Где | только FAB | только кнопка в `PageHeader` / шапке `EntityEditPanel` |
+| Primary в шапке страницы | нет (`hidden`, без `inline-flex`) | да (`md:inline-flex`) |
+| FAB | да (`flex`) | нет (`md:hidden`) |
 | Вторичные действия | на странице как обычно | **слева** от primary |
-| FAB | есть | нет (`md:hidden`) |
+
+Нельзя вешать на одну кнопку сразу `inline-flex` и `hidden`: в Tailwind побеждает порядок в CSS, и шапка остаётся видимой рядом с FAB. Видимость задаёт только вариант: toolbar = `hidden md:inline-flex`, FAB = `flex md:hidden`.
 
 Позиция FAB: `right-4`, `bottom: 4.75rem + safe-area-inset-bottom` — над нижней навигацией. У `main` на мобиле запас снизу `7rem + safe-area`, чтобы контент не уезжал под кнопку.
 
