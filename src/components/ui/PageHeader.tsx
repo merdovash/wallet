@@ -1,8 +1,12 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useAppSection } from '../../lib/useAppSection'
+import { useFabKeyboardBottom } from '../../lib/useFabKeyboardBottom'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { usePrimaryActionStore } from '../../store/primaryActionStore'
 import type { AppSection } from '../../types/wallet'
+
+const FAB_CLASS =
+  'fixed flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:hidden'
 
 function CheckIcon({ className }: { className?: string }) {
   return (
@@ -49,46 +53,52 @@ interface PrimaryActionButtonProps {
   className?: string
 }
 
-export function PrimaryActionButton({ section, variant, className = '' }: PrimaryActionButtonProps) {
+function FabButton({ section, className = '' }: { section: AppSection; className?: string }) {
   const override = usePrimaryActionStore((s) => s.override)
   const panelOverride = override?.scope === 'panel' ? override : null
   const sectionPrimary = useSectionPrimary(section)
+  const keyboardBottom = useFabKeyboardBottom()
+  const fabStyle: CSSProperties | undefined = keyboardBottom ? { bottom: keyboardBottom } : undefined
 
-  if (variant === 'fab') {
-    // Панель редактирования: FAB = Сохранить (поверх sheet).
-    if (panelOverride) {
-      return (
-        <button
-          type="button"
-          onClick={panelOverride.onClick}
-          disabled={panelOverride.disabled}
-          title={panelOverride.title}
-          aria-label={panelOverride.label}
-          className={`fixed z-[110] flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:hidden ${className}`}
-        >
-          <span>{panelOverride.label}</span>
-        </button>
-      )
-    }
-
-    if (sectionPrimary.hidden) return null
-
+  if (panelOverride) {
     return (
       <button
         type="button"
-        onClick={sectionPrimary.onClick}
-        disabled={sectionPrimary.disabled}
-        title={sectionPrimary.title}
-        aria-label={sectionPrimary.label}
-        className={`fixed z-[90] flex h-14 min-w-14 items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:hidden ${className}`}
+        onClick={panelOverride.onClick}
+        disabled={panelOverride.disabled}
+        title={panelOverride.title}
+        aria-label={panelOverride.label}
+        style={fabStyle}
+        className={`z-[110] ${FAB_CLASS} ${className}`}
       >
-        {sectionPrimary.showCheckIcon && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
-        <span>{sectionPrimary.label}</span>
+        <span>{panelOverride.label}</span>
       </button>
     )
   }
 
-  // Toolbar: только десктоп, не на странице в адаптиве; при открытой edit-панели скрыт.
+  if (sectionPrimary.hidden) return null
+
+  return (
+    <button
+      type="button"
+      onClick={sectionPrimary.onClick}
+      disabled={sectionPrimary.disabled}
+      title={sectionPrimary.title}
+      aria-label={sectionPrimary.label}
+      style={fabStyle}
+      className={`z-[90] ${FAB_CLASS} ${className}`}
+    >
+      {sectionPrimary.showCheckIcon && <CheckIcon className="h-5 w-5 shrink-0" aria-hidden />}
+      <span>{sectionPrimary.label}</span>
+    </button>
+  )
+}
+
+function ToolbarButton({ section, className = '' }: { section: AppSection; className?: string }) {
+  const override = usePrimaryActionStore((s) => s.override)
+  const panelOverride = override?.scope === 'panel' ? override : null
+  const sectionPrimary = useSectionPrimary(section)
+
   if (panelOverride || sectionPrimary.hidden) return null
 
   return (
@@ -104,6 +114,13 @@ export function PrimaryActionButton({ section, variant, className = '' }: Primar
       <span>{sectionPrimary.label}</span>
     </button>
   )
+}
+
+export function PrimaryActionButton({ section, variant, className = '' }: PrimaryActionButtonProps) {
+  if (variant === 'fab') {
+    return <FabButton section={section} className={className} />
+  }
+  return <ToolbarButton section={section} className={className} />
 }
 
 /** Плавающая кнопка — только на узких экранах. */
