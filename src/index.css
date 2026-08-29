@@ -27,6 +27,27 @@ body {
   }
 }
 
+@keyframes stack-panel-from-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.stack-panel-sheet {
+  animation: stack-panel-up 200ms ease-out;
+}
+
+@media (min-width: 768px) {
+  .stack-panel-sheet {
+    animation: stack-panel-from-right 200ms ease-out;
+  }
+}
+
 @keyframes mobile-drawer-in {
   from {
     transform: translateX(-100%);

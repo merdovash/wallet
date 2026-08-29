@@ -15,7 +15,10 @@ interface StackPanelProps {
 
 const DISMISS_DRAG_PX = 72
 
-/** Нижняя стековая панель (sheet) поверх контента. */
+const SHEET_CLASS =
+  'stack-panel-sheet absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-b-0 border-slate-200 bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-2xl dark:border-slate-700 dark:bg-slate-900 md:left-auto md:right-0 md:top-0 md:h-full md:max-h-none md:w-[min(32rem,100%)] md:rounded-none md:rounded-l-2xl md:border-b md:border-r-0 md:pb-0'
+
+/** Мобиле — нижний sheet со свайпом; десктоп (md+) — правая панель фиксированной ширины. */
 export function StackPanel({
   open,
   title,
@@ -97,6 +100,7 @@ export function StackPanel({
 
   function onDragHandlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) return
     e.preventDefault()
     beginDrag(e.clientY)
   }
@@ -104,7 +108,7 @@ export function StackPanel({
   const sheetStyle = {
     transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
     transition: dragging ? 'none' : 'transform 200ms ease-out',
-    animation: dragOffset > 0 ? undefined : 'stack-panel-up 200ms ease-out',
+    animation: dragOffset > 0 || dragging ? 'none' : undefined,
   }
 
   return createPortal(
@@ -119,13 +123,13 @@ export function StackPanel({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-b-0 border-slate-200 bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className={SHEET_CLASS}
         style={sheetStyle}
         {...dataQa(qaId)}
       >
         <div className="flex shrink-0 flex-col items-center border-b border-slate-100 dark:border-slate-800">
           <div
-            className="mt-2 h-1 w-10 shrink-0 cursor-grab touch-none rounded-full bg-slate-300 active:cursor-grabbing"
+            className="mt-2 h-1 w-10 shrink-0 cursor-grab touch-none rounded-full bg-slate-300 active:cursor-grabbing md:hidden"
             aria-hidden
             onPointerDown={onDragHandlePointerDown}
             {...dataQa(`${qaId}-handle`)}
@@ -141,7 +145,7 @@ export function StackPanel({
               {headerActions}
               <button
                 type="button"
-                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 md:border md:border-slate-300 md:px-3 md:py-1.5 dark:md:border-slate-600"
                 onClick={onClose}
                 {...dataQa(`${qaId}-close`)}
               >
