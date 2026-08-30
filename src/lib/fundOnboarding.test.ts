@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addAmountToMonth,
   draftsFromOnboardingLines,
   formatYearMonthRu,
   meanEnteredAmounts,
@@ -43,16 +44,6 @@ describe('visibleMonthKeys', () => {
   })
 })
 
-describe('resolveMonthlyTarget', () => {
-  it('uses the mean when auto is on', () => {
-    expect(resolveMonthlyTarget(true, { '2026-07': '10 000', '2026-06': '20 000' }, 1)).toBe(15_000)
-  })
-
-  it('uses the manual value when auto is off', () => {
-    expect(resolveMonthlyTarget(false, { '2026-07': '10 000' }, 8_000)).toBe(8_000)
-  })
-})
-
 describe('meanEnteredAmounts', () => {
   it('is the arithmetic mean including zeros', () => {
     expect(meanEnteredAmounts({ a: '10 000', b: '0', c: '5 000' })).toBe(5_000)
@@ -92,5 +83,37 @@ describe('draftsFromOnboardingLines', () => {
         ],
       },
     ])
+  })
+})
+
+describe('resolveMonthlyTarget', () => {
+  it('uses the mean when auto is on', () => {
+    expect(resolveMonthlyTarget(true, { '2026-07': '10 000', '2026-06': '20 000' }, 1)).toBe(15_000)
+  })
+
+  it('uses the manual value when auto is off', () => {
+    expect(resolveMonthlyTarget(false, { '2026-07': '10 000' }, 8_000)).toBe(8_000)
+  })
+})
+
+describe('addAmountToMonth', () => {
+  it('adds to the current month total', () => {
+    expect(
+      addAmountToMonth(
+        [
+          { yearMonth: '2026-08', amount: 1_000 },
+          { yearMonth: '2026-07', amount: 5_000 },
+        ],
+        '2026-08',
+        250,
+      ),
+    ).toEqual([
+      { yearMonth: '2026-08', amount: 1_250 },
+      { yearMonth: '2026-07', amount: 5_000 },
+    ])
+  })
+
+  it('creates a month that did not exist', () => {
+    expect(addAmountToMonth([], '2026-08', 100)).toEqual([{ yearMonth: '2026-08', amount: 100 }])
   })
 })

@@ -125,6 +125,32 @@ export function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
 }
 
+export function yearMonthFromIso(iso: string): string {
+  return iso.slice(0, 7)
+}
+
+/** Add `delta` to a calendar month total (creates the month if missing). */
+export function addAmountToMonth(
+  expenses: FundMonthlyExpense[] | undefined,
+  yearMonth: string,
+  delta: number,
+): FundMonthlyExpense[] {
+  if (!YEAR_MONTH_RE.test(yearMonth) || !Number.isFinite(delta) || delta === 0) {
+    return [...(expenses ?? [])].sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+  }
+  const byMonth = new Map<string, number>()
+  for (const row of expenses ?? []) {
+    if (!YEAR_MONTH_RE.test(row.yearMonth) || !Number.isFinite(row.amount) || row.amount < 0) continue
+    byMonth.set(row.yearMonth, row.amount)
+  }
+  const next = roundMoney((byMonth.get(yearMonth) ?? 0) + delta)
+  if (next < 0) byMonth.delete(yearMonth)
+  else byMonth.set(yearMonth, next)
+  return [...byMonth.entries()]
+    .map(([month, amount]) => ({ yearMonth: month, amount }))
+    .sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+}
+
 export function expensesFromAmounts(amounts: Record<string, string>): FundMonthlyExpense[] {
   const rows: FundMonthlyExpense[] = []
   for (const [yearMonth, raw] of Object.entries(amounts)) {

@@ -1,5 +1,6 @@
 import { dataQa } from '../../lib/dataQa'
 import { formatYearMonthRu } from '../../lib/fundOnboarding'
+import { formatCurrency } from '../../lib/format'
 import { MoneyInput } from '../ui/FormControls'
 
 export function FundExpenseMonthsEditor({
@@ -77,5 +78,36 @@ export function FundAutoTargetToggle({
           : 'Цель задаётся вручную. Расходы за месяцы всё равно сохраняются.'}
       </p>
     </div>
+  )
+}
+
+export function FundMonthlyExpenseList({
+  expenses,
+  currency,
+  emptyText = 'Расходов пока нет',
+}: {
+  expenses: { yearMonth: string; amount: number }[] | undefined
+  currency: string
+  emptyText?: string
+}) {
+  const rows = [...(expenses ?? [])].sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+  if (rows.length === 0) {
+    return <p className="text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
+  }
+  return (
+    <ul className="divide-y divide-slate-100 dark:divide-slate-800" {...dataQa('fund-expense-list')}>
+      {rows.map((row) => (
+        <li
+          key={row.yearMonth}
+          className="flex items-baseline justify-between gap-3 py-2 text-sm"
+          {...dataQa(`fund-expense-row-${row.yearMonth}`)}
+        >
+          <span className="text-slate-600 dark:text-slate-300">{formatYearMonthRu(row.yearMonth)}</span>
+          <span className="tabular-nums text-slate-900 dark:text-slate-200">
+            {formatCurrency(row.amount, currency)}
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }

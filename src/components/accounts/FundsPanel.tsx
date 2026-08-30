@@ -11,11 +11,12 @@ import {
 } from '../../lib/avgMonthlyExpense'
 import { dataQa } from '../../lib/dataQa'
 import {
+  addAmountToMonth,
   amountsFromExpenses,
-  editorMonthKeys,
   expensesFromAmounts,
+  formatYearMonthRu,
   resolveMonthlyTarget,
-  visibleMonthKeys,
+  yearMonthFromIso,
 } from '../../lib/fundOnboarding'
 import { isFreeMoneyFund, nextLowerUserPriority } from '../../lib/fundAllocation'
 import { buildAccountFundsState } from '../../lib/fundBalances'
@@ -25,7 +26,7 @@ import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { FundsOnboarding } from './FundsOnboarding'
-import { FundAutoTargetToggle, FundExpenseMonthsEditor } from './FundExpenseMonthsEditor'
+import { FundAutoTargetToggle, FundMonthlyExpenseList } from './FundExpenseMonthsEditor'
 import { Button, Card, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { StackPanel } from '../ui/StackPanel'
@@ -43,8 +44,11 @@ export function FundsPanel({ active }: { active: boolean }) {
 
   const [expenseMonths, setExpenseMonths] = useState(FUNDS_EXPENSE_MONTHS_DEFAULT)
   const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState<'read' | 'edit'>('read')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewFreeId, setViewFreeId] = useState<string | null>(null)
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false)
+  const [addExpenseAmount, setAddExpenseAmount] = useState('')
   const [name, setName] = useState('')
   const [accountId, setAccountId] = useState('')
   const [monthlyTarget, setMonthlyTarget] = useState('')
@@ -109,6 +113,8 @@ export function FundsPanel({ active }: { active: boolean }) {
     setPriority(String(nextLowerUserPriority(funds, hostAccounts[0]?.id ?? '')))
     setAutoTarget(false)
     setExpenseAmounts({})
+    setFormMode('edit')
+    setAddExpenseOpen(false)
     setFormOpen(true)
   }
 
@@ -123,13 +129,19 @@ export function FundsPanel({ active }: { active: boolean }) {
     setPriority(String(fund.priority))
     setAutoTarget(Boolean(fund.autoTarget))
     setExpenseAmounts(amountsFromExpenses(fund.monthlyExpenses))
+    setFormMode('read')
+    setAddExpenseOpen(false)
+    setAddExpenseAmount('')
     setFormOpen(true)
   }
 
   async function handleSave() {
     const trimmed = name.trim()
     const prio = Number(priority)
-    const target = resolveMonthlyTarget(autoTarget, expenseAmounts, parseMoneyInput(monthlyTarget))
+    const amountsForTarget = viewingFund
+      ? amountsFromExpenses(viewingFund.monthlyExpenses)
+      : expenseAmounts
+    const target = resolveMonthlyTarget(autoTarget, amountsForTarget, parseMoneyInput(monthlyTarget))
     if (!trimmed || !accountId || target == null || !Number.isFinite(prio)) {
       setError(
         autoTarget
@@ -138,7 +150,9 @@ export function FundsPanel({ active }: { active: boolean }) {
       )
       return
     }
-    const monthlyExpenses = expensesFromAmounts(expenseAmounts)
+    const monthlyExpenses = viewingFund
+      ? (viewingFund.monthlyExpenses ?? [])
+      : expensesFromAmounts(expenseAmounts)
     setSaving(true)
     setError(null)
     try {
@@ -151,6 +165,7 @@ export function FundsPanel({ active }: { active: boolean }) {
           autoTarget,
           monthlyExpenses,
         })
+        setFormMode('read')
       } else {
         await addAccountFund({
           name: trimmed,
@@ -160,10 +175,48 @@ export function FundsPanel({ active }: { active: boolean }) {
           autoTarget,
           monthlyExpenses,
         })
+        setFormOpen(false)
       }
-      setFormOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить фонд')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAddExpense() {
+    if (!editingId) return
+    const fund = funds.find((f) => f.id === editingId)
+    if (!fund || isFreeMoneyFund(fund)) return
+    const delta = parseMoneyInput(addExpenseAmount)
+    if (delta == null || !(delta > 0)) {
+      setError('Укажите сумму расхода больше 0')
+      return
+    }
+    const month = yearMonthFromIso(todayIsoDate())
+    const monthlyExpenses = addAmountToMonth(fund.monthlyExpenses, month, delta)
+    const target = resolveMonthlyTarget(
+      Boolean(fund.autoTarget),
+      amountsFromExpenses(monthlyExpenses),
+      fund.monthlyTarget,
+    )
+    if (fund.autoTarget && target == null) {
+      setError('После расхода среднее должно быть больше 0')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await updateAccountFund(editingId, {
+        monthlyExpenses,
+        autoTarget: Boolean(fund.autoTarget),
+        monthlyTarget: target ?? fund.monthlyTarget,
+      })
+      setExpenseAmounts(amountsFromExpenses(monthlyExpenses))
+      setAddExpenseOpen(false)
+      setAddExpenseAmount('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось добавить расход')
     } finally {
       setSaving(false)
     }
@@ -183,13 +236,24 @@ export function FundsPanel({ active }: { active: boolean }) {
     }
   }
 
+  const viewingFund = editingId ? funds.find((f) => f.id === editingId) : undefined
+  const viewingAccount = viewingFund
+    ? accounts.find((a) => a.id === viewingFund.accountId)
+    : undefined
   const hasUserFunds = funds.some((f) => !isFreeMoneyFund(f))
   const canCreate = hostAccounts.length > 0
-  const resolvedTarget = resolveMonthlyTarget(autoTarget, expenseAmounts, parseMoneyInput(monthlyTarget))
+  const isCreate = formOpen && !editingId
+  const isRead = formOpen && !!editingId && formMode === 'read'
+  const isEdit = formOpen && (isCreate || formMode === 'edit')
+  const amountsForTarget = viewingFund
+    ? amountsFromExpenses(viewingFund.monthlyExpenses)
+    : expenseAmounts
+  const resolvedTarget = resolveMonthlyTarget(autoTarget, amountsForTarget, parseMoneyInput(monthlyTarget))
   const canSave =
     name.trim().length > 0 && !!accountId && resolvedTarget != null && Number.isFinite(Number(priority))
-  const expenseMonthKeys = editorMonthKeys(todayIsoDate(), expenseAmounts)
-  const visibleExpenseMonths = visibleMonthKeys(expenseAmounts, expenseMonthKeys)
+  const addDelta = parseMoneyInput(addExpenseAmount)
+  const canAddExpense = addDelta != null && addDelta > 0 && !saving
+  const currentExpenseMonth = yearMonthFromIso(todayIsoDate())
 
   useRegisterPrimaryAction(active && hasUserFunds && !formOpen && !viewFreeId, {
     id: 'funds-add',
@@ -342,83 +406,179 @@ export function FundsPanel({ active }: { active: boolean }) {
 
       <EntityEditPanel
         open={formOpen}
-        title={editingId ? 'Фонд' : 'Новый фонд'}
-        onClose={() => setFormOpen(false)}
-        onSave={handleSave}
-        saveDisabled={!canSave || saving}
-        saveActionId="fund-form-save"
+        title={editingId ? viewingFund?.name ?? 'Фонд' : 'Новый фонд'}
+        onClose={() => {
+          if (addExpenseOpen) {
+            setAddExpenseOpen(false)
+            return
+          }
+          setFormOpen(false)
+          setFormMode('read')
+        }}
+        onSave={() => {
+          if (isRead) {
+            if (viewingFund && !isFreeMoneyFund(viewingFund)) {
+              setName(viewingFund.name)
+              setAccountId(viewingFund.accountId)
+              setMonthlyTarget(String(viewingFund.monthlyTarget))
+              setPriority(String(viewingFund.priority))
+              setAutoTarget(Boolean(viewingFund.autoTarget))
+              setExpenseAmounts(amountsFromExpenses(viewingFund.monthlyExpenses))
+            }
+            setFormMode('edit')
+            return
+          }
+          void handleSave()
+        }}
+        saveDisabled={isRead ? false : !canSave || saving}
+        saveLabel={isRead ? 'Изменить' : 'Сохранить'}
+        saveTitle={isRead ? 'Редактировать фонд' : undefined}
+        saveActionId={isRead ? 'fund-form-edit' : 'fund-form-save'}
+        saveActive={!addExpenseOpen}
         dataQa="fund-form"
       >
         <div className="space-y-4">
-          <Field label="Название">
-            <Input value={name} onChange={(e) => setName(e.target.value)} dataQa="fund-form-name" />
-          </Field>
-          <Field label="Счёт">
-            <Select
-              value={accountId}
-              onChange={(e) => {
-                const nextId = e.target.value
-                setAccountId(nextId)
-                if (!editingId) setPriority(String(nextLowerUserPriority(funds, nextId)))
-              }}
-              dataQa="fund-form-account"
-            >
-              {hostAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({a.currency})
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <FundAutoTargetToggle
-            autoTarget={autoTarget}
-            onChange={(next) => {
-              setAutoTarget(next)
-              if (next) {
-                const mean = resolveMonthlyTarget(true, expenseAmounts, null)
-                if (mean != null) setMonthlyTarget(String(mean))
-              }
-            }}
-          />
-          <Field label="Целевое ежемесячное пополнение">
-            <MoneyInput
-              value={
-                autoTarget && resolvedTarget != null ? String(resolvedTarget) : monthlyTarget
-              }
-              onChange={setMonthlyTarget}
-              allowNegative={false}
-              disabled={autoTarget}
-              dataQa="fund-form-target"
-            />
-          </Field>
-          <div className="space-y-2" {...dataQa('fund-form-expenses')}>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Расходы за месяцы</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Сначала прошлый месяц. Как только укажете сумму (можно 0), появится более ранний.
-            </p>
-            <FundExpenseMonthsEditor
-              months={visibleExpenseMonths}
-              amounts={expenseAmounts}
-              onChangeAmount={(month, value) =>
-                setExpenseAmounts((prev) => ({ ...prev, [month]: value }))
-              }
-            />
-          </div>
-          <Field label="Приоритет (больше — раньше; новый фонд по умолчанию в конце очереди)">
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              dataQa="fund-form-priority"
-            />
-          </Field>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {isRead && viewingFund ? (
+            <>
+              <div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Счёт</p>
+                <p className="mt-1 text-sm text-slate-900 dark:text-slate-200">
+                  {viewingAccount?.name ?? '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Цель пополнения</p>
+                <p className="mt-1 text-sm tabular-nums text-slate-900 dark:text-slate-200">
+                  {formatCurrency(
+                    viewingFund.monthlyTarget,
+                    viewingAccount?.currency ?? settings.baseCurrency,
+                  )}
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    {viewingFund.autoTarget ? 'по расходам' : 'вручную'}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Приоритет</p>
+                <p className="mt-1 text-sm text-slate-900 dark:text-slate-200">{viewingFund.priority}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Название">
+                <Input value={name} onChange={(e) => setName(e.target.value)} dataQa="fund-form-name" />
+              </Field>
+              <Field label="Счёт">
+                <Select
+                  value={accountId}
+                  onChange={(e) => {
+                    const nextId = e.target.value
+                    setAccountId(nextId)
+                    if (!editingId) setPriority(String(nextLowerUserPriority(funds, nextId)))
+                  }}
+                  dataQa="fund-form-account"
+                >
+                  {hostAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <FundAutoTargetToggle
+                autoTarget={autoTarget}
+                onChange={(next) => {
+                  setAutoTarget(next)
+                  if (next) {
+                    const mean = resolveMonthlyTarget(
+                      true,
+                      viewingFund
+                        ? amountsFromExpenses(viewingFund.monthlyExpenses)
+                        : expenseAmounts,
+                      null,
+                    )
+                    if (mean != null) setMonthlyTarget(String(mean))
+                  }
+                }}
+              />
+              <Field label="Целевое ежемесячное пополнение">
+                <MoneyInput
+                  value={
+                    autoTarget && resolvedTarget != null ? String(resolvedTarget) : monthlyTarget
+                  }
+                  onChange={setMonthlyTarget}
+                  allowNegative={false}
+                  disabled={autoTarget}
+                  dataQa="fund-form-target"
+                />
+              </Field>
+              <Field label="Приоритет (больше — раньше; новый фонд по умолчанию в конце очереди)">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  dataQa="fund-form-priority"
+                />
+              </Field>
+            </>
+          )}
+
           {editingId ? (
+            <div className="space-y-2" {...dataQa('fund-form-expenses')}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Расходы по месяцам</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="!px-3 !py-1.5"
+                  onClick={() => {
+                    setError(null)
+                    setAddExpenseAmount('')
+                    setAddExpenseOpen(true)
+                  }}
+                  dataQa="fund-add-expense"
+                >
+                  Добавить расход
+                </Button>
+              </div>
+              <FundMonthlyExpenseList
+                expenses={viewingFund?.monthlyExpenses}
+                currency={viewingAccount?.currency ?? settings.baseCurrency}
+              />
+            </div>
+          ) : null}
+
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {isEdit && editingId ? (
             <Button type="button" variant="danger" onClick={() => void handleDelete()} dataQa="fund-form-delete">
               Удалить фонд
             </Button>
           ) : null}
+        </div>
+      </EntityEditPanel>
+
+      <EntityEditPanel
+        open={addExpenseOpen}
+        title="Добавить расход"
+        onClose={() => setAddExpenseOpen(false)}
+        onSave={() => void handleAddExpense()}
+        saveDisabled={!canAddExpense}
+        saveActionId="fund-expense-add-save"
+        dataQa="fund-expense-add"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Сумма добавится к итогу за {formatYearMonthRu(currentExpenseMonth)}.
+          </p>
+          <Field label="Сумма">
+            <MoneyInput
+              value={addExpenseAmount}
+              onChange={setAddExpenseAmount}
+              allowNegative={false}
+              dataQa="fund-expense-add-amount"
+            />
+          </Field>
         </div>
       </EntityEditPanel>
 
