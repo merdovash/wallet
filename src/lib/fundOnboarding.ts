@@ -27,7 +27,16 @@ export interface FundOnboardingDraft {
   name: string
   monthlyTarget: number
   priority: number
+  autoTarget: boolean
+  monthlyExpenses: FundMonthlyExpense[]
 }
+
+export interface FundMonthlyExpense {
+  yearMonth: string
+  amount: number
+}
+
+export const YEAR_MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/
 
 export function shiftYearMonth(yearMonth: string, delta: number): string {
   const match = /^(\d{4})-(\d{2})$/.exec(yearMonth)
@@ -65,24 +74,40 @@ function isAmountEntered(raw: string | undefined): boolean {
   return parseMoneyInput(raw ?? '') != null
 }
 
-/** Always show the latest month; each older month appears after the newer one has any amount, including 0. */
+/** Always show the latest month; older months appear after a newer amount (including 0) or if already filled. */
 export function visibleMonthKeys(
   amounts: Record<string, string>,
   monthKeysNewestFirst: string[],
 ): string[] {
-  const visible: string[] = []
+  const progressive: string[] = []
   for (let i = 0; i < monthKeysNewestFirst.length; i += 1) {
     const key = monthKeysNewestFirst[i]
     if (!key) break
     if (i === 0) {
-      visible.push(key)
+      progressive.push(key)
       continue
     }
     const newer = monthKeysNewestFirst[i - 1]
     if (!newer || !isAmountEntered(amounts[newer])) break
-    visible.push(key)
+    progressive.push(key)
   }
-  return visible
+  const shown = new Set(progressive)
+  for (const key of monthKeysNewestFirst) {
+    if (isAmountEntered(amounts[key])) shown.add(key)
+  }
+  return monthKeysNewestFirst.filter((key) => shown.has(key))
+}
+
+/** Calendar months for the editor, plus any stored months outside the default window. */
+export function editorMonthKeys(
+  asOfIso: string,
+  amounts: Record<string, string>,
+  max: number = FUND_ONBOARDING_MAX_MONTHS,
+): string[] {
+  const base = onboardingMonthKeys(asOfIso, max)
+  const extra = Object.keys(amounts).filter((key) => YEAR_MONTH_RE.test(key) && !base.includes(key))
+  extra.sort((a, b) => b.localeCompare(a))
+  return [...base, ...extra]
 }
 
 export function meanEnteredAmounts(amounts: Record<string, string>): number | null {
@@ -100,13 +125,54 @@ export function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
 }
 
+export function expensesFromAmounts(amounts: Record<string, string>): FundMonthlyExpense[] {
+  const rows: FundMonthlyExpense[] = []
+  for (const [yearMonth, raw] of Object.entries(amounts)) {
+    if (!YEAR_MONTH_RE.test(yearMonth)) continue
+    const amount = parseMoneyInput(raw)
+    if (amount == null || amount < 0) continue
+    rows.push({ yearMonth, amount: roundMoney(amount) })
+  }
+  rows.sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+  return rows
+}
+
+export function amountsFromExpenses(expenses: FundMonthlyExpense[] | undefined): Record<string, string> {
+  const amounts: Record<string, string> = {}
+  for (const row of expenses ?? []) {
+    if (!YEAR_MONTH_RE.test(row.yearMonth) || !Number.isFinite(row.amount) || row.amount < 0) continue
+    amounts[row.yearMonth] = String(row.amount)
+  }
+  return amounts
+}
+
+export function resolveMonthlyTarget(
+  autoTarget: boolean,
+  amounts: Record<string, string>,
+  manual: number | null,
+): number | null {
+  if (autoTarget) {
+    const mean = meanEnteredAmounts(amounts)
+    if (mean == null || !(mean > 0)) return null
+    return roundMoney(mean)
+  }
+  if (manual == null || !(manual > 0) || !Number.isFinite(manual)) return null
+  return roundMoney(manual)
+}
+
 export function draftsFromOnboardingLines(lines: FundOnboardingLine[]): FundOnboardingDraft[] {
-  const ready: { name: string; monthlyTarget: number }[] = []
+  const ready: Omit<FundOnboardingDraft, 'priority'>[] = []
   for (const line of lines) {
     const name = line.name.trim()
-    const mean = meanEnteredAmounts(line.amounts)
-    if (!name || mean == null || !(mean > 0)) continue
-    ready.push({ name, monthlyTarget: roundMoney(mean) })
+    const monthlyExpenses = expensesFromAmounts(line.amounts)
+    const monthlyTarget = resolveMonthlyTarget(true, line.amounts, null)
+    if (!name || monthlyTarget == null) continue
+    ready.push({
+      name,
+      monthlyTarget,
+      autoTarget: true,
+      monthlyExpenses,
+    })
   }
   const n = ready.length
   return ready.map((item, index) => ({

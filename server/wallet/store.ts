@@ -89,6 +89,11 @@ function mapSettings(row: {
 
 export type DbFundSystemKey = 'free_money'
 
+export interface DbFundMonthlyExpense {
+  yearMonth: string
+  amount: number
+}
+
 export interface DbAccountFund {
   id: string
   accountId: string
@@ -97,6 +102,8 @@ export interface DbAccountFund {
   priority: number
   systemKey: DbFundSystemKey | null
   createdAt?: string
+  autoTarget: boolean
+  monthlyExpenses: DbFundMonthlyExpense[]
 }
 
 export interface WalletBundle {
@@ -705,11 +712,14 @@ type FundRow = {
   priority: number | string
   system_key: string | null
   created_at: Date | string | null
+  auto_target: boolean | null
 }
 
-const FUND_SELECT = `id, account_id, name, monthly_target, priority, system_key, created_at`
+const FUND_SELECT = `id, account_id, name, monthly_target, priority, system_key, created_at, auto_target`
 
-function mapFund(row: FundRow): DbAccountFund {
+const YEAR_MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/
+
+function mapFund(row: FundRow, monthlyExpenses: DbFundMonthlyExpense[] = []): DbAccountFund {
   const systemKey = row.system_key === 'free_money' ? 'free_money' : null
   return {
     id: String(row.id),
@@ -719,7 +729,98 @@ function mapFund(row: FundRow): DbAccountFund {
     priority: Math.trunc(num(row.priority)),
     systemKey,
     createdAt: isoTs(row.created_at),
+    autoTarget: systemKey ? false : Boolean(row.auto_target),
+    monthlyExpenses: systemKey ? [] : monthlyExpenses,
   }
+}
+
+function normalizeMonthlyExpenses(raw: unknown): DbFundMonthlyExpense[] {
+  if (!Array.isArray(raw)) return []
+  const byMonth = new Map<string, number>()
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const yearMonth = String((item as { yearMonth?: unknown }).yearMonth ?? '')
+    if (!YEAR_MONTH_RE.test(yearMonth)) continue
+    const amount = num((item as { amount?: unknown }).amount)
+    if (!Number.isFinite(amount) || amount < 0) continue
+    byMonth.set(yearMonth, Math.round(amount * 100) / 100)
+  }
+  return [...byMonth.entries()]
+    .map(([yearMonth, amount]) => ({ yearMonth, amount }))
+    .sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
+}
+
+function meanExpenseAmount(rows: DbFundMonthlyExpense[]): number | null {
+  if (rows.length === 0) return null
+  const sum = rows.reduce((s, row) => s + row.amount, 0)
+  return Math.round((sum / rows.length) * 100) / 100
+}
+
+async function loadFundExpensesByFund(
+  userId: string,
+  fundIds: string[],
+): Promise<Map<string, DbFundMonthlyExpense[]>> {
+  const map = new Map<string, DbFundMonthlyExpense[]>()
+  if (fundIds.length === 0) return map
+  const pool = getPool()
+  const result = await pool.query<{
+    fund_id: string
+    year_month: string
+    amount: number | string
+  }>(
+    `SELECT fund_id, year_month, amount
+     FROM wallet_account_fund_expenses
+     WHERE user_id = $1 AND fund_id = ANY($2::uuid[])
+     ORDER BY year_month DESC`,
+    [userId, fundIds],
+  )
+  for (const row of result.rows) {
+    const fundId = String(row.fund_id)
+    const list = map.get(fundId) ?? []
+    list.push({ yearMonth: String(row.year_month).trim(), amount: num(row.amount) })
+    map.set(fundId, list)
+  }
+  return map
+}
+
+async function replaceFundExpenses(
+  userId: string,
+  fundId: string,
+  expenses: DbFundMonthlyExpense[],
+): Promise<DbFundMonthlyExpense[]> {
+  const pool = getPool()
+  await pool.query(
+    `DELETE FROM wallet_account_fund_expenses WHERE fund_id = $1 AND user_id = $2`,
+    [fundId, userId],
+  )
+  for (const row of expenses) {
+    await pool.query(
+      `INSERT INTO wallet_account_fund_expenses (fund_id, user_id, year_month, amount)
+       VALUES ($1, $2, $3, $4)`,
+      [fundId, userId, row.yearMonth, row.amount],
+    )
+  }
+  return expenses
+}
+
+function resolveStoredTarget(
+  autoTarget: boolean,
+  expenses: DbFundMonthlyExpense[],
+  requestedTarget: number | undefined,
+  currentTarget: number,
+): number {
+  if (autoTarget) {
+    const mean = meanExpenseAmount(expenses)
+    if (mean == null || !(mean > 0)) {
+      throw new Error('Для авторасчёта укажите расходы за месяцы со средним больше 0')
+    }
+    return mean
+  }
+  const target = requestedTarget !== undefined ? requestedTarget : currentTarget
+  if (!(target > 0) || !Number.isFinite(target)) {
+    throw new Error('Целевое пополнение должно быть больше 0')
+  }
+  return target
 }
 
 function isFundHostKind(kind: string): boolean {
@@ -748,7 +849,11 @@ export async function listAccountFunds(userId: string): Promise<DbAccountFund[]>
      ORDER BY priority DESC, name ASC`,
     [userId],
   )
-  return result.rows.map(mapFund)
+  const expenses = await loadFundExpensesByFund(
+    userId,
+    result.rows.map((row) => String(row.id)),
+  )
+  return result.rows.map((row) => mapFund(row, expenses.get(String(row.id)) ?? []))
 }
 
 async function ensureFreeMoneyFund(userId: string, accountId: string): Promise<void> {
@@ -772,6 +877,8 @@ export async function createAccountFund(
     name: string
     monthlyTarget: number
     priority?: number
+    autoTarget?: boolean
+    monthlyExpenses?: DbFundMonthlyExpense[]
   },
 ): Promise<{ fund: DbAccountFund; funds: DbAccountFund[] }> {
   const account = await loadFundAccount(userId, input.accountId)
@@ -780,9 +887,10 @@ export async function createAccountFund(
   if (!isFundHostKind(account.kind)) throw new Error('Фонды нельзя привязать к кредитке или кэшбеку')
   const name = input.name.trim()
   if (!name) throw new Error('Нужно название фонда')
-  if (!(input.monthlyTarget > 0) || !Number.isFinite(input.monthlyTarget)) {
-    throw new Error('Целевое пополнение должно быть больше 0')
-  }
+
+  const autoTarget = Boolean(input.autoTarget)
+  const monthlyExpenses = normalizeMonthlyExpenses(input.monthlyExpenses)
+  const monthlyTarget = resolveStoredTarget(autoTarget, monthlyExpenses, input.monthlyTarget, 0)
 
   await ensureFreeMoneyFund(userId, input.accountId)
 
@@ -801,12 +909,14 @@ export async function createAccountFund(
 
   const result = await pool.query<FundRow>(
     `INSERT INTO wallet_account_funds
-       (user_id, account_id, name, monthly_target, priority, system_key)
-     VALUES ($1, $2, $3, $4, $5, NULL)
+       (user_id, account_id, name, monthly_target, priority, system_key, auto_target)
+     VALUES ($1, $2, $3, $4, $5, NULL, $6)
      RETURNING ${FUND_SELECT}`,
-    [userId, input.accountId, name, input.monthlyTarget, priority],
+    [userId, input.accountId, name, monthlyTarget, priority, autoTarget],
   )
-  const fund = mapFund(result.rows[0]!)
+  const inserted = result.rows[0]!
+  const savedExpenses = await replaceFundExpenses(userId, String(inserted.id), monthlyExpenses)
+  const fund = mapFund(inserted, savedExpenses)
   const funds = await listAccountFunds(userId)
   return { fund, funds }
 }
@@ -819,6 +929,8 @@ export async function updateAccountFund(
     name: string
     monthlyTarget: number
     priority: number
+    autoTarget: boolean
+    monthlyExpenses: DbFundMonthlyExpense[]
   }>,
 ): Promise<DbAccountFund | null> {
   const pool = getPool()
@@ -828,7 +940,8 @@ export async function updateAccountFund(
   )
   const row = existing.rows[0]
   if (!row) return null
-  const current = mapFund(row)
+  const currentExpensesMap = await loadFundExpensesByFund(userId, [id])
+  const current = mapFund(row, currentExpensesMap.get(id) ?? [])
   if (current.systemKey === 'free_money') {
     throw new Error('Системный фонд «Свободные деньги» нельзя изменить')
   }
@@ -845,10 +958,17 @@ export async function updateAccountFund(
 
   const nextName = patch.name != null ? patch.name.trim() : current.name
   if (!nextName) throw new Error('Нужно название фонда')
-  const nextTarget = patch.monthlyTarget !== undefined ? patch.monthlyTarget : current.monthlyTarget
-  if (!(nextTarget > 0) || !Number.isFinite(nextTarget)) {
-    throw new Error('Целевое пополнение должно быть больше 0')
-  }
+  const nextAutoTarget = patch.autoTarget !== undefined ? Boolean(patch.autoTarget) : current.autoTarget
+  const nextExpenses =
+    patch.monthlyExpenses !== undefined
+      ? normalizeMonthlyExpenses(patch.monthlyExpenses)
+      : current.monthlyExpenses
+  const nextTarget = resolveStoredTarget(
+    nextAutoTarget,
+    nextExpenses,
+    patch.monthlyTarget,
+    current.monthlyTarget,
+  )
   const nextPriority =
     patch.priority !== undefined && Number.isFinite(patch.priority)
       ? Math.trunc(patch.priority)
@@ -860,12 +980,17 @@ export async function updateAccountFund(
        name = $4,
        monthly_target = $5,
        priority = $6,
+       auto_target = $7,
        updated_at = now()
      WHERE id = $1 AND user_id = $2
      RETURNING ${FUND_SELECT}`,
-    [id, userId, nextAccountId, nextName, nextTarget, nextPriority],
+    [id, userId, nextAccountId, nextName, nextTarget, nextPriority, nextAutoTarget],
   )
-  return mapFund(result.rows[0]!)
+  const savedExpenses =
+    patch.monthlyExpenses !== undefined
+      ? await replaceFundExpenses(userId, id, nextExpenses)
+      : nextExpenses
+  return mapFund(result.rows[0]!, savedExpenses)
 }
 
 export async function deleteAccountFund(userId: string, id: string): Promise<boolean> {

@@ -96,6 +96,9 @@ export interface AccountFund {
   priority: number
   systemKey?: AccountFundSystemKey | null
   createdAt?: string
+  /** When true, monthlyTarget is the mean of monthlyExpenses. */
+  autoTarget?: boolean
+  monthlyExpenses?: { yearMonth: string; amount: number }[]
 }
 
 /** Manual rates: 1 unit of currency → how many units of baseCurrency. */

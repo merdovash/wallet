@@ -4,7 +4,7 @@
 
 Источники схемы:
 
-- миграции: [`server/db/migrations/`](server/db/migrations/) (`001` … `011`)
+- миграции: [`server/db/migrations/`](server/db/migrations/) (`001` … `012`)
 - учёт миграций: таблица `wallet_schema_migrations`
 - клиентские типы: [`src/types/wallet.ts`](src/types/wallet.ts)
 
@@ -25,6 +25,7 @@
 | `wallet_snapshot_lines` | Остатки счетов внутри чек-ина |
 | `wallet_transfers` | Переводы между счетами |
 | `wallet_account_funds` | Фонды (конверты) внутри счёта; остатки считаются из чек-инов и переводов |
+| `wallet_account_fund_expenses` | Итоговые расходы фонда по календарным месяцам |
 | `cbr_rate_days` | Кэш дневных курсов ЦБ (общий) |
 
 ```mermaid
@@ -45,6 +46,11 @@ erDiagram
   wallet_accounts ||--o{ wallet_transfers : from
   wallet_accounts ||--o{ wallet_transfers : to
   wallet_accounts ||--o{ wallet_account_funds : envelopes
+  wallet_account_funds ||--o{ wallet_account_fund_expenses : months
+  wallet_account_fund_expenses {
+    uuid fund_id PK
+    text year_month PK
+  }
   cbr_rate_days {
     date rate_date PK
   }
@@ -256,10 +262,26 @@ erDiagram
 | `monthly_target` | NUMERIC(20, 8) | NOT NULL | `0` | Цель пополнения переводами за календарный месяц; `0` у free_money |
 | `priority` | INT | NOT NULL | `0` | Больше — раньше заполняется при входящем переводе |
 | `system_key` | TEXT | NULL | — | `NULL` или `'free_money'` |
+| `auto_target` | BOOLEAN | NOT NULL | `FALSE` | Если true, `monthly_target` = среднее сохранённых расходов по месяцам |
 | `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Создание |
 | `updated_at` | TIMESTAMPTZ | NOT NULL | `now()` | Обновление |
 
 Индекс уникальности одного free_money на счёт: `wallet_account_funds_one_free_money` на `(account_id) WHERE system_key = 'free_money'`.
+
+---
+
+## 9.1. `wallet_account_fund_expenses`
+
+Итог расхода фонда за календарный месяц (`YYYY-MM`). Не путать с `expense` чек-ина. На карточке фонда можно вводить прошлые месяцы; при `auto_target` цель пополнения пересчитывается как среднее арифметическое этих сумм.
+
+| Поле | Тип | NULL | По умолчанию | Описание |
+|------|-----|------|--------------|----------|
+| `fund_id` | UUID | NOT NULL | — | PK, FK → `wallet_account_funds(id)` `ON DELETE CASCADE` |
+| `year_month` | TEXT | NOT NULL | — | PK, `YYYY-MM` |
+| `user_id` | UUID | NOT NULL | — | FK → `users(id)` `ON DELETE CASCADE` |
+| `amount` | NUMERIC(20, 8) | NOT NULL | — | Сумма ≥ 0 |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Создание |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `now()` | Обновление |
 
 ---
 
@@ -296,6 +318,7 @@ erDiagram
 | `009_annual_inflation.sql` | Годовая инфляция в настройках |
 | `010_key_rate.sql` | Ключевая ставка в настройках |
 | `011_account_funds.sql` | Фонды-конверты внутри счёта |
+| `012_fund_monthly_expenses.sql` | Расходы фонда по месяцам и `auto_target` |
 
 ---
 
@@ -308,7 +331,7 @@ erDiagram
 | `/api/wallet/accounts` | `wallet_accounts` |
 | `/api/wallet/snapshots` | `wallet_snapshots`, `wallet_snapshot_lines` |
 | `/api/wallet/transfers` | `wallet_transfers` |
-| `/api/wallet/funds` | `wallet_account_funds` |
+| `/api/wallet/funds` | `wallet_account_funds`, `wallet_account_fund_expenses` |
 | `/api/wallet/import` | все `wallet_*` (если кошелёк пуст) |
 | `/api/rates` | `cbr_rate_days` |
 

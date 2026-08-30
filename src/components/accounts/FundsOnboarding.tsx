@@ -3,16 +3,17 @@ import { dataQa } from '../../lib/dataQa'
 import {
   createOnboardingLine,
   draftsFromOnboardingLines,
-  formatYearMonthRu,
   meanEnteredAmounts,
   onboardingMonthKeys,
   visibleMonthKeys,
+  type FundOnboardingDraft,
   type FundOnboardingLine,
 } from '../../lib/fundOnboarding'
 import { formatCurrency } from '../../lib/format'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import type { Account } from '../../types/wallet'
-import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { Button, Card, EmptyState, Field, Input, Select } from '../ui/FormControls'
+import { FundExpenseMonthsEditor } from './FundExpenseMonthsEditor'
 
 export function FundsOnboarding({
   active,
@@ -25,7 +26,7 @@ export function FundsOnboarding({
   accounts: Account[]
   currency: string
   asOfDate: string
-  onCreate: (drafts: { name: string; monthlyTarget: number; priority: number; accountId: string }[]) => Promise<void>
+  onCreate: (drafts: (FundOnboardingDraft & { accountId: string })[]) => Promise<void>
 }) {
   const monthKeys = useMemo(() => onboardingMonthKeys(asOfDate), [asOfDate])
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
@@ -108,7 +109,7 @@ export function FundsOnboarding({
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Заполните основные статьи расходов за последние месяцы. Для каждой статьи появится прошлый месяц — как
           только укажете сумму (можно 0), откроется ещё более ранний. После сохранения создадим фонды с целью,
-          равной среднему арифметическому. Сами суммы месяцев не хранятся.
+          равной среднему арифметическому, и сохраним суммы по месяцам.
         </p>
       </Card>
 
@@ -154,22 +155,12 @@ export function FundsOnboarding({
                 </Button>
               ) : null}
             </div>
-            <ul className="space-y-2">
-              {visible.map((month) => (
-                <li key={month} className="flex flex-wrap items-center gap-2">
-                  <span className="w-32 shrink-0 text-sm text-slate-600 dark:text-slate-300">
-                    {formatYearMonthRu(month)}
-                  </span>
-                  <MoneyInput
-                    value={line.amounts[month] ?? ''}
-                    onChange={(value) => setAmount(line.id, month, value)}
-                    allowNegative={false}
-                    className="max-w-xs"
-                    dataQa={`funds-onboarding-amount-${index}-${month}`}
-                  />
-                </li>
-              ))}
-            </ul>
+            <FundExpenseMonthsEditor
+              months={visible}
+              amounts={line.amounts}
+              onChangeAmount={(month, value) => setAmount(line.id, month, value)}
+              lineIndex={index}
+            />
             {mean != null && mean > 0 ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Цель фонда: {formatCurrency(mean, displayCurrency)} в месяц (среднее)

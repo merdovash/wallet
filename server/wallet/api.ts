@@ -309,16 +309,20 @@ export async function handleWalletApi(
         name?: string
         monthlyTarget?: number
         priority?: number
+        autoTarget?: boolean
+        monthlyExpenses?: { yearMonth: string; amount: number }[]
       }>(req)
-      if (!body.accountId || !body.name?.trim() || body.monthlyTarget == null) {
-        sendJson(res, 400, { error: 'Нужны accountId, name, monthlyTarget' })
+      if (!body.accountId || !body.name?.trim()) {
+        sendJson(res, 400, { error: 'Нужны accountId и name' })
         return true
       }
       const created = await store.createAccountFund(user.id, {
         accountId: body.accountId,
         name: body.name,
-        monthlyTarget: Number(body.monthlyTarget),
+        monthlyTarget: body.monthlyTarget == null ? 0 : Number(body.monthlyTarget),
         priority: body.priority != null ? Number(body.priority) : undefined,
+        autoTarget: body.autoTarget,
+        monthlyExpenses: body.monthlyExpenses,
       })
       sendJson(res, 201, created)
       return true
@@ -333,12 +337,16 @@ export async function handleWalletApi(
             name?: string
             monthlyTarget?: number
             priority?: number
+            autoTarget?: boolean
+            monthlyExpenses?: { yearMonth: string; amount: number }[]
           }>(req)
           const fund = await store.updateAccountFund(user.id, params.id!, {
             accountId: body.accountId,
             name: body.name,
             monthlyTarget: body.monthlyTarget == null ? undefined : Number(body.monthlyTarget),
             priority: body.priority == null ? undefined : Number(body.priority),
+            autoTarget: body.autoTarget,
+            monthlyExpenses: body.monthlyExpenses,
           })
           if (!fund) {
             sendJson(res, 404, { error: 'Фонд не найден' })

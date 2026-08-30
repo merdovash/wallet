@@ -10,6 +10,13 @@ import {
   writeFundsExpenseMonths,
 } from '../../lib/avgMonthlyExpense'
 import { dataQa } from '../../lib/dataQa'
+import {
+  amountsFromExpenses,
+  editorMonthKeys,
+  expensesFromAmounts,
+  resolveMonthlyTarget,
+  visibleMonthKeys,
+} from '../../lib/fundOnboarding'
 import { isFreeMoneyFund, nextLowerUserPriority } from '../../lib/fundAllocation'
 import { buildAccountFundsState } from '../../lib/fundBalances'
 import { formatCurrency, formatIsoToRu, todayIsoDate } from '../../lib/format'
@@ -18,6 +25,7 @@ import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { FundsOnboarding } from './FundsOnboarding'
+import { FundAutoTargetToggle, FundExpenseMonthsEditor } from './FundExpenseMonthsEditor'
 import { Button, Card, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { StackPanel } from '../ui/StackPanel'
@@ -41,6 +49,8 @@ export function FundsPanel({ active }: { active: boolean }) {
   const [accountId, setAccountId] = useState('')
   const [monthlyTarget, setMonthlyTarget] = useState('')
   const [priority, setPriority] = useState('1')
+  const [autoTarget, setAutoTarget] = useState(false)
+  const [expenseAmounts, setExpenseAmounts] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -97,6 +107,8 @@ export function FundsPanel({ active }: { active: boolean }) {
     setAccountId(hostAccounts[0]?.id ?? '')
     setMonthlyTarget('')
     setPriority(String(nextLowerUserPriority(funds, hostAccounts[0]?.id ?? '')))
+    setAutoTarget(false)
+    setExpenseAmounts({})
     setFormOpen(true)
   }
 
@@ -109,17 +121,24 @@ export function FundsPanel({ active }: { active: boolean }) {
     setAccountId(fund.accountId)
     setMonthlyTarget(String(fund.monthlyTarget))
     setPriority(String(fund.priority))
+    setAutoTarget(Boolean(fund.autoTarget))
+    setExpenseAmounts(amountsFromExpenses(fund.monthlyExpenses))
     setFormOpen(true)
   }
 
   async function handleSave() {
     const trimmed = name.trim()
-    const target = parseMoneyInput(monthlyTarget)
     const prio = Number(priority)
-    if (!trimmed || !accountId || target == null || !(target > 0) || !Number.isFinite(prio)) {
-      setError('Укажите название, счёт, цель > 0 и приоритет')
+    const target = resolveMonthlyTarget(autoTarget, expenseAmounts, parseMoneyInput(monthlyTarget))
+    if (!trimmed || !accountId || target == null || !Number.isFinite(prio)) {
+      setError(
+        autoTarget
+          ? 'Укажите название, счёт, расходы со средним > 0 и приоритет'
+          : 'Укажите название, счёт, цель > 0 и приоритет',
+      )
       return
     }
+    const monthlyExpenses = expensesFromAmounts(expenseAmounts)
     setSaving(true)
     setError(null)
     try {
@@ -129,6 +148,8 @@ export function FundsPanel({ active }: { active: boolean }) {
           accountId,
           monthlyTarget: target,
           priority: Math.trunc(prio),
+          autoTarget,
+          monthlyExpenses,
         })
       } else {
         await addAccountFund({
@@ -136,6 +157,8 @@ export function FundsPanel({ active }: { active: boolean }) {
           accountId,
           monthlyTarget: target,
           priority: Math.trunc(prio),
+          autoTarget,
+          monthlyExpenses,
         })
       }
       setFormOpen(false)
@@ -162,11 +185,11 @@ export function FundsPanel({ active }: { active: boolean }) {
 
   const hasUserFunds = funds.some((f) => !isFreeMoneyFund(f))
   const canCreate = hostAccounts.length > 0
+  const resolvedTarget = resolveMonthlyTarget(autoTarget, expenseAmounts, parseMoneyInput(monthlyTarget))
   const canSave =
-    name.trim().length > 0 &&
-    !!accountId &&
-    (parseMoneyInput(monthlyTarget) ?? 0) > 0 &&
-    Number.isFinite(Number(priority))
+    name.trim().length > 0 && !!accountId && resolvedTarget != null && Number.isFinite(Number(priority))
+  const expenseMonthKeys = editorMonthKeys(todayIsoDate(), expenseAmounts)
+  const visibleExpenseMonths = visibleMonthKeys(expenseAmounts, expenseMonthKeys)
 
   useRegisterPrimaryAction(active && hasUserFunds && !formOpen && !viewFreeId, {
     id: 'funds-add',
@@ -200,6 +223,8 @@ export function FundsPanel({ active }: { active: boolean }) {
                 accountId: draft.accountId,
                 monthlyTarget: draft.monthlyTarget,
                 priority: draft.priority,
+                autoTarget: draft.autoTarget,
+                monthlyExpenses: draft.monthlyExpenses,
               })
             }
           }}
@@ -345,14 +370,40 @@ export function FundsPanel({ active }: { active: boolean }) {
               ))}
             </Select>
           </Field>
+          <FundAutoTargetToggle
+            autoTarget={autoTarget}
+            onChange={(next) => {
+              setAutoTarget(next)
+              if (next) {
+                const mean = resolveMonthlyTarget(true, expenseAmounts, null)
+                if (mean != null) setMonthlyTarget(String(mean))
+              }
+            }}
+          />
           <Field label="Целевое ежемесячное пополнение">
             <MoneyInput
-              value={monthlyTarget}
+              value={
+                autoTarget && resolvedTarget != null ? String(resolvedTarget) : monthlyTarget
+              }
               onChange={setMonthlyTarget}
               allowNegative={false}
+              disabled={autoTarget}
               dataQa="fund-form-target"
             />
           </Field>
+          <div className="space-y-2" {...dataQa('fund-form-expenses')}>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Расходы за месяцы</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Сначала прошлый месяц. Как только укажете сумму (можно 0), появится более ранний.
+            </p>
+            <FundExpenseMonthsEditor
+              months={visibleExpenseMonths}
+              amounts={expenseAmounts}
+              onChangeAmount={(month, value) =>
+                setExpenseAmounts((prev) => ({ ...prev, [month]: value }))
+              }
+            />
+          </div>
           <Field label="Приоритет (больше — раньше; новый фонд по умолчанию в конце очереди)">
             <Input
               type="number"

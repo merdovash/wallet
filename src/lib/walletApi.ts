@@ -163,6 +163,8 @@ export async function createAccountFundApi(input: {
   name: string
   monthlyTarget: number
   priority?: number
+  autoTarget?: boolean
+  monthlyExpenses?: { yearMonth: string; amount: number }[]
 }): Promise<{ fund: AccountFund; funds: AccountFund[] }> {
   return api<{ fund: AccountFund; funds: AccountFund[] }>('/api/wallet/funds', {
     method: 'POST',
@@ -177,6 +179,8 @@ export async function updateAccountFundApi(
     name: string
     monthlyTarget: number
     priority: number
+    autoTarget: boolean
+    monthlyExpenses: { yearMonth: string; amount: number }[]
   }>,
 ): Promise<AccountFund> {
   const body = await api<{ fund: AccountFund }>(`/api/wallet/funds/${id}`, {

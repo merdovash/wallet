@@ -89,6 +89,8 @@ interface WalletState {
     name: string
     monthlyTarget: number
     priority?: number
+    autoTarget?: boolean
+    monthlyExpenses?: { yearMonth: string; amount: number }[]
   }) => Promise<string>
   updateAccountFund: (
     id: string,
@@ -97,6 +99,8 @@ interface WalletState {
       name: string
       monthlyTarget: number
       priority: number
+      autoTarget: boolean
+      monthlyExpenses: { yearMonth: string; amount: number }[]
     }>,
   ) => Promise<void>
   deleteAccountFund: (id: string) => Promise<void>
