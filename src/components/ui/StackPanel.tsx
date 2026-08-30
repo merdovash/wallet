@@ -154,8 +154,9 @@ export function StackPanel({
             </div>
           </div>
         </div>
+        {/* Mobile: extra bottom padding so content can scroll above the FAB (Изменить / Сохранить). */}
         <div
-          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4"
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-4 pb-[calc(9rem+env(safe-area-inset-bottom,0px))] md:pb-4"
           {...dataQa(`${qaId}-body`)}
         >
           {children}
