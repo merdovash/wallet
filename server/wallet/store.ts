@@ -86,11 +86,23 @@ function mapSettings(row: {
   }
 }
 
+export type DbFundSystemKey = 'free_money'
+
+export interface DbAccountFund {
+  id: string
+  accountId: string
+  name: string
+  monthlyTarget: number
+  priority: number
+  systemKey: DbFundSystemKey | null
+}
+
 export interface WalletBundle {
   settings: DbSettings
   accounts: DbAccount[]
   snapshots: DbSnapshot[]
   transfers: DbTransfer[]
+  funds: DbAccountFund[]
 }
 
 function num(value: unknown): number {
@@ -667,14 +679,205 @@ export async function deleteTransfer(userId: string, id: string): Promise<boolea
   return result.rowCount > 0
 }
 
+const FREE_MONEY_NAME = 'Свободные деньги'
+const FREE_MONEY_PRIORITY = -1_000_000
+
+type FundRow = {
+  id: string
+  account_id: string
+  name: string
+  monthly_target: number | string
+  priority: number | string
+  system_key: string | null
+}
+
+const FUND_SELECT = `id, account_id, name, monthly_target, priority, system_key`
+
+function mapFund(row: FundRow): DbAccountFund {
+  const systemKey = row.system_key === 'free_money' ? 'free_money' : null
+  return {
+    id: String(row.id),
+    accountId: String(row.account_id),
+    name: String(row.name),
+    monthlyTarget: num(row.monthly_target),
+    priority: Math.trunc(num(row.priority)),
+    systemKey,
+  }
+}
+
+function isFundHostKind(kind: string): boolean {
+  const k = normalizeKind(kind)
+  return k !== 'credit' && k !== 'cashback'
+}
+
+async function loadFundAccount(
+  userId: string,
+  accountId: string,
+): Promise<{ id: string; kind: string; archived: boolean } | null> {
+  const pool = getPool()
+  const result = await pool.query<{ id: string; kind: string; archived: boolean }>(
+    `SELECT id, kind, archived FROM wallet_accounts WHERE id = $1 AND user_id = $2`,
+    [accountId, userId],
+  )
+  return result.rows[0] ?? null
+}
+
+export async function listAccountFunds(userId: string): Promise<DbAccountFund[]> {
+  const pool = getPool()
+  const result = await pool.query<FundRow>(
+    `SELECT ${FUND_SELECT}
+     FROM wallet_account_funds
+     WHERE user_id = $1
+     ORDER BY priority DESC, name ASC`,
+    [userId],
+  )
+  return result.rows.map(mapFund)
+}
+
+async function ensureFreeMoneyFund(userId: string, accountId: string): Promise<void> {
+  const pool = getPool()
+  await pool.query(
+    `INSERT INTO wallet_account_funds
+       (user_id, account_id, name, monthly_target, priority, system_key)
+     SELECT $1, $2, $3, 0, $4, 'free_money'
+     WHERE NOT EXISTS (
+       SELECT 1 FROM wallet_account_funds
+       WHERE account_id = $2 AND system_key = 'free_money'
+     )`,
+    [userId, accountId, FREE_MONEY_NAME, FREE_MONEY_PRIORITY],
+  )
+}
+
+export async function createAccountFund(
+  userId: string,
+  input: {
+    accountId: string
+    name: string
+    monthlyTarget: number
+    priority?: number
+  },
+): Promise<{ fund: DbAccountFund; funds: DbAccountFund[] }> {
+  const account = await loadFundAccount(userId, input.accountId)
+  if (!account) throw new Error('Счёт не найден')
+  if (account.archived) throw new Error('Нельзя привязать фонд к архивному счёту')
+  if (!isFundHostKind(account.kind)) throw new Error('Фонды нельзя привязать к кредитке или кэшбеку')
+  const name = input.name.trim()
+  if (!name) throw new Error('Нужно название фонда')
+  if (!(input.monthlyTarget > 0) || !Number.isFinite(input.monthlyTarget)) {
+    throw new Error('Целевое пополнение должно быть больше 0')
+  }
+
+  await ensureFreeMoneyFund(userId, input.accountId)
+
+  const pool = getPool()
+  let priority = input.priority
+  if (priority == null || !Number.isFinite(priority)) {
+    const max = await pool.query<{ m: number | null }>(
+      `SELECT MAX(priority) AS m FROM wallet_account_funds
+       WHERE user_id = $1 AND account_id = $2 AND system_key IS NULL`,
+      [userId, input.accountId],
+    )
+    priority = (max.rows[0]?.m == null ? 0 : Math.trunc(num(max.rows[0].m))) + 1
+  } else {
+    priority = Math.trunc(priority)
+  }
+
+  const result = await pool.query<FundRow>(
+    `INSERT INTO wallet_account_funds
+       (user_id, account_id, name, monthly_target, priority, system_key)
+     VALUES ($1, $2, $3, $4, $5, NULL)
+     RETURNING ${FUND_SELECT}`,
+    [userId, input.accountId, name, input.monthlyTarget, priority],
+  )
+  const fund = mapFund(result.rows[0]!)
+  const funds = await listAccountFunds(userId)
+  return { fund, funds }
+}
+
+export async function updateAccountFund(
+  userId: string,
+  id: string,
+  patch: Partial<{
+    accountId: string
+    name: string
+    monthlyTarget: number
+    priority: number
+  }>,
+): Promise<DbAccountFund | null> {
+  const pool = getPool()
+  const existing = await pool.query<FundRow>(
+    `SELECT ${FUND_SELECT} FROM wallet_account_funds WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  const row = existing.rows[0]
+  if (!row) return null
+  const current = mapFund(row)
+  if (current.systemKey === 'free_money') {
+    throw new Error('Системный фонд «Свободные деньги» нельзя изменить')
+  }
+
+  let nextAccountId = current.accountId
+  if (patch.accountId && patch.accountId !== current.accountId) {
+    const account = await loadFundAccount(userId, patch.accountId)
+    if (!account) throw new Error('Счёт не найден')
+    if (account.archived) throw new Error('Нельзя привязать фонд к архивному счёту')
+    if (!isFundHostKind(account.kind)) throw new Error('Фонды нельзя привязать к кредитке или кэшбеку')
+    nextAccountId = patch.accountId
+    await ensureFreeMoneyFund(userId, nextAccountId)
+  }
+
+  const nextName = patch.name != null ? patch.name.trim() : current.name
+  if (!nextName) throw new Error('Нужно название фонда')
+  const nextTarget = patch.monthlyTarget !== undefined ? patch.monthlyTarget : current.monthlyTarget
+  if (!(nextTarget > 0) || !Number.isFinite(nextTarget)) {
+    throw new Error('Целевое пополнение должно быть больше 0')
+  }
+  const nextPriority =
+    patch.priority !== undefined && Number.isFinite(patch.priority)
+      ? Math.trunc(patch.priority)
+      : current.priority
+
+  const result = await pool.query<FundRow>(
+    `UPDATE wallet_account_funds SET
+       account_id = $3,
+       name = $4,
+       monthly_target = $5,
+       priority = $6,
+       updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING ${FUND_SELECT}`,
+    [id, userId, nextAccountId, nextName, nextTarget, nextPriority],
+  )
+  return mapFund(result.rows[0]!)
+}
+
+export async function deleteAccountFund(userId: string, id: string): Promise<boolean> {
+  const pool = getPool()
+  const existing = await pool.query<{ system_key: string | null }>(
+    `SELECT system_key FROM wallet_account_funds WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  const row = existing.rows[0]
+  if (!row) return false
+  if (row.system_key === 'free_money') {
+    throw new Error('Системный фонд «Свободные деньги» нельзя удалить')
+  }
+  const result = await pool.query(
+    `DELETE FROM wallet_account_funds WHERE id = $1 AND user_id = $2 AND system_key IS NULL`,
+    [id, userId],
+  )
+  return result.rowCount > 0
+}
+
 export async function loadWalletBundle(userId: string): Promise<WalletBundle> {
-  const [settings, accounts, snapshots, transfers] = await Promise.all([
+  const [settings, accounts, snapshots, transfers, funds] = await Promise.all([
     ensureUserSettings(userId),
     listAccounts(userId),
     listSnapshots(userId),
     listTransfers(userId),
+    listAccountFunds(userId),
   ])
-  return { settings, accounts, snapshots, transfers }
+  return { settings, accounts, snapshots, transfers, funds }
 }
 
 export async function isWalletEmpty(userId: string): Promise<boolean> {

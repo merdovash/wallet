@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { todayIsoDate } from '../../lib/format'
+import { convertAmount } from '../../engine/growthEngine'
+import { dataQa } from '../../lib/dataQa'
+import { todayIsoDate, formatCurrency } from '../../lib/format'
+import { previewInboundAllocation } from '../../lib/fundBalances'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
@@ -14,6 +17,10 @@ interface TransferCreatePanelProps {
 
 export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreatePanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
+  const snapshots = useWalletStore((s) => s.snapshots)
+  const transfers = useWalletStore((s) => s.transfers)
+  const funds = useWalletStore((s) => s.funds)
+  const settings = useWalletStore((s) => s.settings)
   const addTransferCheckIn = useWalletStore((s) => s.addTransferCheckIn)
   const rateBook = useRatesStore((s) => s.byDate)
 
@@ -42,6 +49,47 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   }, [open, activeAccounts])
 
   const fromAccount = activeAccounts.find((a) => a.id === fromAccountId)
+  const toAccount = activeAccounts.find((a) => a.id === toAccountId)
+  const parsedAmount = parseMoneyInput(amount)
+
+  const fundPreview = useMemo(() => {
+    if (!toAccount || parsedAmount == null || parsedAmount <= 0) return []
+    if (!funds.some((f) => f.accountId === toAccount.id)) return []
+    const destAmount =
+      fromAccount && fromAccount.currency !== toAccount.currency
+        ? convertAmount(
+            parsedAmount,
+            fromAccount.currency,
+            toAccount.currency,
+            settings,
+            date,
+            rateBook,
+          )
+        : parsedAmount
+    if (!Number.isFinite(destAmount) || destAmount <= 0) return []
+    return previewInboundAllocation(
+      toAccount.id,
+      destAmount,
+      date,
+      funds,
+      snapshots,
+      transfers,
+      accounts,
+      settings,
+      rateBook,
+    )
+  }, [
+    toAccount,
+    fromAccount,
+    parsedAmount,
+    funds,
+    settings,
+    date,
+    rateBook,
+    snapshots,
+    transfers,
+    accounts,
+  ])
 
   async function handleSave() {
     const value = parseMoneyInput(amount)
@@ -123,6 +171,22 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
         <Field label="Комментарий">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" dataQa="transfer-create-note" />
         </Field>
+        {fundPreview.length > 0 && toAccount ? (
+          <div
+            className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50"
+            {...dataQa('transfer-fund-preview')}
+          >
+            <p className="mb-1 font-medium text-slate-700 dark:text-slate-200">Куда ляжет на {toAccount.name}</p>
+            <ul className="space-y-0.5 text-slate-600 dark:text-slate-300">
+              {fundPreview.map((row) => (
+                <li key={row.fund.id} className="flex justify-between gap-2 tabular-nums">
+                  <span>{row.fund.name}</span>
+                  <span>{formatCurrency(row.balance, toAccount.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </EntityEditPanel>
   )

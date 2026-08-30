@@ -81,6 +81,20 @@ export interface Transfer {
   note?: string
 }
 
+export type AccountFundSystemKey = 'free_money'
+
+/** Envelope inside an account. Balances are derived, not stored. */
+export interface AccountFund {
+  id: string
+  accountId: string
+  name: string
+  /** Monthly inbound-transfer target in the account currency. 0 for system free-money. */
+  monthlyTarget: number
+  /** Higher runs first on inbound transfers. */
+  priority: number
+  systemKey?: AccountFundSystemKey | null
+}
+
 /** Manual rates: 1 unit of currency → how many units of baseCurrency. */
 export type ExchangeRates = Record<string, number>
 

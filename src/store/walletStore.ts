@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { ACCOUNT_COLORS, DEFAULT_SETTINGS } from '../types/wallet'
 import type {
   Account,
+  AccountFund,
   BalanceSnapshot,
   SnapshotLine,
   SnapshotOrigin,
@@ -13,8 +14,10 @@ import { buildTransferSnapshotLines } from '../lib/transferCheckIn'
 import type { RateBook } from '../engine/growthEngine'
 import {
   createAccountApi,
+  createAccountFundApi,
   createTransferApi,
   deleteAccountApi,
+  deleteAccountFundApi,
   deleteSnapshotApi,
   deleteTransferApi,
   fetchWallet,
@@ -22,6 +25,7 @@ import {
   patchSettings,
   reorderAccountsApi,
   updateAccountApi,
+  updateAccountFundApi,
   updateSnapshotApi,
   upsertSnapshotApi,
   withFallbackRates,
@@ -34,6 +38,7 @@ interface WalletState {
   accounts: Account[]
   snapshots: BalanceSnapshot[]
   transfers: Transfer[]
+  funds: AccountFund[]
   loaded: boolean
   loading: boolean
   error: string | null
@@ -79,6 +84,22 @@ interface WalletState {
     rateBook?: RateBook,
   ) => Promise<{ transferId: string; snapshotId: string }>
   deleteTransfer: (id: string) => Promise<void>
+  addAccountFund: (input: {
+    accountId: string
+    name: string
+    monthlyTarget: number
+    priority?: number
+  }) => Promise<string>
+  updateAccountFund: (
+    id: string,
+    patch: Partial<{
+      accountId: string
+      name: string
+      monthlyTarget: number
+      priority: number
+    }>,
+  ) => Promise<void>
+  deleteAccountFund: (id: string) => Promise<void>
 }
 
 function nextColor(accounts: Account[]): string {
@@ -152,6 +173,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   accounts: [],
   snapshots: [],
   transfers: [],
+  funds: [],
   loaded: false,
   loading: false,
   error: null,
@@ -162,6 +184,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       accounts: [],
       snapshots: [],
       transfers: [],
+      funds: [],
       loaded: false,
       loading: false,
       error: null,
@@ -191,6 +214,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         accounts: bundle.accounts.map(normalizeAccount),
         snapshots: bundle.snapshots.map(normalizeSnapshot),
         transfers: bundle.transfers,
+        funds: bundle.funds ?? [],
         loaded: true,
         loading: false,
       })
@@ -262,6 +286,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       transfers: state.transfers.filter(
         (t) => t.fromAccountId !== id && t.toAccountId !== id,
       ),
+      funds: state.funds.filter((f) => f.accountId !== id),
     }))
   },
 
@@ -354,6 +379,26 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     await deleteTransferApi(id)
     set((state) => ({
       transfers: state.transfers.filter((t) => t.id !== id),
+    }))
+  },
+
+  addAccountFund: async (input) => {
+    const { fund, funds } = await createAccountFundApi(input)
+    set({ funds })
+    return fund.id
+  },
+
+  updateAccountFund: async (id, patch) => {
+    const fund = await updateAccountFundApi(id, patch)
+    set((state) => ({
+      funds: state.funds.map((f) => (f.id === id ? fund : f)),
+    }))
+  },
+
+  deleteAccountFund: async (id) => {
+    await deleteAccountFundApi(id)
+    set((state) => ({
+      funds: state.funds.filter((f) => f.id !== id),
     }))
   },
 }))

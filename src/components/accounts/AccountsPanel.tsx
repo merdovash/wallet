@@ -39,6 +39,7 @@ import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../u
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { PageHeader } from '../ui/PageHeader'
 import { GrowthChart } from '../dashboard/GrowthChart'
+import { FundsPanel } from './FundsPanel'
 
 interface AccountsPanelProps {
   focusAccountId?: string | null
@@ -68,6 +69,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [linkedAccountId, setLinkedAccountId] = useState('')
   const [graceMonths, setGraceMonths] = useState('3')
   const [showArchived, setShowArchived] = useState(false)
+  const [pageTab, setPageTab] = useState<'registry' | 'funds'>('registry')
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null)
@@ -258,7 +260,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     setFormOpen(false)
   }
 
-  useRegisterPrimaryAction(!formOpen, {
+  useRegisterPrimaryAction(!formOpen && pageTab === 'registry', {
     id: 'accounts-add',
     label: 'Добавить счёт',
     title: 'Новый счёт',
@@ -307,15 +309,54 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     <div className="mx-auto max-w-5xl space-y-4" {...dataQa('accounts-page')}>
       <PageHeader
         title="Счета"
-        description="Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий."
+        description={
+          pageTab === 'funds'
+            ? 'Конверты внутри счёта: пополнение переводами по приоритету, рост — по доле.'
+            : 'Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий.'
+        }
         actions={
-          <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)} dataQa="accounts-show-archived">
-            {showArchived ? 'Скрыть архив' : 'Показать архив'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700"
+              {...dataQa('accounts-tabs')}
+            >
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 text-sm ${
+                  pageTab === 'registry'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-300'
+                }`}
+                onClick={() => setPageTab('registry')}
+                {...dataQa('accounts-tab-registry')}
+              >
+                Реестр
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 text-sm ${
+                  pageTab === 'funds'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-300'
+                }`}
+                onClick={() => setPageTab('funds')}
+                {...dataQa('accounts-tab-funds')}
+              >
+                Фонды
+              </button>
+            </div>
+            {pageTab === 'registry' ? (
+              <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)} dataQa="accounts-show-archived">
+                {showArchived ? 'Скрыть архив' : 'Показать архив'}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
-      {visible.length === 0 ? (
+      {pageTab === 'funds' ? (
+        <FundsPanel active={!formOpen} />
+      ) : visible.length === 0 ? (
         <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." dataQa="accounts-empty" />
       ) : (
         <>

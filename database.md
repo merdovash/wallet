@@ -4,7 +4,7 @@
 
 Источники схемы:
 
-- миграции: [`server/db/migrations/`](server/db/migrations/) (`001` … `007`)
+- миграции: [`server/db/migrations/`](server/db/migrations/) (`001` … `011`)
 - учёт миграций: таблица `wallet_schema_migrations`
 - клиентские типы: [`src/types/wallet.ts`](src/types/wallet.ts)
 
@@ -24,6 +24,7 @@
 | `wallet_snapshots` | Чек-ины (шапка по дате) |
 | `wallet_snapshot_lines` | Остатки счетов внутри чек-ина |
 | `wallet_transfers` | Переводы между счетами |
+| `wallet_account_funds` | Фонды (конверты) внутри счёта; остатки считаются из чек-инов и переводов |
 | `cbr_rate_days` | Кэш дневных курсов ЦБ (общий) |
 
 ```mermaid
@@ -37,11 +38,13 @@ erDiagram
   users ||--o{ wallet_accounts : owns
   users ||--o{ wallet_snapshots : owns
   users ||--o{ wallet_transfers : owns
+  users ||--o{ wallet_account_funds : owns
   wallet_accounts ||--o| wallet_accounts : "linked_account_id (float)"
   wallet_snapshots ||--o{ wallet_snapshot_lines : contains
   wallet_accounts ||--o{ wallet_snapshot_lines : "amount on date"
   wallet_accounts ||--o{ wallet_transfers : from
   wallet_accounts ||--o{ wallet_transfers : to
+  wallet_accounts ||--o{ wallet_account_funds : envelopes
   cbr_rate_days {
     date rate_date PK
   }
@@ -238,7 +241,29 @@ erDiagram
 
 ---
 
-## 9. `cbr_rate_days`
+## 9. `wallet_account_funds`
+
+Конверты («фонды») внутри счёта. В таблице только определения: название, целевое ежемесячное пополнение, приоритет, привязка к счёту. Остатки и доли **не хранятся** — считаются из чек-инов и переводов.
+
+Системный фонд `system_key = 'free_money'` («Свободные деньги») создаётся при первом пользовательском фонде на счёте, не удаляется.
+
+| Поле | Тип | NULL | По умолчанию | Описание |
+|------|-----|------|--------------|----------|
+| `id` | UUID | NOT NULL | `gen_random_uuid()` | PK |
+| `user_id` | UUID | NOT NULL | — | FK → `users(id)` `ON DELETE CASCADE` |
+| `account_id` | UUID | NOT NULL | — | FK → `wallet_accounts(id)` `ON DELETE CASCADE` |
+| `name` | TEXT | NOT NULL | — | Название |
+| `monthly_target` | NUMERIC(20, 8) | NOT NULL | `0` | Цель пополнения переводами за календарный месяц; `0` у free_money |
+| `priority` | INT | NOT NULL | `0` | Больше — раньше заполняется при входящем переводе |
+| `system_key` | TEXT | NULL | — | `NULL` или `'free_money'` |
+| `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Создание |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | `now()` | Обновление |
+
+Индекс уникальности одного free_money на счёт: `wallet_account_funds_one_free_money` на `(account_id) WHERE system_key = 'free_money'`.
+
+---
+
+## 10. `cbr_rate_days`
 
 Общий кэш курсов ЦБ (без `user_id`). Может уже существовать из trip_budget. Заполняется через `GET /api/rates?date=YYYY-MM-DD` (в т.ч. `refresh=1` для принудительного обновления).
 
@@ -267,6 +292,10 @@ erDiagram
 | `005_account_kinds.sql` | Виды: bank / cash / credit / investment (легаси) |
 | `006_snapshot_cashflow.sql` | `income`, `expense` у чек-инов |
 | `007_account_kind_growth.sql` | Виды: operational / fund / deposit / investment / cash / credit |
+| `008_cashback_kind.sql` | Вид счёта cashback |
+| `009_annual_inflation.sql` | Годовая инфляция в настройках |
+| `010_key_rate.sql` | Ключевая ставка в настройках |
+| `011_account_funds.sql` | Фонды-конверты внутри счёта |
 
 ---
 
@@ -279,6 +308,7 @@ erDiagram
 | `/api/wallet/accounts` | `wallet_accounts` |
 | `/api/wallet/snapshots` | `wallet_snapshots`, `wallet_snapshot_lines` |
 | `/api/wallet/transfers` | `wallet_transfers` |
+| `/api/wallet/funds` | `wallet_account_funds` |
 | `/api/wallet/import` | все `wallet_*` (если кошелёк пуст) |
 | `/api/rates` | `cbr_rate_days` |
 

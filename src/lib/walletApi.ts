@@ -1,5 +1,6 @@
 import type {
   Account,
+  AccountFund,
   BalanceSnapshot,
   SnapshotLine,
   SnapshotOrigin,
@@ -13,6 +14,7 @@ export interface WalletBundle {
   accounts: Account[]
   snapshots: BalanceSnapshot[]
   transfers: Transfer[]
+  funds?: AccountFund[]
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -154,6 +156,38 @@ export async function createTransferApi(input: Omit<Transfer, 'id'>): Promise<Tr
 
 export async function deleteTransferApi(id: string): Promise<void> {
   await api(`/api/wallet/transfers/${id}`, { method: 'DELETE' })
+}
+
+export async function createAccountFundApi(input: {
+  accountId: string
+  name: string
+  monthlyTarget: number
+  priority?: number
+}): Promise<{ fund: AccountFund; funds: AccountFund[] }> {
+  return api<{ fund: AccountFund; funds: AccountFund[] }>('/api/wallet/funds', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function updateAccountFundApi(
+  id: string,
+  patch: Partial<{
+    accountId: string
+    name: string
+    monthlyTarget: number
+    priority: number
+  }>,
+): Promise<AccountFund> {
+  const body = await api<{ fund: AccountFund }>(`/api/wallet/funds/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return body.fund
+}
+
+export async function deleteAccountFundApi(id: string): Promise<void> {
+  await api(`/api/wallet/funds/${id}`, { method: 'DELETE' })
 }
 
 export async function importWalletApi(payload: {

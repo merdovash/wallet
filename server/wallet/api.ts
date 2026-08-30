@@ -298,6 +298,67 @@ export async function handleWalletApi(
       }
     }
 
+    if (pathname === '/api/wallet/funds' && method === 'GET') {
+      sendJson(res, 200, { funds: await store.listAccountFunds(user.id) })
+      return true
+    }
+
+    if (pathname === '/api/wallet/funds' && method === 'POST') {
+      const body = await readJsonBody<{
+        accountId?: string
+        name?: string
+        monthlyTarget?: number
+        priority?: number
+      }>(req)
+      if (!body.accountId || !body.name?.trim() || body.monthlyTarget == null) {
+        sendJson(res, 400, { error: 'Нужны accountId, name, monthlyTarget' })
+        return true
+      }
+      const created = await store.createAccountFund(user.id, {
+        accountId: body.accountId,
+        name: body.name,
+        monthlyTarget: Number(body.monthlyTarget),
+        priority: body.priority != null ? Number(body.priority) : undefined,
+      })
+      sendJson(res, 201, created)
+      return true
+    }
+
+    {
+      const params = matchPath(pathname, '/api/wallet/funds/:id')
+      if (params) {
+        if (method === 'PATCH') {
+          const body = await readJsonBody<{
+            accountId?: string
+            name?: string
+            monthlyTarget?: number
+            priority?: number
+          }>(req)
+          const fund = await store.updateAccountFund(user.id, params.id!, {
+            accountId: body.accountId,
+            name: body.name,
+            monthlyTarget: body.monthlyTarget == null ? undefined : Number(body.monthlyTarget),
+            priority: body.priority == null ? undefined : Number(body.priority),
+          })
+          if (!fund) {
+            sendJson(res, 404, { error: 'Фонд не найден' })
+            return true
+          }
+          sendJson(res, 200, { fund })
+          return true
+        }
+        if (method === 'DELETE') {
+          const ok = await store.deleteAccountFund(user.id, params.id!)
+          if (!ok) {
+            sendJson(res, 404, { error: 'Фонд не найден' })
+            return true
+          }
+          sendJson(res, 200, { ok: true })
+          return true
+        }
+      }
+    }
+
     if (pathname === '/api/wallet/import' && method === 'POST') {
       const body = await readJsonBody<{
         settings?: { baseCurrency?: string }

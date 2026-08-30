@@ -79,6 +79,17 @@ export function accountKindLabel(kind: AccountKind): string {
   return ACCOUNT_KIND_LABELS[kind]
 }
 
+/** Accounts that can host envelope funds (not credit or cashback). */
+export function isFundHostKind(kind: AccountKind): boolean {
+  const normalized = normalizeAccountKind(kind)
+  return normalized !== 'credit' && normalized !== 'cashback'
+}
+
+export function isFundHostAccount(account: Pick<Account, 'kind' | 'archived'>): boolean {
+  if (account.archived) return false
+  return isFundHostKind(account.kind)
+}
+
 export function growthAccounts<T extends Pick<Account, 'kind' | 'archived'>>(accounts: T[]): T[] {
   return accounts.filter(isGrowthAccount)
 }
