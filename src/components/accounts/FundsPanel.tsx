@@ -86,7 +86,7 @@ export function FundsPanel({ active }: { active: boolean }) {
             asOfDate,
           ),
         )
-        .filter((state) => state.rows.length > 0),
+        .filter((state) => state.rows.some((row) => !isFreeMoneyFund(row.fund))),
     [hostAccounts, funds, snapshots, transfers, accounts, settings, rateBook, asOfDate],
   )
 
