@@ -17,7 +17,8 @@ import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { FundsOnboarding } from './FundsOnboarding'
+import { Button, Card, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { StackPanel } from '../ui/StackPanel'
 
@@ -159,6 +160,7 @@ export function FundsPanel({ active }: { active: boolean }) {
     }
   }
 
+  const hasUserFunds = funds.some((f) => !isFreeMoneyFund(f))
   const canCreate = hostAccounts.length > 0
   const canSave =
     name.trim().length > 0 &&
@@ -166,7 +168,7 @@ export function FundsPanel({ active }: { active: boolean }) {
     (parseMoneyInput(monthlyTarget) ?? 0) > 0 &&
     Number.isFinite(Number(priority))
 
-  useRegisterPrimaryAction(active && !formOpen && !viewFreeId, {
+  useRegisterPrimaryAction(active && hasUserFunds && !formOpen && !viewFreeId, {
     id: 'funds-add',
     label: 'Добавить фонд',
     title: canCreate ? 'Новый фонд' : 'Сначала создайте счёт',
@@ -180,6 +182,31 @@ export function FundsPanel({ active }: { active: boolean }) {
     ? states.find((s) => s.accountId === viewFree.accountId)
     : null
   const viewFreeRow = viewFreeState?.rows.find((r) => r.fund.id === viewFree?.id)
+
+  if (!hasUserFunds) {
+    const onboardingCurrency =
+      hostAccounts.find((a) => a.id === hostAccounts[0]?.id)?.currency ?? settings.baseCurrency
+    return (
+      <div className="space-y-4" {...dataQa('funds-page')}>
+        <FundsOnboarding
+          active={active}
+          accounts={hostAccounts}
+          currency={onboardingCurrency}
+          asOfDate={todayIsoDate()}
+          onCreate={async (drafts) => {
+            for (const draft of drafts) {
+              await addAccountFund({
+                name: draft.name,
+                accountId: draft.accountId,
+                monthlyTarget: draft.monthlyTarget,
+                priority: draft.priority,
+              })
+            }
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4" {...dataQa('funds-page')}>
@@ -214,17 +241,10 @@ export function FundsPanel({ active }: { active: boolean }) {
         </div>
       </Card>
 
-      {states.length === 0 ? (
-        <EmptyState
-          title="Фондов пока нет"
-          description="Создайте фонд на счёте: следующие входящие переводы заполнят его по приоритету. Уже сделанные переводы новый фонд не забирает — они остаются в старых фондах и в «Свободных деньгах»."
-          dataQa="funds-empty"
-        />
-      ) : (
-        states.map((state) => {
-          const account = accounts.find((a) => a.id === state.accountId)
-          if (!account) return null
-          return (
+      {states.map((state) => {
+        const account = accounts.find((a) => a.id === state.accountId)
+        if (!account) return null
+        return (
             <Card key={state.accountId} className="!p-0" dataQa={`funds-account-${state.accountId}`}>
               <div className="border-b border-slate-100 px-3 py-2.5 dark:border-slate-800 sm:px-4">
                 <p className="font-medium text-slate-900 dark:text-slate-200">{account.name}</p>
@@ -293,8 +313,7 @@ export function FundsPanel({ active }: { active: boolean }) {
               </ul>
             </Card>
           )
-        })
-      )}
+        })}
 
       <EntityEditPanel
         open={formOpen}
