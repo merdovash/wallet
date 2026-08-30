@@ -758,10 +758,8 @@ function meanExpenseAmount(rows: DbFundMonthlyExpense[]): number | null {
 
 async function loadFundExpensesByFund(
   userId: string,
-  fundIds: string[],
 ): Promise<Map<string, DbFundMonthlyExpense[]>> {
   const map = new Map<string, DbFundMonthlyExpense[]>()
-  if (fundIds.length === 0) return map
   const pool = getPool()
   const result = await pool.query<{
     fund_id: string
@@ -770,9 +768,9 @@ async function loadFundExpensesByFund(
   }>(
     `SELECT fund_id, year_month, amount
      FROM wallet_account_fund_expenses
-     WHERE user_id = $1 AND fund_id = ANY($2::uuid[])
+     WHERE user_id = $1
      ORDER BY year_month DESC`,
-    [userId, fundIds],
+    [userId],
   )
   for (const row of result.rows) {
     const fundId = String(row.fund_id)
@@ -849,10 +847,7 @@ export async function listAccountFunds(userId: string): Promise<DbAccountFund[]>
      ORDER BY priority DESC, name ASC`,
     [userId],
   )
-  const expenses = await loadFundExpensesByFund(
-    userId,
-    result.rows.map((row) => String(row.id)),
-  )
+  const expenses = await loadFundExpensesByFund(userId)
   return result.rows.map((row) => mapFund(row, expenses.get(String(row.id)) ?? []))
 }
 
@@ -940,7 +935,7 @@ export async function updateAccountFund(
   )
   const row = existing.rows[0]
   if (!row) return null
-  const currentExpensesMap = await loadFundExpensesByFund(userId, [id])
+  const currentExpensesMap = await loadFundExpensesByFund(userId)
   const current = mapFund(row, currentExpensesMap.get(id) ?? [])
   if (current.systemKey === 'free_money') {
     throw new Error('Системный фонд «Свободные деньги» нельзя изменить')
