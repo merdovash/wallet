@@ -31,16 +31,21 @@ export function nextLowerUserPriority(funds: AccountFund[], accountId: string): 
   return Math.min(...user.map((f) => f.priority)) - 1
 }
 
-function transferInstant(transfer: Pick<Transfer, 'date' | 'createdAt'>): string {
+/** Instant of a transfer. Missing createdAt → start of that calendar day (UTC). */
+export function transferInstant(transfer: Pick<Transfer, 'date' | 'createdAt'>): string {
   if (transfer.createdAt) return transfer.createdAt
-  return `${transfer.date}T23:59:59.000Z`
+  return `${transfer.date}T00:00:00.000Z`
 }
 
-function fundCreatedInstant(fund: Pick<AccountFund, 'createdAt'>): string {
+/** Instant a fund started. Missing createdAt → treat as always existing. */
+export function fundCreatedInstant(fund: Pick<AccountFund, 'createdAt'>): string {
   return fund.createdAt ?? '0000-01-01T00:00:00.000Z'
 }
 
-/** User funds created after a transfer must not rewrite that transfer's split. */
+/**
+ * A user fund only receives transfers posted at or after it was created.
+ * Transfers that already happened stay in older funds / «Свободные деньги».
+ */
 export function isFundActiveForTransfer(
   fund: AccountFund,
   transfer: Pick<Transfer, 'date' | 'createdAt'>,
@@ -62,7 +67,7 @@ export function freeMoneyFund(funds: AccountFund[]): AccountFund | undefined {
 
 /**
  * Split an inbound transfer by remaining monthly targets, highest priority first.
- * Remainder goes to free money. Allocations sum to `amount` (or the whole amount if no free money).
+ * Remainder goes to free money. Only call with funds that already existed at transfer time.
  */
 export function allocateInboundTransfer(
   amount: number,

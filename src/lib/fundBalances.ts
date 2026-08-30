@@ -19,6 +19,7 @@ import {
   fundsForTransfer,
   freeMoneyFund,
   isFreeMoneyFund,
+  transferInstant,
   yearMonth,
 } from './fundAllocation'
 
@@ -148,7 +149,12 @@ function applyTransfersInInterval(
         (t.toAccountId === accountId || t.fromAccountId === accountId) &&
         inOpenClosedInterval(t.date, t0, t1),
     )
-    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        transferInstant(a).localeCompare(transferInstant(b)) ||
+        a.id.localeCompare(b.id),
+    )
 
   for (const transfer of relevant) {
     const month = yearMonth(transfer.date)
@@ -337,7 +343,7 @@ export function previewInboundAllocation(
   for (const row of state.rows) {
     if (!isFreeMoneyFund(row.fund)) filled[row.fund.id] = row.filledThisMonth
   }
-  const transfer = { date: transferDate, createdAt: undefined }
+  const transfer = { date: transferDate, createdAt: new Date().toISOString() }
   const active = fundsForTransfer(accountFunds, transfer)
   const allocation = allocateInboundTransfer(amountInAccountCurrency, active, filled)
   return state.rows

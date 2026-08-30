@@ -209,4 +209,81 @@ describe('buildAccountFundsState', () => {
     expect(byId.late).toBeCloseTo(0, 6)
     expect(byId.free).toBeCloseTo(5_000, 6)
   })
+
+  it('does not let a same-day later fund take an earlier transfer', () => {
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-10', lines: [{ accountId: 'acc', amount: 25_000 }, { accountId: 'op', amount: 0 }] },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-10',
+        fromAccountId: 'op',
+        toAccountId: 'acc',
+        amount: 25_000,
+        createdAt: '2026-01-10T10:00:00.000Z',
+      },
+    ]
+    const first = fund({
+      id: 'vac',
+      name: 'Отпуск',
+      monthlyTarget: 20_000,
+      priority: 1,
+      createdAt: '2026-01-10T09:00:00.000Z',
+    })
+    const late = fund({
+      id: 'late',
+      name: 'Второй',
+      monthlyTarget: 10_000,
+      priority: 9,
+      createdAt: '2026-01-10T15:00:00.000Z',
+    })
+    const state = buildAccountFundsState(
+      'acc',
+      [first, late, free],
+      snapshots,
+      transfers,
+      [acc, op],
+      settings,
+    )
+    const byId = Object.fromEntries(state.rows.map((r) => [r.fund.id, r.balance]))
+    expect(byId.vac).toBeCloseTo(20_000, 6)
+    expect(byId.late).toBeCloseTo(0, 6)
+    expect(byId.free).toBeCloseTo(5_000, 6)
+  })
+
+  it('fills a fund from transfers posted after it was created', () => {
+    const snapshots: BalanceSnapshot[] = [
+      { id: 's1', date: '2026-01-01', lines: [{ accountId: 'acc', amount: 0 }, { accountId: 'op', amount: 20_000 }] },
+      { id: 's2', date: '2026-01-20', lines: [{ accountId: 'acc', amount: 20_000 }, { accountId: 'op', amount: 0 }] },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-20',
+        fromAccountId: 'op',
+        toAccountId: 'acc',
+        amount: 20_000,
+        createdAt: '2026-01-20T12:00:00.000Z',
+      },
+    ]
+    const vac = fund({
+      id: 'vac',
+      name: 'Отпуск',
+      monthlyTarget: 20_000,
+      priority: 2,
+      createdAt: '2026-01-10T00:00:00.000Z',
+    })
+    const state = buildAccountFundsState(
+      'acc',
+      [vac, free],
+      snapshots,
+      transfers,
+      [acc, op],
+      settings,
+    )
+    const byId = Object.fromEntries(state.rows.map((r) => [r.fund.id, r.balance]))
+    expect(byId.vac).toBeCloseTo(20_000, 6)
+    expect(byId.free).toBeCloseTo(0, 6)
+  })
 })

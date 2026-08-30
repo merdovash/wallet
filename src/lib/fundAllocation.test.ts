@@ -101,4 +101,41 @@ describe('isFundActiveForTransfer', () => {
     ).toBe(false)
     expect(isFundActiveForTransfer(free, { date: '2026-01-10' })).toBe(true)
   })
+
+  it('does not let a same-day later fund consume an earlier transfer', () => {
+    const late = fund({
+      id: 'late',
+      name: 'Late',
+      createdAt: '2026-01-10T15:00:00.000Z',
+    })
+    expect(
+      isFundActiveForTransfer(late, {
+        date: '2026-01-10',
+        createdAt: '2026-01-10T10:00:00.000Z',
+      }),
+    ).toBe(false)
+  })
+
+  it('lets a fund receive a transfer posted after it was created', () => {
+    const existing = fund({
+      id: 'early',
+      name: 'Early',
+      createdAt: '2026-01-10T09:00:00.000Z',
+    })
+    expect(
+      isFundActiveForTransfer(existing, {
+        date: '2026-01-10',
+        createdAt: '2026-01-10T11:00:00.000Z',
+      }),
+    ).toBe(true)
+  })
+
+  it('does not give an undated transfer to a fund created later that day', () => {
+    const late = fund({
+      id: 'late',
+      name: 'Late',
+      createdAt: '2026-01-10T15:00:00.000Z',
+    })
+    expect(isFundActiveForTransfer(late, { date: '2026-01-10' })).toBe(false)
+  })
 })
