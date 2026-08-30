@@ -10,7 +10,7 @@ import {
   writeFundsExpenseMonths,
 } from '../../lib/avgMonthlyExpense'
 import { dataQa } from '../../lib/dataQa'
-import { isFreeMoneyFund } from '../../lib/fundAllocation'
+import { isFreeMoneyFund, nextLowerUserPriority } from '../../lib/fundAllocation'
 import { buildAccountFundsState } from '../../lib/fundBalances'
 import { formatCurrency, formatIsoToRu, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
@@ -95,10 +95,7 @@ export function FundsPanel({ active }: { active: boolean }) {
     setName('')
     setAccountId(hostAccounts[0]?.id ?? '')
     setMonthlyTarget('')
-    const maxPriority = funds
-      .filter((f) => !isFreeMoneyFund(f) && f.accountId === (hostAccounts[0]?.id ?? ''))
-      .reduce((m, f) => Math.max(m, f.priority), 0)
-    setPriority(String(maxPriority + 1))
+    setPriority(String(nextLowerUserPriority(funds, hostAccounts[0]?.id ?? '')))
     setFormOpen(true)
   }
 
@@ -313,7 +310,15 @@ export function FundsPanel({ active }: { active: boolean }) {
             <Input value={name} onChange={(e) => setName(e.target.value)} dataQa="fund-form-name" />
           </Field>
           <Field label="Счёт">
-            <Select value={accountId} onChange={(e) => setAccountId(e.target.value)} dataQa="fund-form-account">
+            <Select
+              value={accountId}
+              onChange={(e) => {
+                const nextId = e.target.value
+                setAccountId(nextId)
+                if (!editingId) setPriority(String(nextLowerUserPriority(funds, nextId)))
+              }}
+              dataQa="fund-form-account"
+            >
               {hostAccounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} ({a.currency})
@@ -329,7 +334,7 @@ export function FundsPanel({ active }: { active: boolean }) {
               dataQa="fund-form-target"
             />
           </Field>
-          <Field label="Приоритет (больше — раньше)">
+          <Field label="Приоритет (больше — раньше; новый фонд по умолчанию в конце очереди)">
             <Input
               type="number"
               inputMode="numeric"

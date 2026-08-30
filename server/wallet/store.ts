@@ -58,6 +58,7 @@ export interface DbTransfer {
   toAccountId: string
   amount: number
   note?: string
+  createdAt?: string
 }
 
 export interface DbSettings {
@@ -95,6 +96,7 @@ export interface DbAccountFund {
   monthlyTarget: number
   priority: number
   systemKey: DbFundSystemKey | null
+  createdAt?: string
 }
 
 export interface WalletBundle {
@@ -107,6 +109,15 @@ export interface WalletBundle {
 
 function num(value: unknown): number {
   return typeof value === 'number' ? value : Number(value)
+}
+
+function isoTs(value: unknown): string | undefined {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString()
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = new Date(value)
+    if (Number.isFinite(parsed.getTime())) return parsed.toISOString()
+  }
+  return undefined
 }
 
 type AccountRow = {
@@ -591,8 +602,9 @@ export async function listTransfers(userId: string): Promise<DbTransfer[]> {
     to_account_id: string
     amount: number
     note: string | null
+    created_at: Date | string | null
   }>(
-    `SELECT id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, note
+    `SELECT id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, note, created_at
      FROM wallet_transfers
      WHERE user_id = $1
      ORDER BY transfer_date ASC, id ASC`,
@@ -605,6 +617,7 @@ export async function listTransfers(userId: string): Promise<DbTransfer[]> {
     toAccountId: String(row.to_account_id),
     amount: num(row.amount),
     note: row.note ? String(row.note) : undefined,
+    createdAt: isoTs(row.created_at),
   }))
 }
 
@@ -645,11 +658,12 @@ export async function createTransfer(
     to_account_id: string
     amount: number
     note: string | null
+    created_at: Date | string | null
   }>(
     `INSERT INTO wallet_transfers
        (user_id, transfer_date, from_account_id, to_account_id, amount, note)
      VALUES ($1, $2::date, $3, $4, $5, $6)
-     RETURNING id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, note`,
+     RETURNING id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, note, created_at`,
     [
       userId,
       input.date,
@@ -667,6 +681,7 @@ export async function createTransfer(
     toAccountId: String(row.to_account_id),
     amount: num(row.amount),
     note: row.note ? String(row.note) : undefined,
+    createdAt: isoTs(row.created_at),
   }
 }
 
@@ -689,9 +704,10 @@ type FundRow = {
   monthly_target: number | string
   priority: number | string
   system_key: string | null
+  created_at: Date | string | null
 }
 
-const FUND_SELECT = `id, account_id, name, monthly_target, priority, system_key`
+const FUND_SELECT = `id, account_id, name, monthly_target, priority, system_key, created_at`
 
 function mapFund(row: FundRow): DbAccountFund {
   const systemKey = row.system_key === 'free_money' ? 'free_money' : null
@@ -702,6 +718,7 @@ function mapFund(row: FundRow): DbAccountFund {
     monthlyTarget: num(row.monthly_target),
     priority: Math.trunc(num(row.priority)),
     systemKey,
+    createdAt: isoTs(row.created_at),
   }
 }
 
@@ -772,12 +789,12 @@ export async function createAccountFund(
   const pool = getPool()
   let priority = input.priority
   if (priority == null || !Number.isFinite(priority)) {
-    const max = await pool.query<{ m: number | null }>(
-      `SELECT MAX(priority) AS m FROM wallet_account_funds
+    const min = await pool.query<{ m: number | null }>(
+      `SELECT MIN(priority) AS m FROM wallet_account_funds
        WHERE user_id = $1 AND account_id = $2 AND system_key IS NULL`,
       [userId, input.accountId],
     )
-    priority = (max.rows[0]?.m == null ? 0 : Math.trunc(num(max.rows[0].m))) + 1
+    priority = min.rows[0]?.m == null ? 1 : Math.trunc(num(min.rows[0].m)) - 1
   } else {
     priority = Math.trunc(priority)
   }

@@ -4,6 +4,8 @@ import {
   allocateInboundTransfer,
   allocateOutboundTransfer,
   FREE_MONEY_SYSTEM_KEY,
+  isFundActiveForTransfer,
+  nextLowerUserPriority,
 } from './fundAllocation'
 
 function fund(
@@ -75,5 +77,28 @@ describe('allocateOutboundTransfer', () => {
     expect(alloc.free).toBe(5_000)
     expect(alloc.low).toBe(3_000)
     expect(alloc.high).toBe(0)
+  })
+})
+
+describe('nextLowerUserPriority', () => {
+  it('puts a new fund after existing ones', () => {
+    expect(nextLowerUserPriority([fund({ id: 'a', name: 'A', priority: 2 }), free], 'acc')).toBe(1)
+  })
+})
+
+describe('isFundActiveForTransfer', () => {
+  it('ignores a fund created after the transfer', () => {
+    const late = fund({
+      id: 'late',
+      name: 'Late',
+      createdAt: '2026-02-01T12:00:00.000Z',
+    })
+    expect(
+      isFundActiveForTransfer(late, {
+        date: '2026-01-10',
+        createdAt: '2026-01-10T10:00:00.000Z',
+      }),
+    ).toBe(false)
+    expect(isFundActiveForTransfer(free, { date: '2026-01-10' })).toBe(true)
   })
 })

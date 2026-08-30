@@ -79,6 +79,8 @@ export interface Transfer {
   /** Amount in the source account currency. */
   amount: number
   note?: string
+  /** Server timestamp; used so a fund created later does not rewrite older transfers. */
+  createdAt?: string
 }
 
 export type AccountFundSystemKey = 'free_money'
@@ -93,6 +95,7 @@ export interface AccountFund {
   /** Higher runs first on inbound transfers. */
   priority: number
   systemKey?: AccountFundSystemKey | null
+  createdAt?: string
 }
 
 /** Manual rates: 1 unit of currency → how many units of baseCurrency. */

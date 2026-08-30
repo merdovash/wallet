@@ -1,4 +1,4 @@
-import type { AccountFund } from '../types/wallet'
+import type { AccountFund, Transfer } from '../types/wallet'
 
 export const FREE_MONEY_SYSTEM_KEY = 'free_money' as const
 export const FREE_MONEY_NAME = 'Свободные деньги'
@@ -23,6 +23,37 @@ export function userFundsByOutboundPriority(funds: AccountFund[]): AccountFund[]
     .filter((f) => !isFreeMoneyFund(f))
     .slice()
     .sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+}
+
+export function nextLowerUserPriority(funds: AccountFund[], accountId: string): number {
+  const user = funds.filter((f) => f.accountId === accountId && !isFreeMoneyFund(f))
+  if (user.length === 0) return 1
+  return Math.min(...user.map((f) => f.priority)) - 1
+}
+
+function transferInstant(transfer: Pick<Transfer, 'date' | 'createdAt'>): string {
+  if (transfer.createdAt) return transfer.createdAt
+  return `${transfer.date}T23:59:59.000Z`
+}
+
+function fundCreatedInstant(fund: Pick<AccountFund, 'createdAt'>): string {
+  return fund.createdAt ?? '0000-01-01T00:00:00.000Z'
+}
+
+/** User funds created after a transfer must not rewrite that transfer's split. */
+export function isFundActiveForTransfer(
+  fund: AccountFund,
+  transfer: Pick<Transfer, 'date' | 'createdAt'>,
+): boolean {
+  if (isFreeMoneyFund(fund)) return true
+  return fundCreatedInstant(fund) <= transferInstant(transfer)
+}
+
+export function fundsForTransfer(
+  funds: AccountFund[],
+  transfer: Pick<Transfer, 'date' | 'createdAt'>,
+): AccountFund[] {
+  return funds.filter((f) => isFundActiveForTransfer(f, transfer))
 }
 
 export function freeMoneyFund(funds: AccountFund[]): AccountFund | undefined {

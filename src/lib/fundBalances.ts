@@ -16,6 +16,7 @@ import {
   allocateOutboundTransfer,
   applyAllocation,
   applyFilledMonth,
+  fundsForTransfer,
   freeMoneyFund,
   isFreeMoneyFund,
   yearMonth,
@@ -165,11 +166,13 @@ function applyTransfersInInterval(
         settings,
         rateBook,
       )
-      const allocation = allocateInboundTransfer(amount, funds, filled)
+      const active = fundsForTransfer(funds, transfer)
+      const allocation = allocateInboundTransfer(amount, active, filled)
       applyAllocation(balances, allocation, 1)
-      applyFilledMonth(filled, allocation, funds)
+      applyFilledMonth(filled, allocation, active)
     } else {
-      const allocation = allocateOutboundTransfer(transfer.amount, funds, balances)
+      const active = fundsForTransfer(funds, transfer)
+      const allocation = allocateOutboundTransfer(transfer.amount, active, balances)
       applyAllocation(balances, allocation, -1)
     }
   }
@@ -334,7 +337,9 @@ export function previewInboundAllocation(
   for (const row of state.rows) {
     if (!isFreeMoneyFund(row.fund)) filled[row.fund.id] = row.filledThisMonth
   }
-  const allocation = allocateInboundTransfer(amountInAccountCurrency, accountFunds, filled)
+  const transfer = { date: transferDate, createdAt: undefined }
+  const active = fundsForTransfer(accountFunds, transfer)
+  const allocation = allocateInboundTransfer(amountInAccountCurrency, active, filled)
   return state.rows
     .map((row) => ({
       ...row,
