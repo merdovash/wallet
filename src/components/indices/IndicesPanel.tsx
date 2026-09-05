@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ACCOUNT_COLORS, type IndexKind, type MarketIndex } from '../../types/wallet'
 import { dataQa } from '../../lib/dataQa'
+import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { formatIsoToRu, todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
@@ -28,6 +29,7 @@ function formatValue(value: number, kind: IndexKind): string {
 export function IndicesPanel({ active }: { active: boolean }) {
   const indices = useWalletStore((s) => s.indices)
   const indexValues = useWalletStore((s) => s.indexValues)
+  const settings = useWalletStore((s) => s.settings)
   const addMarketIndex = useWalletStore((s) => s.addMarketIndex)
   const updateMarketIndex = useWalletStore((s) => s.updateMarketIndex)
   const deleteMarketIndex = useWalletStore((s) => s.deleteMarketIndex)
@@ -37,6 +39,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
   const [editing, setEditing] = useState<MarketIndex | null>(null)
   const [name, setName] = useState('')
   const [kind, setKind] = useState<IndexKind>('amount')
+  const [currency, setCurrency] = useState(settings.baseCurrency)
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
   const [updateOpen, setUpdateOpen] = useState(false)
   const [date, setDate] = useState(todayIsoDate)
@@ -60,6 +63,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
     setEditing(null)
     setName('')
     setKind('amount')
+    setCurrency(settings.baseCurrency)
     setColor(ACCOUNT_COLORS[indices.length % ACCOUNT_COLORS.length]!)
     setFormOpen(true)
   }
@@ -68,6 +72,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
     setEditing(index)
     setName(index.name)
     setKind(index.kind)
+    setCurrency(index.currency)
     setColor(index.color)
     setFormOpen(true)
   }
@@ -96,8 +101,8 @@ export function IndicesPanel({ active }: { active: boolean }) {
     if (!trimmed || saving) return
     setSaving(true)
     try {
-      if (editing) await updateMarketIndex(editing.id, { name: trimmed, kind, color })
-      else await addMarketIndex({ name: trimmed, kind, color })
+      if (editing) await updateMarketIndex(editing.id, { name: trimmed, kind, currency, color })
+      else await addMarketIndex({ name: trimmed, kind, currency, color })
       setFormOpen(false)
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось сохранить индекс')
@@ -158,7 +163,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openEdit(index)} {...dataQa(`index-edit-${index.id}`)}>
                     <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{index.name}</span>
                     <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      {index.kind === 'amount' ? 'суммовой' : 'процентный'}
+                      {index.kind === 'amount' ? 'суммовой' : 'процентный'} · {index.currency}
                     </span>
                   </button>
                   <span className="shrink-0 text-right tabular-nums">
@@ -193,6 +198,18 @@ export function IndicesPanel({ active }: { active: boolean }) {
             <Select value={kind} onChange={(event) => setKind(event.target.value as IndexKind)} disabled={Boolean(editing && indexValues.some((item) => item.indexId === editing.id))} dataQa="index-kind">
               <option value="amount">{KIND_LABELS.amount}</option>
               <option value="annual_rate">{KIND_LABELS.annual_rate}</option>
+            </Select>
+          </Field>
+          <Field label="Валюта">
+            <Select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              disabled={Boolean(editing && indexValues.some((item) => item.indexId === editing.id))}
+              dataQa="index-currency"
+            >
+              {CURRENCY_OPTIONS.filter((item) => item.code !== 'CBK').map((item) => (
+                <option key={item.code} value={item.code}>{item.code} — {item.name}</option>
+              ))}
             </Select>
           </Field>
           <Field label="Цвет">
@@ -244,7 +261,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
               .filter((item) => item.indexId === index.id && item.date <= date)
               .sort((a, b) => b.date.localeCompare(a.date))[0]
             return (
-              <Field key={index.id} label={`${index.name}${index.kind === 'annual_rate' ? ', % годовых' : ''}`}>
+              <Field key={index.id} label={`${index.name}, ${index.kind === 'annual_rate' ? '% годовых' : index.currency}`}>
                 <MoneyInput
                   value={amounts[index.id] ?? ''}
                   onChange={(value) => setAmounts((current) => ({ ...current, [index.id]: value }))}

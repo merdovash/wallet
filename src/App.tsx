@@ -42,6 +42,8 @@ export default function App() {
   const authInitialized = useAuthStore((s) => s.initialized)
   const initAuth = useAuthStore((s) => s.init)
   const snapshots = useWalletStore((s) => s.snapshots)
+  const transfers = useWalletStore((s) => s.transfers)
+  const indexValues = useWalletStore((s) => s.indexValues)
   const loadAll = useWalletStore((s) => s.loadAll)
   const clearWallet = useWalletStore((s) => s.clear)
   const walletLoaded = useWalletStore((s) => s.loaded)
@@ -75,8 +77,13 @@ export default function App() {
 
   useEffect(() => {
     if (!walletLoaded) return
-    void ensureRates([...snapshotDates(snapshots), todayIsoDate()])
-  }, [snapshots, ensureRates, walletLoaded])
+    void ensureRates([
+      ...snapshotDates(snapshots),
+      ...transfers.map((transfer) => transfer.date),
+      ...indexValues.map((value) => value.date),
+      todayIsoDate(),
+    ])
+  }, [snapshots, transfers, indexValues, ensureRates, walletLoaded])
 
   const openAccount = useCallback(
     (accountId: string) => {

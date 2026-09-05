@@ -3,6 +3,8 @@ import {
   growthCapitalFlows,
   type RateBook,
 } from '../engine/growthEngine'
+import { resolvePivotForDate } from './cbrRates'
+import { toBase } from './currency'
 import type {
   Account,
   BalanceSnapshot,
@@ -69,11 +71,21 @@ export function buildIndexComparison(input: {
   )
   const lower = input.range?.startDate
   const upper = input.range?.endDate
+  const basePerIndexUnit = (date: string): number =>
+    toBase(
+      1,
+      input.index.currency,
+      input.settings.baseCurrency,
+      input.settings.exchangeRates,
+      resolvePivotForDate(date, input.rateBook ?? {}),
+    )
   const actual = actualAll.filter(
     (point) =>
       (!lower || point.date >= lower) &&
       (!upper || point.date <= upper) &&
-      valueOnDate(observations, point.date) != null,
+      valueOnDate(observations, point.date) != null &&
+      Number.isFinite(basePerIndexUnit(point.date)) &&
+      basePerIndexUnit(point.date) > 0,
   )
   if (actual.length === 0) return []
 
@@ -95,8 +107,22 @@ export function buildIndexComparison(input: {
 
   const indexTotalByDate =
     input.index.kind === 'annual_rate'
-      ? buildRateTotals(start.date, start.total, actual.map((p) => p.date), observations, flowByDate)
-      : buildAmountTotals(start.date, start.total, actual.map((p) => p.date), observations, flows)
+      ? buildRateTotals(
+          start.date,
+          start.total,
+          actual.map((p) => p.date),
+          observations,
+          flowByDate,
+          basePerIndexUnit,
+        )
+      : buildAmountTotals(
+          start.date,
+          start.total,
+          actual.map((p) => p.date),
+          observations,
+          flows,
+          basePerIndexUnit,
+        )
 
   let cumulativeFlow = 0
   let previousDate = start.date
@@ -127,20 +153,24 @@ function buildAmountTotals(
   dates: string[],
   observations: IndexValue[],
   flows: Array<{ date: string; amount: number }>,
+  basePerIndexUnit: (date: string) => number,
 ): Map<string, number> {
   const startLevel = valueOnDate(observations, startDate)
-  if (startLevel == null || !(startLevel > 0)) return new Map()
-  let units = startTotal / startLevel
+  const startFx = basePerIndexUnit(startDate)
+  if (startLevel == null || !(startLevel > 0) || !(startFx > 0)) return new Map()
+  let units = startTotal / (startLevel * startFx)
   let previousDate = startDate
   const result = new Map<string, number>([[startDate, startTotal]])
   for (const date of dates.slice(1)) {
     for (const flow of flows) {
       if (flow.date <= previousDate || flow.date > date) continue
       const level = valueOnDate(observations, flow.date)
-      if (level != null && level > 0) units += flow.amount / level
+      const fx = basePerIndexUnit(flow.date)
+      if (level != null && level > 0 && fx > 0) units += flow.amount / (level * fx)
     }
     const level = valueOnDate(observations, date)
-    if (level != null) result.set(date, units * level)
+    const fx = basePerIndexUnit(date)
+    if (level != null && fx > 0) result.set(date, units * level * fx)
     previousDate = date
   }
   return result
@@ -152,10 +182,12 @@ function buildRateTotals(
   outputDates: string[],
   observations: IndexValue[],
   flowByDate: Map<string, number>,
+  basePerIndexUnit: (date: string) => number,
 ): Map<string, number> {
   let rate = valueOnDate(observations, startDate)
-  if (rate == null) return new Map()
-  let total = startTotal
+  const startFx = basePerIndexUnit(startDate)
+  if (rate == null || !(startFx > 0)) return new Map()
+  let totalNative = startTotal / startFx
   let previousDate = startDate
   const result = new Map<string, number>([[startDate, startTotal]])
   const outputSet = new Set(outputDates)
@@ -170,11 +202,13 @@ function buildRateTotals(
   }
 
   for (const date of [...eventDates].sort()) {
-    total *= Math.pow(1 + rate, daysBetween(previousDate, date) / 365)
+    totalNative *= Math.pow(1 + rate, daysBetween(previousDate, date) / 365)
     const observation = observations.find((item) => item.date === date)
     if (observation) rate = observation.value
-    total += flowByDate.get(date) ?? 0
-    if (outputSet.has(date)) result.set(date, total)
+    const fx = basePerIndexUnit(date)
+    const flow = flowByDate.get(date) ?? 0
+    if (flow !== 0 && fx > 0) totalNative += flow / fx
+    if (outputSet.has(date) && fx > 0) result.set(date, totalNative * fx)
     previousDate = date
   }
   return result

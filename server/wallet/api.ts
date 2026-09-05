@@ -381,19 +381,25 @@ export async function handleWalletApi(
       const body = await readJsonBody<{
         name?: string
         kind?: store.DbIndexKind
+        currency?: string
         color?: string
       }>(req)
-      if (!body.name?.trim() || !body.kind || !body.color) {
-        sendJson(res, 400, { error: 'Нужны name, kind и color' })
+      if (!body.name?.trim() || !body.kind || !body.currency || !body.color) {
+        sendJson(res, 400, { error: 'Нужны name, kind, currency и color' })
         return true
       }
       if (body.kind !== 'amount' && body.kind !== 'annual_rate') {
         sendJson(res, 400, { error: 'Некорректный тип индекса' })
         return true
       }
+      if (!/^[A-Z]{3,8}$/i.test(body.currency)) {
+        sendJson(res, 400, { error: 'Некорректная валюта индекса' })
+        return true
+      }
       const index = await store.createMarketIndex(user.id, {
         name: body.name,
         kind: body.kind,
+        currency: body.currency,
         color: body.color,
       })
       sendJson(res, 201, { index })
@@ -407,10 +413,15 @@ export async function handleWalletApi(
           const body = await readJsonBody<{
             name?: string
             kind?: store.DbIndexKind
+            currency?: string
             color?: string
           }>(req)
           if (body.kind !== undefined && body.kind !== 'amount' && body.kind !== 'annual_rate') {
             sendJson(res, 400, { error: 'Некорректный тип индекса' })
+            return true
+          }
+          if (body.currency !== undefined && !/^[A-Z]{3,8}$/i.test(body.currency)) {
+            sendJson(res, 400, { error: 'Некорректная валюта индекса' })
             return true
           }
           const index = await store.updateMarketIndex(user.id, params.id!, body)

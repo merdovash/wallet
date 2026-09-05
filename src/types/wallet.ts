@@ -115,6 +115,8 @@ export interface MarketIndex {
   id: string
   name: string
   kind: IndexKind
+  /** Currency in which the level or rate-bearing balance is quoted. */
+  currency: string
   color: string
 }
 

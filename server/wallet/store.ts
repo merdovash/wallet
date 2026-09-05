@@ -113,6 +113,7 @@ export interface DbMarketIndex {
   id: string
   name: string
   kind: DbIndexKind
+  currency: string
   color: string
 }
 
@@ -1038,6 +1039,7 @@ type MarketIndexRow = {
   id: string
   name: string
   kind: string
+  currency: string
   color: string
 }
 
@@ -1050,6 +1052,7 @@ function mapMarketIndex(row: MarketIndexRow): DbMarketIndex {
     id: String(row.id),
     name: String(row.name),
     kind: normalizeIndexKind(row.kind),
+    currency: String(row.currency),
     color: String(row.color),
   }
 }
@@ -1057,7 +1060,7 @@ function mapMarketIndex(row: MarketIndexRow): DbMarketIndex {
 export async function listMarketIndices(userId: string): Promise<DbMarketIndex[]> {
   const pool = getPool()
   const result = await pool.query<MarketIndexRow>(
-    `SELECT id, name, kind, color
+    `SELECT id, name, kind, currency, color
      FROM wallet_market_indices
      WHERE user_id = $1
      ORDER BY name ASC`,
@@ -1068,16 +1071,16 @@ export async function listMarketIndices(userId: string): Promise<DbMarketIndex[]
 
 export async function createMarketIndex(
   userId: string,
-  input: { name: string; kind: DbIndexKind; color: string },
+  input: { name: string; kind: DbIndexKind; currency: string; color: string },
 ): Promise<DbMarketIndex> {
   const name = input.name.trim()
   if (!name) throw new Error('Нужно название индекса')
   const pool = getPool()
   const result = await pool.query<MarketIndexRow>(
-    `INSERT INTO wallet_market_indices (user_id, name, kind, color)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, name, kind, color`,
-    [userId, name, normalizeIndexKind(input.kind), input.color],
+    `INSERT INTO wallet_market_indices (user_id, name, kind, currency, color)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, name, kind, currency, color`,
+    [userId, name, normalizeIndexKind(input.kind), input.currency.toUpperCase(), input.color],
   )
   return mapMarketIndex(result.rows[0]!)
 }
@@ -1085,11 +1088,11 @@ export async function createMarketIndex(
 export async function updateMarketIndex(
   userId: string,
   id: string,
-  patch: Partial<{ name: string; kind: DbIndexKind; color: string }>,
+  patch: Partial<{ name: string; kind: DbIndexKind; currency: string; color: string }>,
 ): Promise<DbMarketIndex | null> {
   const pool = getPool()
   const existing = await pool.query<MarketIndexRow>(
-    `SELECT id, name, kind, color FROM wallet_market_indices WHERE id = $1 AND user_id = $2`,
+    `SELECT id, name, kind, currency, color FROM wallet_market_indices WHERE id = $1 AND user_id = $2`,
     [id, userId],
   )
   const current = existing.rows[0]
@@ -1098,26 +1101,31 @@ export async function updateMarketIndex(
   if (!name) throw new Error('Нужно название индекса')
   const nextKind =
     patch.kind !== undefined ? normalizeIndexKind(patch.kind) : normalizeIndexKind(current.kind)
-  if (nextKind !== normalizeIndexKind(current.kind)) {
+  const nextCurrency = patch.currency?.toUpperCase() ?? current.currency
+  if (
+    nextKind !== normalizeIndexKind(current.kind) ||
+    nextCurrency !== current.currency
+  ) {
     const values = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count FROM wallet_market_index_values
        WHERE index_id = $1 AND user_id = $2`,
       [id, userId],
     )
     if (num(values.rows[0]?.count ?? 0) > 0) {
-      throw new Error('Нельзя изменить тип индекса после фиксации значений')
+      throw new Error('Нельзя изменить тип или валюту индекса после фиксации значений')
     }
   }
   const result = await pool.query<MarketIndexRow>(
     `UPDATE wallet_market_indices
-     SET name = $3, kind = $4, color = $5, updated_at = now()
+     SET name = $3, kind = $4, currency = $5, color = $6, updated_at = now()
      WHERE id = $1 AND user_id = $2
-     RETURNING id, name, kind, color`,
+     RETURNING id, name, kind, currency, color`,
     [
       id,
       userId,
       name,
       nextKind,
+      nextCurrency,
       patch.color ?? current.color,
     ],
   )

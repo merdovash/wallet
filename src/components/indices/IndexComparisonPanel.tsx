@@ -94,12 +94,12 @@ export function IndexComparisonPanel() {
               <span>Индекс</span>
               <Select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className="w-full sm:w-auto sm:min-w-56" dataQa="index-comparison-select">
                 {available.map((index) => (
-                  <option key={index.id} value={index.id}>{index.name}</option>
+                  <option key={index.id} value={index.id}>{index.name} · {index.currency}</option>
                 ))}
               </Select>
             </label>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Переводы между инвестиционными счетами исключаются. Перевод из обычного счёта в фонд, вклад или инвестиции покупает индекс по значению на дату перевода; обратный перевод продаёт его.
+              Переводы между инвестиционными счетами исключаются. Перевод из обычного счёта в фонд, вклад или инвестиции покупает индекс по значению и валютному курсу на дату перевода; обратный перевод продаёт его.
             </p>
           </Card>
 

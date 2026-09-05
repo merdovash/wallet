@@ -50,6 +50,7 @@ describe('buildIndexComparison', () => {
       id: 'imoex',
       name: 'Мосбиржа',
       kind: 'amount',
+      currency: 'RUB',
       color: '#2563eb',
     }
     const points = buildIndexComparison({
@@ -89,6 +90,7 @@ describe('buildIndexComparison', () => {
       id: 'rate',
       name: 'Ставка банка',
       kind: 'annual_rate',
+      currency: 'RUB',
       color: '#059669',
     }
     const points = buildIndexComparison({
@@ -105,5 +107,36 @@ describe('buildIndexComparison', () => {
 
     expect(points.at(-1)?.indexTotal).toBeCloseTo(110, 8)
     expect(points.at(-1)?.indexGrowth).toBeCloseTo(10, 8)
+  })
+
+  it('includes the exchange-rate effect for an index quoted in foreign currency', () => {
+    const index: MarketIndex = {
+      id: 'sp500',
+      name: 'S&P 500',
+      kind: 'amount',
+      currency: 'USD',
+      color: '#2563eb',
+    }
+    const points = buildIndexComparison({
+      index,
+      indexValues: [
+        { indexId: index.id, date: '2025-01-01', value: 10 },
+        { indexId: index.id, date: '2025-02-01', value: 10 },
+      ],
+      accounts: [fund],
+      snapshots: [
+        snapshot('s1', '2025-01-01', 100),
+        snapshot('s2', '2025-02-01', 100),
+      ],
+      transfers: [],
+      settings,
+      rateBook: {
+        '2025-01-01': { RUB: 1, USD: 80 },
+        '2025-02-01': { RUB: 1, USD: 100 },
+      },
+    })
+
+    expect(points.at(-1)?.indexTotal).toBeCloseTo(125, 8)
+    expect(points.at(-1)?.indexGrowth).toBeCloseTo(25, 8)
   })
 })
