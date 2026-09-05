@@ -4,7 +4,7 @@
 
 Источники схемы:
 
-- миграции: [`server/db/migrations/`](server/db/migrations/) (`001` … `012`)
+- миграции: [`server/db/migrations/`](server/db/migrations/) (`001` … `013`)
 - учёт миграций: таблица `wallet_schema_migrations`
 - клиентские типы: [`src/types/wallet.ts`](src/types/wallet.ts)
 
@@ -230,7 +230,8 @@ erDiagram
 | `transfer_date` | DATE | NOT NULL | — | Дата перевода |
 | `from_account_id` | UUID | NOT NULL | — | FK → `wallet_accounts(id)` `ON DELETE CASCADE` — откуда |
 | `to_account_id` | UUID | NOT NULL | — | FK → `wallet_accounts(id)` `ON DELETE CASCADE` — куда |
-| `amount` | NUMERIC(20, 8) | NOT NULL | — | Сумма в валюте счёта-источника; `CHECK (amount > 0)` |
+| `amount` | NUMERIC(20, 8) | NOT NULL | — | Сумма списания в валюте счёта-источника; `CHECK (amount > 0)` |
+| `to_amount` | NUMERIC(20, 8) | NULL | — | Сумма зачисления в валюте счёта-получателя. `NULL` — как раньше: та же сумма или официальный курс. `CHECK (to_amount IS NULL OR to_amount > 0)` |
 | `note` | TEXT | NULL | — | Комментарий |
 | `created_at` | TIMESTAMPTZ | NOT NULL | `now()` | Создание |
 

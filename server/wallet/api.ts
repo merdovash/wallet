@@ -262,6 +262,7 @@ export async function handleWalletApi(
         fromAccountId?: string
         toAccountId?: string
         amount?: number
+        toAmount?: number
         note?: string
       }>(req)
       if (
@@ -274,11 +275,20 @@ export async function handleWalletApi(
         sendJson(res, 400, { error: 'Нужны date, fromAccountId, toAccountId, amount > 0' })
         return true
       }
+      const toAmount =
+        body.toAmount == null || body.toAmount === undefined
+          ? undefined
+          : Number(body.toAmount)
+      if (toAmount != null && !(toAmount > 0)) {
+        sendJson(res, 400, { error: 'Сумма получения должна быть больше 0' })
+        return true
+      }
       const transfer = await store.createTransfer(user.id, {
         date: body.date,
         fromAccountId: body.fromAccountId,
         toAccountId: body.toAccountId,
         amount: Number(body.amount),
+        toAmount,
         note: body.note,
       })
       sendJson(res, 201, { transfer })

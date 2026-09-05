@@ -1,10 +1,10 @@
 import {
   balanceOnDate,
-  convertAmount,
   netWorthAmount,
   type RateBook,
 } from '../engine/growthEngine'
 import { isGrowthAccount } from './accountKinds'
+import { transferReceivedAmount } from './transferAmounts'
 import { toBase } from './currency'
 import { resolvePivotForDate } from './cbrRates'
 import type {
@@ -23,7 +23,7 @@ export interface SuggestCheckInCashflowInput {
   /** Effective balances for the check-in (typed + carried). */
   lines: SnapshotLine[]
   /** Transfers on this date (saved + pending). */
-  transfers: Array<Pick<Transfer, 'fromAccountId' | 'toAccountId' | 'amount'>>
+  transfers: Array<Pick<Transfer, 'fromAccountId' | 'toAccountId' | 'amount' | 'toAmount'>>
   rateBook?: RateBook
   /** When editing, ignore this snapshot so «previous» is read correctly. */
   excludeSnapshotId?: string | null
@@ -123,11 +123,13 @@ export function suggestCheckInCashflow(input: SuggestCheckInCashflowInput): Sugg
 
     const amountBase = amountInBase(t.amount, from.currency, date, settings, rateBook)
     if (fromGrowth && !toGrowth) {
-      // Growth → non-growth: may differ by FX when currencies differ.
-      const received =
-        from.currency === to.currency
-          ? t.amount
-          : convertAmount(t.amount, from.currency, to.currency, settings, date, rateBook)
+      const received = transferReceivedAmount(
+        { ...t, date },
+        from,
+        to,
+        settings,
+        rateBook,
+      )
       netTransfersIntoNonGrowth += amountInBase(received, to.currency, date, settings, rateBook)
     } else if (!fromGrowth && toGrowth) {
       netTransfersIntoNonGrowth -= amountBase

@@ -57,6 +57,7 @@ export interface DbTransfer {
   fromAccountId: string
   toAccountId: string
   amount: number
+  toAmount?: number
   note?: string
   createdAt?: string
 }
@@ -608,10 +609,11 @@ export async function listTransfers(userId: string): Promise<DbTransfer[]> {
     from_account_id: string
     to_account_id: string
     amount: number
+    to_amount: number | string | null
     note: string | null
     created_at: Date | string | null
   }>(
-    `SELECT id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, note, created_at
+    `SELECT id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, to_amount, note, created_at
      FROM wallet_transfers
      WHERE user_id = $1
      ORDER BY transfer_date ASC, id ASC`,
@@ -623,6 +625,7 @@ export async function listTransfers(userId: string): Promise<DbTransfer[]> {
     fromAccountId: String(row.from_account_id),
     toAccountId: String(row.to_account_id),
     amount: num(row.amount),
+    toAmount: row.to_amount == null ? undefined : num(row.to_amount),
     note: row.note ? String(row.note) : undefined,
     createdAt: isoTs(row.created_at),
   }))
@@ -644,6 +647,7 @@ export async function createTransfer(
     fromAccountId: string
     toAccountId: string
     amount: number
+    toAmount?: number
     note?: string
   },
 ): Promise<DbTransfer> {
@@ -656,6 +660,10 @@ export async function createTransfer(
   if (!(await assertAccountOwned(userId, input.toAccountId))) {
     throw new Error('Счёт-получатель не найден')
   }
+  const toAmount =
+    input.toAmount != null && Number.isFinite(input.toAmount) && input.toAmount > 0
+      ? input.toAmount
+      : null
 
   const pool = getPool()
   const result = await pool.query<{
@@ -664,19 +672,21 @@ export async function createTransfer(
     from_account_id: string
     to_account_id: string
     amount: number
+    to_amount: number | string | null
     note: string | null
     created_at: Date | string | null
   }>(
     `INSERT INTO wallet_transfers
-       (user_id, transfer_date, from_account_id, to_account_id, amount, note)
-     VALUES ($1, $2::date, $3, $4, $5, $6)
-     RETURNING id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, note, created_at`,
+       (user_id, transfer_date, from_account_id, to_account_id, amount, to_amount, note)
+     VALUES ($1, $2::date, $3, $4, $5, $6, $7)
+     RETURNING id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, to_amount, note, created_at`,
     [
       userId,
       input.date,
       input.fromAccountId,
       input.toAccountId,
       input.amount,
+      toAmount,
       input.note ?? null,
     ],
   )
@@ -687,6 +697,7 @@ export async function createTransfer(
     fromAccountId: String(row.from_account_id),
     toAccountId: String(row.to_account_id),
     amount: num(row.amount),
+    toAmount: row.to_amount == null ? undefined : num(row.to_amount),
     note: row.note ? String(row.note) : undefined,
     createdAt: isoTs(row.created_at),
   }
@@ -1057,6 +1068,7 @@ export async function importWalletData(
       fromAccountId: string
       toAccountId: string
       amount: number
+      toAmount?: number
       note?: string
     }>
   },
@@ -1138,9 +1150,17 @@ export async function importWalletData(
       if (fromId === toId) continue
       await query(
         `INSERT INTO wallet_transfers
-           (user_id, transfer_date, from_account_id, to_account_id, amount, note)
-         VALUES ($1, $2::date, $3, $4, $5, $6)`,
-        [userId, transfer.date, fromId, toId, transfer.amount, transfer.note ?? null],
+           (user_id, transfer_date, from_account_id, to_account_id, amount, to_amount, note)
+         VALUES ($1, $2::date, $3, $4, $5, $6, $7)`,
+        [
+          userId,
+          transfer.date,
+          fromId,
+          toId,
+          transfer.amount,
+          transfer.toAmount != null && transfer.toAmount > 0 ? transfer.toAmount : null,
+          transfer.note ?? null,
+        ],
       )
     }
   })

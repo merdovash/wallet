@@ -4,10 +4,12 @@ import { dataQa } from '../../lib/dataQa'
 import { todayIsoDate, formatCurrency } from '../../lib/format'
 import { previewInboundAllocation } from '../../lib/fundBalances'
 import { parseMoneyInput } from '../../lib/moneyInput'
+import { transferReceivedAmount, transferSpreadBase } from '../../lib/transferAmounts'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import { DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
+import { TransferSpreadLine } from './TransferSpreadLine'
 
 interface TransferCreatePanelProps {
   open: boolean
@@ -36,6 +38,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
   const [amount, setAmount] = useState('')
+  const [toAmount, setToAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -45,28 +48,40 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     setFromAccountId(activeAccounts[0]?.id ?? '')
     setToAccountId(activeAccounts[1]?.id ?? activeAccounts[0]?.id ?? '')
     setAmount('')
+    setToAmount('')
     setNote('')
   }, [open, activeAccounts])
 
   const fromAccount = activeAccounts.find((a) => a.id === fromAccountId)
   const toAccount = activeAccounts.find((a) => a.id === toAccountId)
   const parsedAmount = parseMoneyInput(amount)
+  const parsedToAmount = parseMoneyInput(toAmount)
+  const crossCurrency = Boolean(
+    fromAccount && toAccount && fromAccount.currency !== toAccount.currency,
+  )
+
+  const destAmount =
+    fromAccount && toAccount && parsedAmount != null && parsedAmount > 0
+      ? transferReceivedAmount(
+          {
+            date,
+            fromAccountId,
+            toAccountId,
+            amount: parsedAmount,
+            toAmount:
+              parsedToAmount != null && parsedToAmount > 0 ? parsedToAmount : undefined,
+          },
+          fromAccount,
+          toAccount,
+          settings,
+          rateBook,
+        )
+      : null
 
   const fundPreview = useMemo(() => {
-    if (!toAccount || parsedAmount == null || parsedAmount <= 0) return []
+    if (!toAccount || destAmount == null || destAmount <= 0) return []
     if (!funds.some((f) => f.accountId === toAccount.id)) return []
-    const destAmount =
-      fromAccount && fromAccount.currency !== toAccount.currency
-        ? convertAmount(
-            parsedAmount,
-            fromAccount.currency,
-            toAccount.currency,
-            settings,
-            date,
-            rateBook,
-          )
-        : parsedAmount
-    if (!Number.isFinite(destAmount) || destAmount <= 0) return []
+    if (!Number.isFinite(destAmount)) return []
     return previewInboundAllocation(
       toAccount.id,
       destAmount,
@@ -80,8 +95,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     )
   }, [
     toAccount,
-    fromAccount,
-    parsedAmount,
+    destAmount,
     funds,
     settings,
     date,
@@ -91,10 +105,15 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     accounts,
   ])
 
+  const receiveOk = crossCurrency
+    ? parsedToAmount != null && parsedToAmount > 0
+    : parsedToAmount == null || parsedToAmount > 0
+
   async function handleSave() {
     const value = parseMoneyInput(amount)
     if (!date || !fromAccountId || !toAccountId || fromAccountId === toAccountId) return
     if (value == null || value <= 0) return
+    if (!receiveOk) return
     setSaving(true)
     try {
       const { snapshotId } = await addTransferCheckIn(
@@ -103,6 +122,8 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           fromAccountId,
           toAccountId,
           amount: value,
+          toAmount:
+            parsedToAmount != null && parsedToAmount > 0 ? parsedToAmount : undefined,
           note: note.trim() || undefined,
         },
         rateBook,
@@ -119,9 +140,44 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     !!fromAccountId &&
     !!toAccountId &&
     fromAccountId !== toAccountId &&
-    parseMoneyInput(amount) != null &&
-    (parseMoneyInput(amount) ?? 0) > 0 &&
+    parsedAmount != null &&
+    parsedAmount > 0 &&
+    receiveOk &&
     activeAccounts.length >= 2
+
+  const spread =
+    parsedAmount != null &&
+    parsedAmount > 0 &&
+    fromAccount &&
+    toAccount &&
+    (crossCurrency ? parsedToAmount != null && parsedToAmount > 0 : true)
+      ? transferSpreadBase(
+          {
+            date,
+            fromAccountId,
+            toAccountId,
+            amount: parsedAmount,
+            toAmount:
+              parsedToAmount != null && parsedToAmount > 0 ? parsedToAmount : undefined,
+          },
+          fromAccount,
+          toAccount,
+          settings,
+          rateBook,
+        )
+      : 0
+
+  const officialHint =
+    crossCurrency && parsedAmount != null && parsedAmount > 0 && fromAccount && toAccount
+      ? convertAmount(
+          parsedAmount,
+          fromAccount.currency,
+          toAccount.currency,
+          settings,
+          date,
+          rateBook,
+        )
+      : null
 
   return (
     <EntityEditPanel
@@ -137,6 +193,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Будет создан чек-ин с обновлёнными остатками. Суммы в нём нельзя менять вручную —
           только удалить перевод или весь чек-ин.
+          {crossCurrency ? ' Для разных валют сумма получения обязательна.' : ''}
         </p>
         <Field label="Дата">
           <DateInput value={date} onChange={setDate} dataQa="transfer-create-date" />
@@ -159,7 +216,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
             ))}
           </Select>
         </Field>
-        <Field label={`Сумма${fromAccount ? ` (${fromAccount.currency})` : ''}`}>
+        <Field label={`Списание${fromAccount ? ` (${fromAccount.currency})` : ''}`}>
           <MoneyInput
             value={amount}
             onChange={setAmount}
@@ -168,6 +225,27 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
             dataQa="transfer-create-amount"
           />
         </Field>
+        <Field
+          label={`Зачисление${toAccount ? ` (${toAccount.currency})` : ''}${crossCurrency ? ' *' : ''}`}
+        >
+          <MoneyInput
+            value={toAmount}
+            onChange={setToAmount}
+            allowNegative={false}
+            placeholder={
+              officialHint != null && Number.isFinite(officialHint)
+                ? officialHint.toLocaleString('ru-RU', { maximumFractionDigits: 2 })
+                : '0'
+            }
+            dataQa="transfer-create-to-amount"
+          />
+        </Field>
+        <TransferSpreadLine
+          spread={spread}
+          currency={settings.baseCurrency}
+          className="text-sm font-medium"
+          dataQa="transfer-create-spread"
+        />
         <Field label="Комментарий">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" dataQa="transfer-create-note" />
         </Field>

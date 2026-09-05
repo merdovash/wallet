@@ -97,7 +97,13 @@ export function SnapshotsPanel() {
                       <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
                         {isTransfer && dayTransfers.length > 0
                           ? dayTransfers
-                              .map((t) => formatTransferLabel(t, accounts))
+                              .map((t) =>
+                                formatTransferLabel(t, accounts, {
+                                  settings,
+                                  date: snap.date,
+                                  rateBook,
+                                }),
+                              )
                               .join(' · ')
                           : `${snap.lines.length} ${
                               snap.lines.length === 1

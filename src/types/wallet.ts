@@ -76,8 +76,14 @@ export interface Transfer {
   date: string
   fromAccountId: string
   toAccountId: string
-  /** Amount in the source account currency. */
+  /** Amount leaving the source account, in the source currency. */
   amount: number
+  /**
+   * Amount arriving on the destination account, in the destination currency.
+   * Required for cross-currency transfers. If omitted, same-currency transfers
+   * use `amount`; legacy FX transfers use the official conversion of `amount`.
+   */
+  toAmount?: number
   note?: string
   /** Server timestamp; used so a fund created later does not rewrite older transfers. */
   createdAt?: string

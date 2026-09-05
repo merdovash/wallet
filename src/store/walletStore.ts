@@ -353,6 +353,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       fromAccountId: input.fromAccountId,
       toAccountId: input.toAccountId,
       amount: input.amount,
+      toAmount: input.toAmount,
       accounts: state.accounts,
       snapshots: state.snapshots,
       settings: state.settings,

@@ -11,6 +11,7 @@ import {
 } from '../engine/growthEngine'
 import { annualizePeriodReturn, MIN_ANNUALIZE_DAYS } from './monthlyReturns'
 import { isGrowthKind, normalizeAccountKind } from './accountKinds'
+import { transferLegBase, transferLegNative } from './transferAmounts'
 import type { Account, BalanceSnapshot, Transfer, WalletSettings } from '../types/wallet'
 
 export interface AccountPeriodReturn {
@@ -41,35 +42,13 @@ function accountCapitalFlows(
   settings: WalletSettings,
   rateBook?: RateBook,
 ): DatedCapitalFlow[] {
-  const map = new Map(accounts.map((a) => [a.id, a]))
   const byDate = new Map<string, number>()
   for (const transfer of transfers) {
     if (transfer.date.localeCompare(t0) <= 0) continue
     if (transfer.date.localeCompare(t1) > 0) continue
-    const from = map.get(transfer.fromAccountId)
-    const to = map.get(transfer.toAccountId)
-    if (transfer.fromAccountId === accountId && from) {
-      const amountBase = convertAmount(
-        transfer.amount,
-        from.currency,
-        settings.baseCurrency,
-        settings,
-        transfer.date,
-        rateBook,
-      )
-      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) - amountBase)
-    }
-    if (transfer.toAccountId === accountId && to) {
-      const amountBase = convertAmount(
-        transfer.amount,
-        to.currency,
-        settings.baseCurrency,
-        settings,
-        transfer.date,
-        rateBook,
-      )
-      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountBase)
-    }
+    const amountBase = transferLegBase(accountId, transfer, accounts, settings, rateBook)
+    if (amountBase === 0) continue
+    byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountBase)
   }
   return [...byDate.entries()]
     .filter(([, amount]) => amount !== 0)
@@ -86,29 +65,15 @@ function accountCapitalFlowsNative(
   settings: WalletSettings,
   rateBook?: RateBook,
 ): DatedCapitalFlow[] {
-  const map = new Map(accounts.map((a) => [a.id, a]))
-  const account = map.get(accountId)
+  const account = accounts.find((a) => a.id === accountId)
   if (!account) return []
   const byDate = new Map<string, number>()
   for (const transfer of transfers) {
     if (transfer.date.localeCompare(t0) <= 0) continue
     if (transfer.date.localeCompare(t1) > 0) continue
-    if (transfer.fromAccountId === accountId) {
-      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) - transfer.amount)
-    }
-    if (transfer.toAccountId === accountId) {
-      const from = map.get(transfer.fromAccountId)
-      const fromCurrency = from?.currency ?? account.currency
-      const amountNative = convertAmount(
-        transfer.amount,
-        fromCurrency,
-        account.currency,
-        settings,
-        transfer.date,
-        rateBook,
-      )
-      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountNative)
-    }
+    const amountNative = transferLegNative(accountId, transfer, accounts, settings, rateBook)
+    if (amountNative === 0) continue
+    byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountNative)
   }
   return [...byDate.entries()]
     .filter(([, amount]) => amount !== 0)

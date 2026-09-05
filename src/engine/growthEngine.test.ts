@@ -641,4 +641,84 @@ describe('growthEngine', () => {
     expect(series[1]?.total).toBe(0)
     expect(series[1]?.growth).toBe(0)
   })
+
+  it('books a same-currency fee on the investment source, not the destination', () => {
+    const accounts = [
+      account({ id: 'inv', name: 'Inv', kind: 'investment' }),
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'inv', amount: 1000 },
+          { accountId: 'op', amount: 0 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-15',
+        lines: [
+          { accountId: 'inv', amount: 0 },
+          { accountId: 'op', amount: 980 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-10',
+        fromAccountId: 'inv',
+        toAccountId: 'op',
+        amount: 1000,
+        toAmount: 980,
+      },
+    ]
+    expect(accountGrowth('inv', '2026-01-01', '2026-01-15', snapshots, transfers, accounts, settings)).toBe(
+      -20,
+    )
+    expect(accountGrowth('op', '2026-01-01', '2026-01-15', snapshots, transfers, accounts, settings)).toBe(0)
+    expect(periodGrowth(accounts, snapshots, settings, undefined, transfers)).toBe(-20)
+  })
+
+  it('books a same-currency fee on the destination when the source is operational', () => {
+    const accounts = [
+      account({ id: 'op', name: 'Op', kind: 'operational' }),
+      account({ id: 'inv', name: 'Inv', kind: 'investment' }),
+    ]
+    const snapshots: BalanceSnapshot[] = [
+      {
+        id: 's1',
+        date: '2026-01-01',
+        lines: [
+          { accountId: 'op', amount: 1000 },
+          { accountId: 'inv', amount: 0 },
+        ],
+      },
+      {
+        id: 's2',
+        date: '2026-01-15',
+        lines: [
+          { accountId: 'op', amount: 0 },
+          { accountId: 'inv', amount: 980 },
+        ],
+      },
+    ]
+    const transfers: Transfer[] = [
+      {
+        id: 't1',
+        date: '2026-01-10',
+        fromAccountId: 'op',
+        toAccountId: 'inv',
+        amount: 1000,
+        toAmount: 980,
+      },
+    ]
+    expect(accountGrowth('op', '2026-01-01', '2026-01-15', snapshots, transfers, accounts, settings)).toBe(0)
+    expect(accountGrowth('inv', '2026-01-01', '2026-01-15', snapshots, transfers, accounts, settings)).toBe(
+      -20,
+    )
+    expect(periodGrowth(accounts, snapshots, settings, undefined, transfers)).toBe(-20)
+  })
 })

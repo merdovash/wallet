@@ -1,9 +1,9 @@
 import {
   balanceOnDate,
-  convertAmount,
   snapshotDates,
   type RateBook,
 } from '../engine/growthEngine'
+import { transferReceivedAmount } from './transferAmounts'
 import type {
   Account,
   AccountFund,
@@ -35,17 +35,7 @@ function inboundAmountInAccountCurrency(
   if (transfer.toAccountId !== accountId) return 0
   const from = accounts.find((a) => a.id === transfer.fromAccountId)
   const to = accounts.find((a) => a.id === accountId)
-  if (!from || !to) return transfer.amount
-  if (from.currency === to.currency) return transfer.amount
-  const converted = convertAmount(
-    transfer.amount,
-    from.currency,
-    to.currency,
-    settings,
-    transfer.date,
-    rateBook,
-  )
-  return Number.isFinite(converted) ? converted : transfer.amount
+  return transferReceivedAmount(transfer, from, to, settings, rateBook)
 }
 
 function inOpenClosedInterval(date: string, t0: string | null, t1: string): boolean {

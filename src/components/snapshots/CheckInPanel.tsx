@@ -1,13 +1,15 @@
 ﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
-import { formatCurrency, todayIsoDate } from '../../lib/format'
+import { todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
-import { formatTransferLabel } from '../../lib/transferCheckIn'
+import { formatTransferLabel, suggestedReceiveAmount } from '../../lib/transferCheckIn'
+import { transferSpreadBase } from '../../lib/transferAmounts'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import type { Account, SnapshotLine, Transfer } from '../../types/wallet'
+import type { RateBook } from '../../engine/growthEngine'
+import type { Account, SnapshotLine, Transfer, WalletSettings } from '../../types/wallet'
 import { dataQa } from '../../lib/dataQa'
 import { Button, DateInput, Input, MoneyInput } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
@@ -16,6 +18,7 @@ import {
   emptyTransferDraft,
   type CheckInTransferDraft,
 } from './CheckInTransferPanel'
+import { TransferSpreadLine } from './TransferSpreadLine'
 
 interface CheckInPanelProps {
   open: boolean
@@ -56,6 +59,7 @@ type PendingTransfer = {
   fromAccountId: string
   toAccountId: string
   amount: string
+  toAmount: string
   note: string
 }
 
@@ -69,13 +73,18 @@ function amountToInput(amount: number): string {
 }
 
 /** Возвращает данные перевода, если черновик корректно заполнен, иначе null. */
-function parsePendingTransfer(t: PendingTransfer): {
+function parsePendingTransfer(
+  t: Pick<PendingTransfer, 'fromAccountId' | 'toAccountId' | 'amount' | 'toAmount' | 'note'>,
+  accounts?: Account[],
+): {
   fromAccountId: string
   toAccountId: string
   amount: number
+  toAmount?: number
   note?: string
 } | null {
   const value = parseMoneyInput(t.amount)
+  const received = parseMoneyInput(t.toAmount)
   if (
     !t.fromAccountId ||
     !t.toAccountId ||
@@ -85,10 +94,16 @@ function parsePendingTransfer(t: PendingTransfer): {
   ) {
     return null
   }
+  const from = accounts?.find((a) => a.id === t.fromAccountId)
+  const to = accounts?.find((a) => a.id === t.toAccountId)
+  const crossCurrency = Boolean(from && to && from.currency !== to.currency)
+  if (crossCurrency && (received == null || received <= 0)) return null
+  if (received != null && received <= 0) return null
   return {
     fromAccountId: t.fromAccountId,
     toAccountId: t.toAccountId,
     amount: value,
+    toAmount: received != null && received > 0 ? received : undefined,
     note: t.note.trim() || undefined,
   }
 }
@@ -231,17 +246,18 @@ export function CheckInPanel({
 
   const transferInputsForSuggest = useMemo(() => {
     const pending = pendingTransfers
-      .map((t) => parsePendingTransfer(t))
+      .map((t) => parsePendingTransfer(t, accounts))
       .filter((t): t is NonNullable<typeof t> => t != null)
     return [
       ...dateTransfers.map((t) => ({
         fromAccountId: t.fromAccountId,
         toAccountId: t.toAccountId,
         amount: t.amount,
+        toAmount: t.toAmount,
       })),
       ...pending,
     ]
-  }, [dateTransfers, pendingTransfers])
+  }, [dateTransfers, pendingTransfers, accounts])
 
   useEffect(() => {
     if (!scrollToTransferId) return
@@ -329,12 +345,20 @@ export function CheckInPanel({
         fromAccountId: t.fromAccountId,
         toAccountId: t.toAccountId,
         amount: t.amount,
+        toAmount: t.toAmount,
         note: t.note,
       },
     })
   }
 
   function openEditSaved(t: Transfer) {
+    const from = accounts.find((a) => a.id === t.fromAccountId)
+    const to = accounts.find((a) => a.id === t.toAccountId)
+    let toAmountInput = t.toAmount != null ? amountToInput(t.toAmount) : ''
+    if (!toAmountInput && from && to && from.currency !== to.currency) {
+      const suggested = suggestedReceiveAmount(t.amount, from, to, settings, t.date, rateBook)
+      if (suggested != null) toAmountInput = amountToInput(suggested)
+    }
     setTransferEditor({
       mode: 'saved',
       id: t.id,
@@ -342,6 +366,7 @@ export function CheckInPanel({
         fromAccountId: t.fromAccountId,
         toAccountId: t.toAccountId,
         amount: amountToInput(t.amount),
+        toAmount: toAmountInput,
         note: t.note ?? '',
       },
     })
@@ -349,7 +374,7 @@ export function CheckInPanel({
 
   async function handleTransferEditorSave(draft: CheckInTransferDraft) {
     if (!transferEditor || !date) return
-    const parsed = parsePendingTransfer({ key: 'x', ...draft })
+    const parsed = parsePendingTransfer(draft, accounts)
     if (parsed == null) return
 
     if (transferEditor.mode === 'create') {
@@ -433,7 +458,7 @@ export function CheckInPanel({
 
       // Pending transfers are saved together with the check-in.
       const transfersToSave = pendingTransfers
-        .map((t) => parsePendingTransfer(t))
+        .map((t) => parsePendingTransfer(t, accounts))
         .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
 
       if (typed.length === 0 && transfersToSave.length === 0) {
@@ -585,7 +610,9 @@ export function CheckInPanel({
             <p className="font-medium">Чек-ин создан переводом</p>
             <ul className="mt-1 list-inside list-disc space-y-0.5 text-amber-900/90">
               {dateTransfers.map((t) => (
-                <li key={t.id}>{formatTransferLabel(t, accounts)}</li>
+                <li key={t.id}>
+                  {formatTransferLabel(t, accounts, { settings, date, rateBook })}
+                </li>
               ))}
             </ul>
             <p className="mt-2 text-xs text-amber-800/80">
@@ -721,6 +748,9 @@ export function CheckInPanel({
         {!locked && (
           <TransfersSection
             accounts={activeAccounts}
+            settings={settings}
+            date={date}
+            rateBook={rateBook}
             savedTransfers={dateTransfers}
             pendingTransfers={pendingTransfers}
             onEditPending={openEditPending}
@@ -748,7 +778,10 @@ export function CheckInPanel({
           ? 'Новый перевод'
           : 'Редактировать перевод'
       }
+      date={date}
       accounts={activeAccounts}
+      settings={settings}
+      rateBook={rateBook}
       initial={transferEditor?.initial ?? null}
       onClose={() => setTransferEditor(null)}
       onSave={handleTransferEditorSave}
@@ -759,6 +792,9 @@ export function CheckInPanel({
 
 function TransfersSection({
   accounts,
+  settings,
+  date,
+  rateBook,
   savedTransfers,
   pendingTransfers,
   onEditPending,
@@ -767,6 +803,9 @@ function TransfersSection({
   onDeleteSaved,
 }: {
   accounts: Account[]
+  settings: WalletSettings
+  date: string
+  rateBook?: RateBook
   savedTransfers: Transfer[]
   pendingTransfers: PendingTransfer[]
   onEditPending: (t: PendingTransfer) => void
@@ -802,8 +841,20 @@ function TransfersSection({
               onClick={() => onEditSaved(t)}
             >
               <p className="font-medium text-slate-900 dark:text-slate-200">
-                {formatTransferLabel(t, accounts)}
+                {formatTransferLabel(t, accounts, { settings, date, rateBook })}
               </p>
+              <TransferSpreadLine
+                spread={transferSpreadBase(
+                  t,
+                  accountMap.get(t.fromAccountId),
+                  accountMap.get(t.toAccountId),
+                  settings,
+                  rateBook,
+                )}
+                currency={settings.baseCurrency}
+                className="mt-0.5 text-xs font-medium"
+                dataQa={`check-in-transfer-spread-${t.id}`}
+              />
               {t.note ? <p className="text-xs text-slate-500 dark:text-slate-400">{t.note}</p> : null}
               <p className="mt-0.5 text-[11px] text-blue-600 dark:text-blue-400">Изменить</p>
             </button>
@@ -833,12 +884,41 @@ function TransfersSection({
                 onClick={() => onEditPending(t)}
               >
                 <p className="font-medium text-slate-900 dark:text-slate-200">
-                  {from?.name ?? '—'} → {to?.name ?? '—'}
+                  {formatTransferLabel(
+                    {
+                      fromAccountId: t.fromAccountId,
+                      toAccountId: t.toAccountId,
+                      amount: parseMoneyInput(t.amount) ?? 0,
+                      toAmount: parseMoneyInput(t.toAmount) ?? undefined,
+                    },
+                    accounts,
+                    { settings, date, rateBook },
+                  )}
                 </p>
+                <TransferSpreadLine
+                  spread={
+                    parseMoneyInput(t.amount) != null
+                      ? transferSpreadBase(
+                          {
+                            date,
+                            fromAccountId: t.fromAccountId,
+                            toAccountId: t.toAccountId,
+                            amount: parseMoneyInput(t.amount) ?? 0,
+                            toAmount: parseMoneyInput(t.toAmount) ?? undefined,
+                          },
+                          from,
+                          to,
+                          settings,
+                          rateBook,
+                        )
+                      : 0
+                  }
+                  currency={settings.baseCurrency}
+                  className="mt-0.5 text-xs font-medium"
+                />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {formatCurrency(parseMoneyInput(t.amount) ?? 0, from?.currency ?? 'RUB')}
-                  {t.note ? ` · ${t.note}` : ''}
-                  {' · '}будет сохранён с чек-ином
+                  {t.note ? `${t.note} · ` : ''}
+                  будет сохранён с чек-ином
                 </p>
                 <p className="mt-0.5 text-[11px] text-blue-600 dark:text-blue-400">Изменить</p>
               </button>

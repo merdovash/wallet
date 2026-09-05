@@ -1,4 +1,5 @@
 import { toBase } from './currency'
+import { transferLegBase } from './transferAmounts'
 import {
   accountGrowth,
   accountGrowthBase,
@@ -132,35 +133,13 @@ function accountCapitalFlows(
   settings: WalletSettings,
   rateBook?: RateBook,
 ): DatedCapitalFlow[] {
-  const map = new Map(accounts.map((a) => [a.id, a]))
   const byDate = new Map<string, number>()
   for (const transfer of transfers) {
     if (transfer.date.localeCompare(t0) <= 0) continue
     if (transfer.date.localeCompare(t1) > 0) continue
-    const from = map.get(transfer.fromAccountId)
-    const to = map.get(transfer.toAccountId)
-    if (transfer.fromAccountId === accountId && from) {
-      const amountBase = convertAmount(
-        transfer.amount,
-        from.currency,
-        settings.baseCurrency,
-        settings,
-        transfer.date,
-        rateBook,
-      )
-      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) - amountBase)
-    }
-    if (transfer.toAccountId === accountId && to) {
-      const amountBase = convertAmount(
-        transfer.amount,
-        to.currency,
-        settings.baseCurrency,
-        settings,
-        transfer.date,
-        rateBook,
-      )
-      byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountBase)
-    }
+    const amountBase = transferLegBase(accountId, transfer, accounts, settings, rateBook)
+    if (amountBase === 0) continue
+    byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + amountBase)
   }
   return [...byDate.entries()]
     .filter(([, amount]) => amount !== 0)

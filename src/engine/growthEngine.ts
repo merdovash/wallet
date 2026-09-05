@@ -1,6 +1,12 @@
 import { toBase } from '../lib/currency'
 import { growthPortfolioAccounts, isGrowthPortfolioAccount } from '../lib/accountKinds'
 import { resolvePivotForDate } from '../lib/cbrRates'
+import {
+  transferBoundaryFlowBase,
+  transferCashLegNative,
+  transferLegBase,
+  transferLegNative,
+} from '../lib/transferAmounts'
 import type {
   Account,
   AccountPoint,
@@ -127,7 +133,7 @@ function accountClosureFlows(
         compareDate(lastDate, t0) > 0 &&
         compareDate(lastDate, t1) <= 0
       ) {
-        const explained = netTransfersIn(
+        const explained = netCashTransfersIn(
           account.id,
           prevDate,
           lastDate,
@@ -155,7 +161,7 @@ function accountClosureFlows(
     if (account.archived && balLast > 0 && lastIdx < dates.length - 1) {
       const firstAfter = dates[lastIdx + 1]!
       if (compareDate(firstAfter, t0) > 0 && compareDate(firstAfter, t1) <= 0) {
-        const explained = netTransfersIn(
+        const explained = netCashTransfersIn(
           account.id,
           lastDate,
           firstAfter,
@@ -297,6 +303,7 @@ export function convertAmount(
 /**
  * Net transfers into account over (t0, t1] in that account's currency.
  * Incoming positive, outgoing negative. Transfer.amount is in the source account currency.
+ * FX / fee residual stays on the source if it is a growth account, else on the destination.
  */
 export function netTransfersIn(
   accountId: string,
@@ -307,24 +314,30 @@ export function netTransfersIn(
   settings?: WalletSettings,
   rateBook?: RateBook,
 ): number {
-  const map = accountById(accounts)
   let net = 0
   for (const t of transfers) {
     if (compareDate(t.date, t0) <= 0) continue
     if (compareDate(t.date, t1) > 0) continue
-    if (t.fromAccountId === accountId) {
-      net -= t.amount
-      continue
-    }
-    if (t.toAccountId === accountId) {
-      const from = map.get(t.fromAccountId)
-      const to = map.get(t.toAccountId)
-      if (from && to && settings && from.currency !== to.currency) {
-        net += convertAmount(t.amount, from.currency, to.currency, settings, t.date, rateBook)
-      } else {
-        net += t.amount
-      }
-    }
+    net += transferLegNative(accountId, t, accounts, settings, rateBook)
+  }
+  return net
+}
+
+/** Actual cash in/out (source amount / dest receipt), for closure heuristics. */
+function netCashTransfersIn(
+  accountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings?: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  let net = 0
+  for (const t of transfers) {
+    if (compareDate(t.date, t0) <= 0) continue
+    if (compareDate(t.date, t1) > 0) continue
+    net += transferCashLegNative(accountId, t, accounts, settings, rateBook)
   }
   return net
 }
@@ -364,37 +377,13 @@ export function netTransfersInBase(
   settings: WalletSettings,
   rateBook?: RateBook,
 ): number {
-  const map = accountById(accounts)
-  const account = map.get(accountId)
+  const account = accountById(accounts).get(accountId)
   if (!account) return 0
   let net = 0
   for (const t of transfers) {
     if (compareDate(t.date, t0) <= 0) continue
     if (compareDate(t.date, t1) > 0) continue
-    if (t.fromAccountId === accountId) {
-      net -= convertAmount(
-        t.amount,
-        account.currency,
-        settings.baseCurrency,
-        settings,
-        t.date,
-        rateBook,
-      )
-      continue
-    }
-    if (t.toAccountId === accountId) {
-      const from = map.get(t.fromAccountId)
-      // Transfer.amount is always in the source account currency.
-      const fromCurrency = from?.currency ?? account.currency
-      net += convertAmount(
-        t.amount,
-        fromCurrency,
-        settings.baseCurrency,
-        settings,
-        t.date,
-        rateBook,
-      )
-    }
+    net += transferLegBase(accountId, t, accounts, settings, rateBook)
   }
   return net
 }
@@ -521,15 +510,7 @@ export function growthCapitalFlows(
     const toGrowth = isGrowthPortfolioAccount(to)
     if (fromGrowth === toGrowth) continue
 
-    const amountBase = convertAmount(
-      t.amount,
-      from.currency,
-      settings.baseCurrency,
-      settings,
-      t.date,
-      rateBook,
-    )
-    const signed = toGrowth && !fromGrowth ? amountBase : -amountBase
+    const signed = transferBoundaryFlowBase(t, from, to, settings, rateBook)
     byDate.set(t.date, (byDate.get(t.date) ?? 0) + signed)
   }
 
