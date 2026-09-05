@@ -24,6 +24,7 @@ const NAV_META: Record<AppSection, { label: string; Icon: NavIcon }> = {
   monthly: { label: 'Помесячно', Icon: MonthlyIcon },
   float: { label: 'Float', Icon: FloatIcon },
   cashback: { label: 'Кэшбек', Icon: CashbackIcon },
+  'index-comparison': { label: 'Сравнение с индексами', Icon: AnalyticsIcon },
   settings: { label: 'Настройки', Icon: SettingsIcon },
 }
 

@@ -377,6 +377,84 @@ export async function handleWalletApi(
       }
     }
 
+    if (pathname === '/api/wallet/indices' && method === 'POST') {
+      const body = await readJsonBody<{
+        name?: string
+        kind?: store.DbIndexKind
+        color?: string
+      }>(req)
+      if (!body.name?.trim() || !body.kind || !body.color) {
+        sendJson(res, 400, { error: 'Нужны name, kind и color' })
+        return true
+      }
+      if (body.kind !== 'amount' && body.kind !== 'annual_rate') {
+        sendJson(res, 400, { error: 'Некорректный тип индекса' })
+        return true
+      }
+      const index = await store.createMarketIndex(user.id, {
+        name: body.name,
+        kind: body.kind,
+        color: body.color,
+      })
+      sendJson(res, 201, { index })
+      return true
+    }
+
+    {
+      const params = matchPath(pathname, '/api/wallet/indices/:id')
+      if (params) {
+        if (method === 'PATCH') {
+          const body = await readJsonBody<{
+            name?: string
+            kind?: store.DbIndexKind
+            color?: string
+          }>(req)
+          if (body.kind !== undefined && body.kind !== 'amount' && body.kind !== 'annual_rate') {
+            sendJson(res, 400, { error: 'Некорректный тип индекса' })
+            return true
+          }
+          const index = await store.updateMarketIndex(user.id, params.id!, body)
+          if (!index) {
+            sendJson(res, 404, { error: 'Индекс не найден' })
+            return true
+          }
+          sendJson(res, 200, { index })
+          return true
+        }
+        if (method === 'DELETE') {
+          const ok = await store.deleteMarketIndex(user.id, params.id!)
+          if (!ok) {
+            sendJson(res, 404, { error: 'Индекс не найден' })
+            return true
+          }
+          sendJson(res, 200, { ok: true })
+          return true
+        }
+      }
+    }
+
+    if (pathname === '/api/wallet/index-values' && method === 'POST') {
+      const body = await readJsonBody<{
+        date?: string
+        values?: Array<{ indexId?: string; value?: number }>
+      }>(req)
+      if (!body.date || !Array.isArray(body.values) || body.values.length === 0) {
+        sendJson(res, 400, { error: 'Нужны date и values' })
+        return true
+      }
+      const parsed = body.values.map((item) => ({
+        indexId: String(item.indexId ?? ''),
+        value: Number(item.value),
+      }))
+      if (parsed.some((item) => !item.indexId || !Number.isFinite(item.value))) {
+        sendJson(res, 400, { error: 'Некорректные значения индексов' })
+        return true
+      }
+      const indexValues = await store.upsertIndexValues(user.id, body.date, parsed)
+      sendJson(res, 201, { indexValues })
+      return true
+    }
+
     if (pathname === '/api/wallet/import' && method === 'POST') {
       const body = await readJsonBody<{
         settings?: { baseCurrency?: string }

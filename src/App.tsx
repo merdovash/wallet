@@ -12,6 +12,7 @@ import { CurrenciesPanel } from './components/currencies/CurrenciesPanel'
 import { MonthlyPanel } from './components/monthly/MonthlyPanel'
 import { DailyGrowthPanel } from './components/daily/DailyGrowthPanel'
 import { CashbackPanel } from './components/cashback/CashbackPanel'
+import { IndexComparisonPanel } from './components/indices/IndexComparisonPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { PrimaryFab } from './components/ui/PrimaryFab'
 import { snapshotDates } from './engine/growthEngine'
@@ -219,6 +220,13 @@ function SectionContent({
         <>
           {analyticsCrumb}
           <CashbackPanel />
+        </>
+      )
+    case 'index-comparison':
+      return (
+        <>
+          {analyticsCrumb}
+          <IndexComparisonPanel />
         </>
       )
     case 'settings':

@@ -9,12 +9,13 @@ export type AppSection =
   | 'daily'
   | 'float'
   | 'cashback'
+  | 'index-comparison'
   | 'settings'
 
 /** Разделы внутри хаба «Аналитика». */
 export type AnalyticsSection = Extract<
   AppSection,
-  'daily' | 'types' | 'currencies' | 'monthly' | 'float' | 'cashback'
+  'daily' | 'types' | 'currencies' | 'monthly' | 'float' | 'cashback' | 'index-comparison'
 >
 
 export type SnapshotOrigin = 'manual' | 'transfer'
@@ -105,6 +106,23 @@ export interface AccountFund {
   /** When true, monthlyTarget is the mean of monthlyExpenses. */
   autoTarget?: boolean
   monthlyExpenses?: { yearMonth: string; amount: number }[]
+}
+
+/** amount = quoted level/points; annual_rate = annual percentage rate as decimal. */
+export type IndexKind = 'amount' | 'annual_rate'
+
+export interface MarketIndex {
+  id: string
+  name: string
+  kind: IndexKind
+  color: string
+}
+
+export interface IndexValue {
+  indexId: string
+  date: string
+  /** Raw level for amount indices; decimal fraction for annual rates. */
+  value: number
 }
 
 /** Manual rates: 1 unit of currency → how many units of baseCurrency. */

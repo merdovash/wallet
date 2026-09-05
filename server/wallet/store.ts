@@ -107,12 +107,29 @@ export interface DbAccountFund {
   monthlyExpenses: DbFundMonthlyExpense[]
 }
 
+export type DbIndexKind = 'amount' | 'annual_rate'
+
+export interface DbMarketIndex {
+  id: string
+  name: string
+  kind: DbIndexKind
+  color: string
+}
+
+export interface DbIndexValue {
+  indexId: string
+  date: string
+  value: number
+}
+
 export interface WalletBundle {
   settings: DbSettings
   accounts: DbAccount[]
   snapshots: DbSnapshot[]
   transfers: DbTransfer[]
   funds: DbAccountFund[]
+  indices: DbMarketIndex[]
+  indexValues: DbIndexValue[]
 }
 
 function num(value: unknown): number {
@@ -1017,15 +1034,171 @@ export async function deleteAccountFund(userId: string, id: string): Promise<boo
   return result.rowCount > 0
 }
 
+type MarketIndexRow = {
+  id: string
+  name: string
+  kind: string
+  color: string
+}
+
+function normalizeIndexKind(kind: unknown): DbIndexKind {
+  return kind === 'annual_rate' ? 'annual_rate' : 'amount'
+}
+
+function mapMarketIndex(row: MarketIndexRow): DbMarketIndex {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    kind: normalizeIndexKind(row.kind),
+    color: String(row.color),
+  }
+}
+
+export async function listMarketIndices(userId: string): Promise<DbMarketIndex[]> {
+  const pool = getPool()
+  const result = await pool.query<MarketIndexRow>(
+    `SELECT id, name, kind, color
+     FROM wallet_market_indices
+     WHERE user_id = $1
+     ORDER BY name ASC`,
+    [userId],
+  )
+  return result.rows.map(mapMarketIndex)
+}
+
+export async function createMarketIndex(
+  userId: string,
+  input: { name: string; kind: DbIndexKind; color: string },
+): Promise<DbMarketIndex> {
+  const name = input.name.trim()
+  if (!name) throw new Error('Нужно название индекса')
+  const pool = getPool()
+  const result = await pool.query<MarketIndexRow>(
+    `INSERT INTO wallet_market_indices (user_id, name, kind, color)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, name, kind, color`,
+    [userId, name, normalizeIndexKind(input.kind), input.color],
+  )
+  return mapMarketIndex(result.rows[0]!)
+}
+
+export async function updateMarketIndex(
+  userId: string,
+  id: string,
+  patch: Partial<{ name: string; kind: DbIndexKind; color: string }>,
+): Promise<DbMarketIndex | null> {
+  const pool = getPool()
+  const existing = await pool.query<MarketIndexRow>(
+    `SELECT id, name, kind, color FROM wallet_market_indices WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  const current = existing.rows[0]
+  if (!current) return null
+  const name = patch.name !== undefined ? patch.name.trim() : current.name
+  if (!name) throw new Error('Нужно название индекса')
+  const nextKind =
+    patch.kind !== undefined ? normalizeIndexKind(patch.kind) : normalizeIndexKind(current.kind)
+  if (nextKind !== normalizeIndexKind(current.kind)) {
+    const values = await pool.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM wallet_market_index_values
+       WHERE index_id = $1 AND user_id = $2`,
+      [id, userId],
+    )
+    if (num(values.rows[0]?.count ?? 0) > 0) {
+      throw new Error('Нельзя изменить тип индекса после фиксации значений')
+    }
+  }
+  const result = await pool.query<MarketIndexRow>(
+    `UPDATE wallet_market_indices
+     SET name = $3, kind = $4, color = $5, updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id, name, kind, color`,
+    [
+      id,
+      userId,
+      name,
+      nextKind,
+      patch.color ?? current.color,
+    ],
+  )
+  return mapMarketIndex(result.rows[0]!)
+}
+
+export async function deleteMarketIndex(userId: string, id: string): Promise<boolean> {
+  const pool = getPool()
+  const result = await pool.query(
+    `DELETE FROM wallet_market_indices WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  return result.rowCount > 0
+}
+
+export async function listIndexValues(userId: string): Promise<DbIndexValue[]> {
+  const pool = getPool()
+  const result = await pool.query<{
+    index_id: string
+    value_date: string
+    value: number | string
+  }>(
+    `SELECT index_id, value_date::text AS value_date, value
+     FROM wallet_market_index_values
+     WHERE user_id = $1
+     ORDER BY value_date ASC, index_id ASC`,
+    [userId],
+  )
+  return result.rows.map((row) => ({
+    indexId: String(row.index_id),
+    date: String(row.value_date).slice(0, 10),
+    value: num(row.value),
+  }))
+}
+
+export async function upsertIndexValues(
+  userId: string,
+  date: string,
+  values: Array<{ indexId: string; value: number }>,
+): Promise<DbIndexValue[]> {
+  const unique = new Map(values.map((item) => [item.indexId, item.value]))
+  if (unique.size === 0) throw new Error('Нужно указать хотя бы одно значение')
+  const pool = getPool()
+  await pool.transaction(async (query) => {
+    for (const [indexId, value] of unique) {
+      const owned = await query<{ kind: string }>(
+        `SELECT kind FROM wallet_market_indices WHERE id = $1 AND user_id = $2`,
+        [indexId, userId],
+      )
+      const row = owned.rows[0]
+      if (!row) throw new Error('Индекс не найден')
+      if (!Number.isFinite(value)) throw new Error('Некорректное значение индекса')
+      if (normalizeIndexKind(row.kind) === 'amount' && value <= 0) {
+        throw new Error('Значение суммового индекса должно быть больше 0')
+      }
+      if (normalizeIndexKind(row.kind) === 'annual_rate' && (value <= -1 || value > 10)) {
+        throw new Error('Годовая ставка вне допустимого диапазона')
+      }
+      await query(
+        `INSERT INTO wallet_market_index_values (index_id, user_id, value_date, value)
+         VALUES ($1, $2, $3::date, $4)
+         ON CONFLICT (index_id, value_date) DO UPDATE
+         SET value = EXCLUDED.value, updated_at = now()`,
+        [indexId, userId, date, value],
+      )
+    }
+  })
+  return listIndexValues(userId)
+}
+
 export async function loadWalletBundle(userId: string): Promise<WalletBundle> {
-  const [settings, accounts, snapshots, transfers, funds] = await Promise.all([
+  const [settings, accounts, snapshots, transfers, funds, indices, indexValues] = await Promise.all([
     ensureUserSettings(userId),
     listAccounts(userId),
     listSnapshots(userId),
     listTransfers(userId),
     listAccountFunds(userId),
+    listMarketIndices(userId),
+    listIndexValues(userId),
   ])
-  return { settings, accounts, snapshots, transfers, funds }
+  return { settings, accounts, snapshots, transfers, funds, indices, indexValues }
 }
 
 export async function isWalletEmpty(userId: string): Promise<boolean> {

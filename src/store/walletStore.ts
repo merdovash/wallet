@@ -4,6 +4,8 @@ import type {
   Account,
   AccountFund,
   BalanceSnapshot,
+  IndexValue,
+  MarketIndex,
   SnapshotLine,
   SnapshotOrigin,
   Transfer,
@@ -15,9 +17,11 @@ import type { RateBook } from '../engine/growthEngine'
 import {
   createAccountApi,
   createAccountFundApi,
+  createMarketIndexApi,
   createTransferApi,
   deleteAccountApi,
   deleteAccountFundApi,
+  deleteMarketIndexApi,
   deleteSnapshotApi,
   deleteTransferApi,
   fetchWallet,
@@ -26,8 +30,10 @@ import {
   reorderAccountsApi,
   updateAccountApi,
   updateAccountFundApi,
+  updateMarketIndexApi,
   updateSnapshotApi,
   upsertSnapshotApi,
+  upsertIndexValuesApi,
   withFallbackRates,
 } from '../lib/walletApi'
 
@@ -39,6 +45,8 @@ interface WalletState {
   snapshots: BalanceSnapshot[]
   transfers: Transfer[]
   funds: AccountFund[]
+  indices: MarketIndex[]
+  indexValues: IndexValue[]
   loaded: boolean
   loading: boolean
   error: string | null
@@ -104,6 +112,13 @@ interface WalletState {
     }>,
   ) => Promise<void>
   deleteAccountFund: (id: string) => Promise<void>
+  addMarketIndex: (input: Omit<MarketIndex, 'id'>) => Promise<string>
+  updateMarketIndex: (id: string, patch: Partial<Omit<MarketIndex, 'id'>>) => Promise<void>
+  deleteMarketIndex: (id: string) => Promise<void>
+  upsertIndexValues: (
+    date: string,
+    values: Array<{ indexId: string; value: number }>,
+  ) => Promise<void>
 }
 
 function nextColor(accounts: Account[]): string {
@@ -178,6 +193,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   snapshots: [],
   transfers: [],
   funds: [],
+  indices: [],
+  indexValues: [],
   loaded: false,
   loading: false,
   error: null,
@@ -189,6 +206,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       snapshots: [],
       transfers: [],
       funds: [],
+      indices: [],
+      indexValues: [],
       loaded: false,
       loading: false,
       error: null,
@@ -219,6 +238,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         snapshots: bundle.snapshots.map(normalizeSnapshot),
         transfers: bundle.transfers,
         funds: bundle.funds ?? [],
+        indices: bundle.indices ?? [],
+        indexValues: bundle.indexValues ?? [],
         loaded: true,
         loading: false,
       })
@@ -405,5 +426,31 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     set((state) => ({
       funds: state.funds.filter((f) => f.id !== id),
     }))
+  },
+
+  addMarketIndex: async (input) => {
+    const index = await createMarketIndexApi(input)
+    set((state) => ({ indices: [...state.indices, index] }))
+    return index.id
+  },
+
+  updateMarketIndex: async (id, patch) => {
+    const index = await updateMarketIndexApi(id, patch)
+    set((state) => ({
+      indices: state.indices.map((item) => (item.id === id ? index : item)),
+    }))
+  },
+
+  deleteMarketIndex: async (id) => {
+    await deleteMarketIndexApi(id)
+    set((state) => ({
+      indices: state.indices.filter((item) => item.id !== id),
+      indexValues: state.indexValues.filter((item) => item.indexId !== id),
+    }))
+  },
+
+  upsertIndexValues: async (date, values) => {
+    const indexValues = await upsertIndexValuesApi({ date, values })
+    set({ indexValues })
   },
 }))

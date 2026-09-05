@@ -40,6 +40,7 @@ import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { PageHeader } from '../ui/PageHeader'
 import { GrowthChart } from '../dashboard/GrowthChart'
 import { FundsPanel } from './FundsPanel'
+import { IndicesPanel } from '../indices/IndicesPanel'
 
 interface AccountsPanelProps {
   focusAccountId?: string | null
@@ -69,7 +70,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [linkedAccountId, setLinkedAccountId] = useState('')
   const [graceMonths, setGraceMonths] = useState('3')
   const [showArchived, setShowArchived] = useState(false)
-  const [pageTab, setPageTab] = useState<'registry' | 'funds'>('registry')
+  const [pageTab, setPageTab] = useState<'registry' | 'funds' | 'indices'>('registry')
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null)
@@ -312,6 +313,8 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
         description={
           pageTab === 'funds'
             ? 'Конверты внутри счёта: пополнение переводами по приоритету, рост — по доле.'
+            : pageTab === 'indices'
+              ? 'Ручные показатели рынков и ставок для сравнения с доходностью портфеля.'
             : 'Перетащите за ⋮⋮, чтобы изменить порядок. На телефоне смахните счёт влево для действий.'
         }
         actions={
@@ -344,6 +347,18 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
               >
                 Фонды
               </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 text-sm ${
+                  pageTab === 'indices'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-300'
+                }`}
+                onClick={() => setPageTab('indices')}
+                {...dataQa('accounts-tab-indices')}
+              >
+                Индексы
+              </button>
             </div>
             {pageTab === 'registry' ? (
               <Button type="button" variant="secondary" onClick={() => setShowArchived((v) => !v)} dataQa="accounts-show-archived">
@@ -356,6 +371,8 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
 
       {pageTab === 'funds' ? (
         <FundsPanel active={!formOpen} />
+      ) : pageTab === 'indices' ? (
+        <IndicesPanel active={!formOpen} />
       ) : visible.length === 0 ? (
         <EmptyState title="Счетов пока нет" description="Создайте первый счёт, чтобы фиксировать остатки." dataQa="accounts-empty" />
       ) : (

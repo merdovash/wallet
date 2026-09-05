@@ -44,6 +44,11 @@ export const ANALYTICS_NAV_ITEMS: {
     label: 'Кэшбек',
     description: 'Скидка от расходов через кэшбек-счета',
   },
+  {
+    id: 'index-comparison',
+    label: 'Сравнение с индексами',
+    description: 'Что было бы, если направлять капитал и пополнения в выбранный индекс',
+  },
 ]
 
 export const ANALYTICS_SECTION_IDS = new Set<AppSection>(

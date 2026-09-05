@@ -2,6 +2,8 @@ import type {
   Account,
   AccountFund,
   BalanceSnapshot,
+  IndexValue,
+  MarketIndex,
   SnapshotLine,
   SnapshotOrigin,
   Transfer,
@@ -15,6 +17,8 @@ export interface WalletBundle {
   snapshots: BalanceSnapshot[]
   transfers: Transfer[]
   funds?: AccountFund[]
+  indices?: MarketIndex[]
+  indexValues?: IndexValue[]
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -192,6 +196,42 @@ export async function updateAccountFundApi(
 
 export async function deleteAccountFundApi(id: string): Promise<void> {
   await api(`/api/wallet/funds/${id}`, { method: 'DELETE' })
+}
+
+export async function createMarketIndexApi(
+  input: Omit<MarketIndex, 'id'>,
+): Promise<MarketIndex> {
+  const body = await api<{ index: MarketIndex }>('/api/wallet/indices', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return body.index
+}
+
+export async function updateMarketIndexApi(
+  id: string,
+  patch: Partial<Omit<MarketIndex, 'id'>>,
+): Promise<MarketIndex> {
+  const body = await api<{ index: MarketIndex }>(`/api/wallet/indices/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return body.index
+}
+
+export async function deleteMarketIndexApi(id: string): Promise<void> {
+  await api(`/api/wallet/indices/${id}`, { method: 'DELETE' })
+}
+
+export async function upsertIndexValuesApi(input: {
+  date: string
+  values: Array<{ indexId: string; value: number }>
+}): Promise<IndexValue[]> {
+  const body = await api<{ indexValues: IndexValue[] }>('/api/wallet/index-values', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return body.indexValues
 }
 
 export async function importWalletApi(payload: {

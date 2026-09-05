@@ -14,7 +14,7 @@ export function AnalyticsPanel({ onOpenSection }: AnalyticsPanelProps) {
     <div className="mx-auto max-w-3xl space-y-4" {...dataQa('analytics-page')}>
       <PageHeader
         title="Аналитика"
-        description="Подробные отчёты по дням, типам счетов, валютам и кредитному float"
+        description="Подробные отчёты по доходности, счетам, валютам, индексам и кредитному float"
         actions={<PeriodFilter showRange />}
       />
 
