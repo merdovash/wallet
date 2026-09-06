@@ -3,6 +3,8 @@ import { balanceOnDate } from '../../engine/growthEngine'
 import { todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
+import { collectIndexValueEntries, indexValueToInput, parseIndexValueInput } from '../../lib/indexValueInput'
+import { isManualIndex } from '../../lib/marketIndex'
 import { formatTransferLabel, suggestedReceiveAmount } from '../../lib/transferCheckIn'
 import { transferSpreadBase } from '../../lib/transferAmounts'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
@@ -123,6 +125,9 @@ export function CheckInPanel({
   const deleteSnapshot = useWalletStore((s) => s.deleteSnapshot)
   const addTransfer = useWalletStore((s) => s.addTransfer)
   const deleteTransfer = useWalletStore((s) => s.deleteTransfer)
+  const indices = useWalletStore((s) => s.indices)
+  const indexValues = useWalletStore((s) => s.indexValues)
+  const upsertIndexValues = useWalletStore((s) => s.upsertIndexValues)
   const rateBook = useRatesStore((s) => s.byDate)
   const settings = useWalletStore((s) => s.settings)
 
@@ -154,6 +159,13 @@ export function CheckInPanel({
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [accounts],
   )
+  const updatableIndices = useMemo(
+    () =>
+      [...indices]
+        .filter((index) => isManualIndex(index.kind))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [indices],
+  )
 
   const [date, setDate] = useState(todayIsoDate)
   const [note, setNote] = useState('')
@@ -161,6 +173,7 @@ export function CheckInPanel({
   const [expense, setExpense] = useState('')
   /** Only manually typed values — empty means «без изменений». */
   const [amounts, setAmounts] = useState<Record<string, string>>({})
+  const [indexAmounts, setIndexAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
   const [transferEditor, setTransferEditor] = useState<TransferEditor | null>(null)
   const [scrollToTransferId, setScrollToTransferId] = useState<string | null>(null)
@@ -185,6 +198,7 @@ export function CheckInPanel({
       setExpense('')
       setIncomeManual(true)
       setAmounts({})
+      setIndexAmounts({})
       setPendingTransfers([])
     } else {
       setDate(prefill?.date ?? todayIsoDate())
@@ -193,6 +207,7 @@ export function CheckInPanel({
       setExpense('')
       setIncomeManual(false)
       setAmounts(prefill?.amounts ?? {})
+      setIndexAmounts({})
       setPendingTransfers(
         (prefill?.pendingTransfers ?? []).map((transfer, index) => ({
           key: `prefill-${index}-${transfer.fromAccountId}-${transfer.toAccountId}`,
@@ -204,6 +219,11 @@ export function CheckInPanel({
     setScrollToTransferId(null)
     setShowHelp(false)
   }, [open, editing, prefill]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on open
+
+  useEffect(() => {
+    if (!open) return
+    setIndexAmounts({})
+  }, [date, open])
 
   const dateTransfers = useMemo(
     () =>
@@ -416,8 +436,29 @@ export function CheckInPanel({
       alert('Укажите дату чек-ина')
       return
     }
+
+    const indexEntries = collectIndexValueEntries(updatableIndices, indexAmounts)
+    const invalidIndex = updatableIndices.find((index) => {
+      const raw = indexAmounts[index.id]?.trim()
+      if (!raw) return false
+      return parseIndexValueInput(raw, index.kind) == null
+    })
+    if (invalidIndex) {
+      alert(`Не удалось разобрать значение индекса «${invalidIndex.name}»`)
+      return
+    }
+
     if (formAccounts.length === 0) {
-      alert('Сначала добавьте хотя бы один счёт')
+      if (indexEntries.length === 0) {
+        alert('Сначала добавьте хотя бы один счёт')
+        return
+      }
+      try {
+        await upsertIndexValues(date, indexEntries)
+        onClose()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Не удалось сохранить значения индексов')
+      }
       return
     }
 
@@ -440,6 +481,7 @@ export function CheckInPanel({
           income: incomeValue,
           expense: expenseValue,
         })
+        if (indexEntries.length > 0) await upsertIndexValues(date, indexEntries)
         onClose()
         return
       }
@@ -460,6 +502,7 @@ export function CheckInPanel({
           lines: merged,
           origin: 'manual',
         })
+        if (indexEntries.length > 0) await upsertIndexValues(date, indexEntries)
         onClose()
         return
       }
@@ -469,10 +512,16 @@ export function CheckInPanel({
         .map((t) => parsePendingTransfer(t, accounts))
         .filter((t): t is NonNullable<ReturnType<typeof parsePendingTransfer>> => t != null)
 
-      if (typed.length === 0 && transfersToSave.length === 0) {
+      if (typed.length === 0 && transfersToSave.length === 0 && indexEntries.length === 0) {
         alert(
-          'Введите новый остаток хотя бы для одного счёта. Серый текст в поле — только подсказка, его нужно ввести вручную.',
+          'Введите новый остаток хотя бы для одного счёта, значение индекса или перевод. Серый текст в поле — только подсказка, его нужно ввести вручную.',
         )
+        return
+      }
+
+      if (typed.length === 0 && transfersToSave.length === 0) {
+        await upsertIndexValues(date, indexEntries)
+        onClose()
         return
       }
 
@@ -505,6 +554,7 @@ export function CheckInPanel({
         await addTransfer({ date, ...transfer })
       }
 
+      if (indexEntries.length > 0) await upsertIndexValues(date, indexEntries)
       onClose()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Не удалось сохранить чек-ин')
@@ -518,9 +568,16 @@ export function CheckInPanel({
     onClose()
   }
 
+  const hasIndexInput = updatableIndices.some(
+    (index) => (indexAmounts[index.id]?.trim() ?? '') !== '',
+  )
   const canSaveHint =
-    !locked && !editing && typedLines().length === 0 && pendingTransfers.length === 0
-      ? 'Введите остаток хотя бы для одного счёта'
+    !locked &&
+    !editing &&
+    typedLines().length === 0 &&
+    pendingTransfers.length === 0 &&
+    !hasIndexInput
+      ? 'Введите остаток хотя бы для одного счёта или значение индекса'
       : null
 
   function submitSave() {
@@ -598,6 +655,10 @@ export function CheckInPanel({
               доступный остаток лимита.
             </p>
             <p>Укажите переводы между счетами за день, чтобы они не считались приростом.</p>
+            <p>
+              Ручные индексы можно зафиксировать в той же форме: пустое поле не меняет
+              сохранённое значение.
+            </p>
           </div>
         )}
 
@@ -750,6 +811,59 @@ export function CheckInPanel({
                 </label>
               )
             })}
+          </div>
+        )}
+
+        {updatableIndices.length > 0 && (
+          <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Индексы</h3>
+            {updatableIndices.map((index) => {
+              const saved = indexValues.find(
+                (item) => item.indexId === index.id && item.date === date,
+              )
+              const previous = [...indexValues]
+                .filter((item) => item.indexId === index.id && item.date <= date)
+                .sort((a, b) => b.date.localeCompare(a.date))[0]
+              const unitLabel = index.kind === 'annual_rate' ? '% годовых' : index.currency
+              const placeholder = saved
+                ? indexValueToInput(saved.value, index.kind)
+                : previous
+                  ? indexValueToInput(previous.value, index.kind)
+                  : '0'
+              return (
+                <label
+                  key={index.id}
+                  className="block min-w-0 max-w-full rounded-lg px-1 py-1"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: index.color }}
+                    />
+                    <MoneyInput
+                      value={indexAmounts[index.id] ?? ''}
+                      onChange={(value) =>
+                        setIndexAmounts((prev) => ({ ...prev, [index.id]: value }))
+                      }
+                      allowNegative={index.kind === 'annual_rate'}
+                      placeholder={placeholder}
+                      className="w-32 shrink-0 sm:w-40"
+                      dataQa={`check-in-index-${index.id}`}
+                      {...focusKeyProps(`index-${index.id}`)}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {index.name}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block pl-5 text-[11px] leading-snug text-slate-400 dark:text-slate-500">
+                    {unitLabel}
+                  </span>
+                </label>
+              )
+            })}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Пустые поля не изменяются. Значение на уже существующую дату будет перезаписано.
+            </p>
           </div>
         )}
 

@@ -344,7 +344,9 @@ export function EmptyState({
       {...dataQaFromProps(dataQa)}
     >
       <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+      <p className="mt-1 whitespace-pre-line text-sm text-slate-500 dark:text-slate-400">
+        {description}
+      </p>
     </div>
   )
 }

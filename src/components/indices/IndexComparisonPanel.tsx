@@ -10,7 +10,9 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  appendComparisonDiagnosis,
   buildIndexComparison,
+  diagnoseIndexComparison,
   type IndexComparisonPoint,
 } from '../../lib/indexComparison'
 import {
@@ -314,6 +316,42 @@ export function IndexComparisonPanel() {
       })),
     [comparisons],
   )
+  const comparisonDiagnosis = useMemo(
+    () =>
+      selectedIndexIds.length > 0 && selectedAccountIds.length > 0
+        ? diagnoseIndexComparison({
+            indices,
+            indexValues,
+            accounts,
+            snapshots,
+            transfers,
+            settings,
+            rateBook,
+            range,
+            selectedIndexIds,
+            selectedAccountIds,
+          })
+        : null,
+    [
+      selectedIndexIds,
+      selectedAccountIds,
+      indices,
+      indexValues,
+      accounts,
+      snapshots,
+      transfers,
+      settings,
+      rateBook,
+      range,
+    ],
+  )
+  const indicesWithoutValues = useMemo(
+    () =>
+      indices
+        .filter((index) => latestIndexValue(index.id, indices, indexValues) == null)
+        .map((index) => index.name),
+    [indices, indexValues],
+  )
 
   function toggleAccount(accountId: string) {
     setSelectedAccountIds((current) =>
@@ -465,7 +503,11 @@ export function IndexComparisonPanel() {
       {available.length === 0 ? (
         <EmptyState
           title="Нет данных индексов"
-          description="Добавьте индекс и зафиксируйте минимум одно значение на вкладке «Счета → Индексы»."
+          description={
+            indicesWithoutValues.length > 0
+              ? `Добавьте индекс и зафиксируйте минимум одно значение на вкладке «Счета → Индексы».\n\nИндексы: ${indicesWithoutValues.join(', ')} — нет зафиксированных значений`
+              : 'Добавьте индекс и зафиксируйте минимум одно значение на вкладке «Счета → Индексы».'
+          }
           dataQa="index-comparison-empty"
         />
       ) : selectedIndexIds.length === 0 ? (
@@ -519,13 +561,27 @@ export function IndexComparisonPanel() {
       {available.length === 0 || selectedIndexIds.length === 0 || selectedAccountIds.length === 0 ? null : commonWindowMissing ? (
         <EmptyState
           title="Нет общего периода"
-          description="У выбранных индексов нет общего отрезка с доступными данными в текущем диапазоне."
+          description={
+            comparisonDiagnosis
+              ? appendComparisonDiagnosis(
+                  'У выбранных индексов нет общего отрезка с доступными данными в текущем диапазоне.',
+                  comparisonDiagnosis,
+                )
+              : 'У выбранных индексов нет общего отрезка с доступными данными в текущем диапазоне.'
+          }
           dataQa="index-comparison-no-overlap"
         />
       ) : rows.length < 2 ? (
         <EmptyState
           title="Недостаточно общих дат"
-          description="Для сравнения нужны хотя бы два чек-ина после первого значения выбранных индексов."
+          description={
+            comparisonDiagnosis
+              ? appendComparisonDiagnosis(
+                  'Для сравнения нужны хотя бы два чек-ина после первого значения выбранных индексов.',
+                  comparisonDiagnosis,
+                )
+              : 'Для сравнения нужны хотя бы два чек-ина после первого значения выбранных индексов.'
+          }
           dataQa="index-comparison-no-range"
         />
       ) : (

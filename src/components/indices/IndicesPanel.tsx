@@ -31,11 +31,12 @@ import {
   resolveIndexCurrency,
 } from '../../lib/marketIndex'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
+import { indexValueToInput } from '../../lib/indexValueInput'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useWalletStore } from '../../store/walletStore'
 import { useTheme } from '../../lib/useTheme'
-import { Button, Card, DateInput, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
+import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { StackPanel } from '../ui/StackPanel'
 
@@ -43,11 +44,6 @@ const KIND_LABELS: Record<IndexKind, string> = {
   amount: 'Суммовой (уровень / пункты)',
   annual_rate: 'Процентный (ставка годовых)',
   derived_rate: 'Расчетный процент (база +/- п.п.)',
-}
-
-function toInput(value: number, kind: IndexKind): string {
-  const shown = kind === 'annual_rate' || kind === 'derived_rate' ? ratePctToPoints(value) : value
-  return formatMoneyInput(String(shown).replace('.', ','))
 }
 
 function formatValue(value: number, kind: IndexKind): string {
@@ -73,10 +69,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
   const [baseIndexId, setBaseIndexId] = useState('')
   const [rateSpreadPoints, setRateSpreadPoints] = useState('')
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
-  const [updateOpen, setUpdateOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
-  const [date, setDate] = useState(todayIsoDate)
-  const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   const ordered = useMemo(
@@ -85,10 +78,6 @@ export function IndicesPanel({ active }: { active: boolean }) {
   )
   const rateBaseOptions = useMemo(
     () => ordered.filter((index) => isRateIndex(index.kind)),
-    [ordered],
-  )
-  const updatable = useMemo(
-    () => ordered.filter((index) => isManualIndex(index.kind)),
     [ordered],
   )
   const latestById = useMemo(() => {
@@ -111,24 +100,13 @@ export function IndicesPanel({ active }: { active: boolean }) {
     setFormOpen(true)
   }
 
-  function openUpdate() {
-    setDate(todayIsoDate())
-    setAmounts({})
-    setUpdateOpen(true)
-  }
-
-  useRegisterPrimaryAction(active && !formOpen && !updateOpen, {
-    id: indices.length > 0 ? 'indices-update' : 'indices-add',
-    label: indices.length > 0 ? 'Обновить индексы' : 'Добавить индекс',
-    title: indices.length > 0 ? 'Зафиксировать значения индексов' : 'Новый индекс',
+  useRegisterPrimaryAction(active && !formOpen && !detailId, {
+    id: 'indices-add',
+    label: 'Добавить индекс',
+    title: 'Новый индекс',
     scope: 'section',
-    onClick: indices.length > 0 ? openUpdate : openCreate,
+    onClick: openCreate,
   })
-
-  useEffect(() => {
-    if (!updateOpen) return
-    setAmounts({})
-  }, [date, updateOpen])
 
   async function saveDefinition() {
     const trimmed = name.trim()
@@ -156,35 +134,11 @@ export function IndicesPanel({ active }: { active: boolean }) {
     }
   }
 
-  async function saveValues() {
-    if (saving) return
-    const values = updatable.flatMap((index) => {
-      const raw = amounts[index.id]?.trim()
-      if (!raw) return []
-      const parsed = parseMoneyInput(raw)
-      if (parsed == null) return []
-      return [{ indexId: index.id, value: index.kind === 'annual_rate' ? pointsToRatePct(parsed) : parsed }]
-    })
-    if (!date || values.length === 0) {
-      alert('Укажите дату и хотя бы одно значение')
-      return
-    }
-    setSaving(true)
-    try {
-      await upsertIndexValues(date, values)
-      setUpdateOpen(false)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Не удалось обновить индексы')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <div className="space-y-3" {...dataQa('indices-registry')}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Ручные уровни и ставки используются в сравнительном отчёте. Расчетные проценты считаются от базового индекса.
+          Ручные уровни и ставки фиксируются в чек-ине. Расчетные проценты считаются от базового индекса.
         </p>
         <Button type="button" variant="secondary" onClick={openCreate} dataQa="index-add">
           Добавить индекс
@@ -320,49 +274,6 @@ export function IndicesPanel({ active }: { active: boolean }) {
           upsertIndexValues={upsertIndexValues}
         />
       ) : null}
-
-      <EntityEditPanel
-        open={updateOpen}
-        title="Обновить индексы"
-        onClose={() => setUpdateOpen(false)}
-        onSave={saveValues}
-        saveActionId="indices-update-save"
-        saveDisabled={saving}
-        dataQa="indices-update-panel"
-      >
-        <div className="space-y-4">
-          <Field label="Дата">
-            <DateInput value={date} onChange={setDate} dataQa="indices-update-date" />
-          </Field>
-          {updatable.length === 0 ? (
-            <EmptyState
-              title="Нет ручных индексов для обновления"
-              description="Расчетные проценты считаются от базовых индексов и не вводятся вручную."
-              dataQa="indices-update-empty"
-            />
-          ) : null}
-          {updatable.map((index) => {
-            const saved = indexValues.find((item) => item.indexId === index.id && item.date === date)
-            const previous = [...indexValues]
-              .filter((item) => item.indexId === index.id && item.date <= date)
-              .sort((a, b) => b.date.localeCompare(a.date))[0]
-            return (
-              <Field key={index.id} label={`${index.name}, ${index.kind === 'annual_rate' ? '% годовых' : index.currency}`}>
-                <MoneyInput
-                  value={amounts[index.id] ?? ''}
-                  onChange={(value) => setAmounts((current) => ({ ...current, [index.id]: value }))}
-                  allowNegative={index.kind === 'annual_rate'}
-                  placeholder={saved ? toInput(saved.value, index.kind) : previous ? toInput(previous.value, index.kind) : '0'}
-                  dataQa={`index-value-${index.id}`}
-                />
-              </Field>
-            )
-          })}
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Пустые поля не изменяются. Значение на уже существующую дату будет перезаписано.
-          </p>
-        </div>
-      </EntityEditPanel>
     </div>
   )
 }
@@ -443,7 +354,7 @@ function IndexDetailPanel({
     )
     setTodayValue(
       index.kind !== 'derived_rate' && directLatestForToday
-        ? toInput(directLatestForToday.value, index.kind)
+        ? indexValueToInput(directLatestForToday.value, index.kind)
         : '',
     )
     setColor(index.color)
@@ -613,7 +524,7 @@ function IndexDetailPanel({
                       value={todayValue}
                       onChange={setTodayValue}
                       allowNegative={kind === 'annual_rate'}
-                      placeholder={directLatestForToday ? toInput(directLatestForToday.value, kind) : '0'}
+                      placeholder={directLatestForToday ? indexValueToInput(directLatestForToday.value, kind) : '0'}
                       dataQa="index-detail-today-value"
                       {...focusKeyProps('today-value')}
                     />

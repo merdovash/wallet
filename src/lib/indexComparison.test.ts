@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildIndexComparison } from './indexComparison'
+import {
+  appendComparisonDiagnosis,
+  buildIndexComparison,
+  diagnoseIndexComparison,
+  formatComparisonDiagnosis,
+} from './indexComparison'
 import type {
   Account,
   BalanceSnapshot,
@@ -237,5 +242,51 @@ describe('buildIndexComparison', () => {
 
     expect(points.at(-1)?.indexTotal).toBeCloseTo(111, 8)
     expect(points.at(-1)?.indexGrowth).toBeCloseTo(11, 8)
+  })
+
+  it('diagnoses wallets and indices missing comparison data', () => {
+    const index: MarketIndex = {
+      id: 'imoex',
+      name: 'Мосбиржа',
+      kind: 'amount',
+      currency: 'RUB',
+      color: '#2563eb',
+    }
+    const emptyWallet: Account = {
+      ...fund,
+      id: 'empty',
+      name: 'Пустой',
+      sortOrder: 3,
+    }
+    const diagnosis = diagnoseIndexComparison({
+      indices: [index],
+      indexValues: [{ indexId: index.id, date: '2025-01-01', value: 10 }],
+      accounts: [fund, emptyWallet],
+      snapshots: [snapshot('s1', '2025-01-01', 100)],
+      transfers: [],
+      settings,
+      selectedIndexIds: [index.id],
+      selectedAccountIds: [fund.id, emptyWallet.id],
+    })
+
+    expect(diagnosis.walletIssues).toEqual([
+      {
+        id: emptyWallet.id,
+        name: 'Пустой',
+        reason: 'нет чек-инов с балансом',
+      },
+    ])
+    expect(diagnosis.indexIssues).toEqual([
+      {
+        id: index.id,
+        name: 'Мосбиржа',
+        reason: 'недостаточно общих дат (нужно минимум два чек-ина)',
+      },
+    ])
+    expect(formatComparisonDiagnosis(diagnosis)).toContain('Мосбиржа')
+    expect(formatComparisonDiagnosis(diagnosis)).toContain('Пустой')
+    expect(
+      appendComparisonDiagnosis('Недостаточно данных.', diagnosis),
+    ).toContain('Недостаточно данных.')
   })
 })

@@ -463,3 +463,210 @@ function buildRateTotals(
   }
   return result
 }
+
+export interface ComparisonDataIssue {
+  id: string
+  name: string
+  reason: string
+}
+
+export interface IndexComparisonDiagnosis {
+  indexIssues: ComparisonDataIssue[]
+  walletIssues: ComparisonDataIssue[]
+}
+
+type IndexComparisonBaseInput = {
+  indices: MarketIndex[]
+  indexValues: IndexValue[]
+  accounts: Account[]
+  snapshots: BalanceSnapshot[]
+  transfers: Transfer[]
+  settings: WalletSettings
+  rateBook?: RateBook
+  range?: { startDate: string; endDate: string } | null
+  selectedAccountIds?: string[]
+}
+
+function inComparisonRange(
+  date: string,
+  range?: { startDate: string; endDate: string } | null,
+): boolean {
+  if (range?.startDate && date < range.startDate) return false
+  if (range?.endDate && date > range.endDate) return false
+  return true
+}
+
+function walletHasCheckInInRange(
+  accountId: string,
+  snapshots: BalanceSnapshot[],
+  range?: { startDate: string; endDate: string } | null,
+): boolean {
+  for (const date of snapshotDates(snapshots)) {
+    if (!inComparisonRange(date, range)) continue
+    if (balanceOnDate(accountId, date, snapshots) != null) return true
+  }
+  return false
+}
+
+function diagnoseSingleIndexIssue(
+  index: MarketIndex,
+  input: IndexComparisonBaseInput,
+  selectedAccounts: Account[],
+): string | null {
+  const observations = resolveIndexValues(index.id, input.indices, input.indexValues)
+  if (observations.length === 0) return 'нет зафиксированных значений'
+
+  const indexCurrency = resolveIndexCurrency(index, input.indices)
+  const selectedIdSet = new Set(selectedAccounts.map((account) => account.id))
+  const actualAll = buildSelectedTotalSeries(
+    selectedAccounts,
+    selectedIdSet,
+    input.accounts,
+    input.snapshots,
+    input.settings,
+    input.rateBook,
+    input.transfers,
+  )
+  if (actualAll.length === 0) return null
+
+  const basePerIndexUnit = (date: string): number =>
+    toBase(
+      1,
+      indexCurrency,
+      input.settings.baseCurrency,
+      input.settings.exchangeRates,
+      resolvePivotForDate(date, input.rateBook ?? {}),
+    )
+
+  const inPeriod = actualAll.filter((point) => inComparisonRange(point.date, input.range))
+  if (inPeriod.length === 0) return null
+
+  const withIndex = inPeriod.filter((point) => valueOnDate(observations, point.date) != null)
+  if (withIndex.length === 0) {
+    const hasIndexInPeriod = observations.some((item) => inComparisonRange(item.date, input.range))
+    if (!hasIndexInPeriod) return 'нет данных в выбранном периоде'
+    return 'нет пересечения с датами чек-инов'
+  }
+
+  const withFx = withIndex.filter((point) => {
+    const fx = basePerIndexUnit(point.date)
+    return Number.isFinite(fx) && fx > 0
+  })
+  if (withFx.length === 0) return `нет курса ${indexCurrency}`
+  if (withFx.length < 2) return 'недостаточно общих дат (нужно минимум два чек-ина)'
+  return null
+}
+
+export function diagnoseIndexComparison(input: {
+  indices: MarketIndex[]
+  indexValues: IndexValue[]
+  accounts: Account[]
+  snapshots: BalanceSnapshot[]
+  transfers: Transfer[]
+  settings: WalletSettings
+  rateBook?: RateBook
+  range?: { startDate: string; endDate: string } | null
+  selectedIndexIds: string[]
+  selectedAccountIds: string[]
+}): IndexComparisonDiagnosis {
+  const indexIssues: ComparisonDataIssue[] = []
+  const walletIssues: ComparisonDataIssue[] = []
+  const selectedAccounts = input.accounts.filter((account) =>
+    input.selectedAccountIds.includes(account.id),
+  )
+  const selectedIndices = input.indices.filter((index) =>
+    input.selectedIndexIds.includes(index.id),
+  )
+  const comparisonInput: IndexComparisonBaseInput = {
+    indices: input.indices,
+    indexValues: input.indexValues,
+    accounts: input.accounts,
+    snapshots: input.snapshots,
+    transfers: input.transfers,
+    settings: input.settings,
+    rateBook: input.rateBook,
+    range: input.range,
+    selectedAccountIds: input.selectedAccountIds,
+  }
+
+  if (snapshotDates(input.snapshots).length === 0) {
+    for (const account of selectedAccounts) {
+      walletIssues.push({ id: account.id, name: account.name, reason: 'нет чек-инов' })
+    }
+  } else {
+    for (const account of selectedAccounts) {
+      if (!walletHasCheckInInRange(account.id, input.snapshots, input.range)) {
+        walletIssues.push({
+          id: account.id,
+          name: account.name,
+          reason: input.range
+            ? 'нет баланса в выбранном периоде'
+            : 'нет чек-инов с балансом',
+        })
+      }
+    }
+  }
+
+  const perIndex = selectedIndices.map((index) => ({
+    index,
+    points: buildIndexComparison({
+      ...comparisonInput,
+      index,
+    }),
+    reason: diagnoseSingleIndexIssue(index, comparisonInput, selectedAccounts),
+  }))
+
+  for (const { index, points, reason } of perIndex) {
+    if (reason) {
+      indexIssues.push({ id: index.id, name: index.name, reason })
+      continue
+    }
+    if (points.length < 2) {
+      indexIssues.push({
+        id: index.id,
+        name: index.name,
+        reason: 'недостаточно общих дат (нужно минимум два чек-ина)',
+      })
+    }
+  }
+
+  if (selectedIndices.length > 1) {
+    const withData = perIndex.filter((item) => item.points.length > 0)
+    if (withData.length === perIndex.length) {
+      const sharedStart = [...withData.map((item) => item.points[0]!.date)].sort().at(-1)!
+      const sharedEnd = [...withData.map((item) => item.points.at(-1)!.date)].sort()[0]!
+      if (sharedStart > sharedEnd) {
+        for (const { index, points } of withData) {
+          if (indexIssues.some((issue) => issue.id === index.id)) continue
+          indexIssues.push({
+            id: index.id,
+            name: index.name,
+            reason: `данные ${points[0]!.date}–${points.at(-1)!.date}, нет общего периода с другими индексами`,
+          })
+        }
+      }
+    }
+  }
+
+  return { indexIssues, walletIssues }
+}
+
+export function formatComparisonDiagnosis(diagnosis: IndexComparisonDiagnosis): string {
+  const lines: string[] = []
+  if (diagnosis.indexIssues.length > 0) {
+    lines.push(
+      `Индексы: ${diagnosis.indexIssues.map((item) => `${item.name} — ${item.reason}`).join('; ')}`,
+    )
+  }
+  if (diagnosis.walletIssues.length > 0) {
+    lines.push(
+      `Кошельки: ${diagnosis.walletIssues.map((item) => `${item.name} — ${item.reason}`).join('; ')}`,
+    )
+  }
+  return lines.join('\n')
+}
+
+export function appendComparisonDiagnosis(base: string, diagnosis: IndexComparisonDiagnosis): string {
+  const details = formatComparisonDiagnosis(diagnosis)
+  return details ? `${base}\n\n${details}` : base
+}
