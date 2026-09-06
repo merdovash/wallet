@@ -30,6 +30,14 @@ const operational: Account = {
   kind: 'operational',
 }
 
+const deposit: Account = {
+  ...fund,
+  id: 'deposit',
+  name: 'Вклад',
+  sortOrder: 2,
+  kind: 'deposit',
+}
+
 function snapshot(id: string, date: string, fundAmount: number, cashAmount = 0): BalanceSnapshot {
   return {
     id,
@@ -109,6 +117,60 @@ describe('buildIndexComparison', () => {
 
     expect(points.at(-1)?.indexTotal).toBeCloseTo(110, 8)
     expect(points.at(-1)?.indexGrowth).toBeCloseTo(10, 8)
+  })
+
+  it('limits the comparison to the selected wallets', () => {
+    const index: MarketIndex = {
+      id: 'imoex',
+      name: 'Мосбиржа',
+      kind: 'amount',
+      currency: 'RUB',
+      color: '#2563eb',
+    }
+    const points = buildIndexComparison({
+      index,
+      indices: [index],
+      indexValues: [
+        { indexId: index.id, date: '2025-01-01', value: 10 },
+        { indexId: index.id, date: '2025-02-01', value: 11 },
+      ],
+      accounts: [fund, deposit],
+      snapshots: [
+        {
+          id: 's1',
+          date: '2025-01-01',
+          origin: 'manual',
+          income: 0,
+          expense: 0,
+          lines: [
+            { accountId: fund.id, amount: 100 },
+            { accountId: deposit.id, amount: 50 },
+          ],
+        },
+        {
+          id: 's2',
+          date: '2025-02-01',
+          origin: 'manual',
+          income: 0,
+          expense: 0,
+          lines: [
+            { accountId: fund.id, amount: 110 },
+            { accountId: deposit.id, amount: 60 },
+          ],
+        },
+      ],
+      transfers: [],
+      settings,
+      selectedAccountIds: [fund.id],
+    })
+
+    expect(points.at(-1)).toMatchObject({
+      actualTotal: 110,
+      indexTotal: 110,
+      actualGrowth: 10,
+      indexGrowth: 10,
+      difference: 0,
+    })
   })
 
   it('includes the exchange-rate effect for an index quoted in foreign currency', () => {

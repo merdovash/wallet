@@ -1,11 +1,18 @@
 import {
-  buildTotalSeries,
-  growthCapitalFlows,
+  balanceOnDate,
+  buildBalanceIndex,
+  effectiveBalanceOnDate,
+  lastSnapshotDateForAccount,
+  netWorthAmount,
+  snapshotDates,
+  type BalanceIndex,
   type RateBook,
 } from '../engine/growthEngine'
-import { resolveIndexCurrency, resolveIndexValues } from './marketIndex'
+import { isGrowthPortfolioAccount } from './accountKinds'
 import { resolvePivotForDate } from './cbrRates'
 import { toBase } from './currency'
+import { resolveIndexCurrency, resolveIndexValues } from './marketIndex'
+import { transferCashLegNative, transferLegBase } from './transferAmounts'
 import type {
   Account,
   BalanceSnapshot,
@@ -26,6 +33,10 @@ export interface IndexComparisonPoint {
 
 const DAY_MS = 86_400_000
 
+function compareDate(a: string, b: string): number {
+  return a.localeCompare(b)
+}
+
 function daysBetween(start: string, end: string): number {
   const a = Date.parse(`${start}T00:00:00Z`)
   const b = Date.parse(`${end}T00:00:00Z`)
@@ -42,6 +53,237 @@ function valueOnDate(values: IndexValue[], date: string): number | null {
   return current
 }
 
+function selectedTotalOnDate(
+  date: string,
+  selectedAccounts: Account[],
+  snapshots: BalanceSnapshot[],
+  settings: WalletSettings,
+  balanceIndex: BalanceIndex,
+  rateBook?: RateBook,
+): number {
+  const pivot = resolvePivotForDate(date, rateBook ?? {})
+  let total = 0
+  for (const account of selectedAccounts) {
+    const balance = effectiveBalanceOnDate(account.id, date, snapshots, balanceIndex, account)
+    if (balance == null) continue
+    total += toBase(
+      netWorthAmount(account, balance),
+      account.currency,
+      settings.baseCurrency,
+      settings.exchangeRates,
+      pivot,
+    )
+  }
+  return total
+}
+
+function selectedNetCashTransfersIn(
+  accountId: string,
+  t0: string,
+  t1: string,
+  transfers: Transfer[],
+  accounts: Account[],
+  settings?: WalletSettings,
+  rateBook?: RateBook,
+): number {
+  let net = 0
+  for (const transfer of transfers) {
+    if (compareDate(transfer.date, t0) <= 0) continue
+    if (compareDate(transfer.date, t1) > 0) continue
+    net += transferCashLegNative(accountId, transfer, accounts, settings, rateBook)
+  }
+  return net
+}
+
+function selectedCapitalFlows(
+  t0: string,
+  t1: string,
+  selectedAccounts: Account[],
+  selectedIdSet: Set<string>,
+  snapshots: BalanceSnapshot[],
+  transfers: Transfer[],
+  allAccounts: Account[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): Array<{ date: string; amount: number }> {
+  const byDate = new Map<string, number>()
+
+  for (const transfer of transfers) {
+    if (compareDate(transfer.date, t0) <= 0) continue
+    if (compareDate(transfer.date, t1) > 0) continue
+    const fromSelected = selectedIdSet.has(transfer.fromAccountId)
+    const toSelected = selectedIdSet.has(transfer.toAccountId)
+    if (fromSelected === toSelected) continue
+    const boundaryAccountId = toSelected ? transfer.toAccountId : transfer.fromAccountId
+    const signed = transferLegBase(boundaryAccountId, transfer, allAccounts, settings, rateBook)
+    byDate.set(transfer.date, (byDate.get(transfer.date) ?? 0) + signed)
+  }
+
+  const orderedSnapshots = [...snapshots].sort(
+    (a, b) => compareDate(a.date, b.date) || a.id.localeCompare(b.id),
+  )
+  const dates = snapshotDates(snapshots)
+
+  for (const account of selectedAccounts) {
+    if (effectiveBalanceOnDate(account.id, t0, snapshots, undefined, account) == null) {
+      const first = orderedSnapshots.find(
+        (snapshot) =>
+          compareDate(snapshot.date, t0) > 0 &&
+          compareDate(snapshot.date, t1) <= 0 &&
+          snapshot.lines.some((line) => line.accountId === account.id),
+      )
+      const opening = first?.lines.find((line) => line.accountId === account.id)?.amount
+      if (first && opening != null && opening !== 0) {
+        const explainedByTransfer = transfers.some(
+          (transfer) =>
+            transfer.toAccountId === account.id &&
+            compareDate(transfer.date, t0) > 0 &&
+            compareDate(transfer.date, first.date) <= 0,
+        )
+        if (!explainedByTransfer) {
+          const openingBase = toBase(
+            netWorthAmount(account, opening),
+            account.currency,
+            settings.baseCurrency,
+            settings.exchangeRates,
+            resolvePivotForDate(first.date, rateBook ?? {}),
+          )
+          byDate.set(first.date, (byDate.get(first.date) ?? 0) + openingBase)
+        }
+      }
+    }
+
+    const lastDate = lastSnapshotDateForAccount(account.id, snapshots)
+    if (!lastDate) continue
+    const lastIdx = dates.indexOf(lastDate)
+    if (lastIdx < 0) continue
+
+    const balanceLast = balanceOnDate(account.id, lastDate, snapshots) ?? 0
+
+    if (balanceLast === 0 && lastIdx > 0) {
+      const prevDate = dates[lastIdx - 1]!
+      const balancePrev =
+        effectiveBalanceOnDate(account.id, prevDate, snapshots, undefined, account) ?? 0
+      if (balancePrev > 0 && compareDate(lastDate, t0) > 0 && compareDate(lastDate, t1) <= 0) {
+        const explained = selectedNetCashTransfersIn(
+          account.id,
+          prevDate,
+          lastDate,
+          transfers,
+          allAccounts,
+          settings,
+          rateBook,
+        )
+        const drop = balancePrev - balanceLast
+        const unexplained = Math.max(0, drop + Math.min(0, explained))
+        if (unexplained > 0) {
+          const amountBase = toBase(
+            unexplained,
+            account.currency,
+            settings.baseCurrency,
+            settings.exchangeRates,
+            resolvePivotForDate(lastDate, rateBook ?? {}),
+          )
+          byDate.set(lastDate, (byDate.get(lastDate) ?? 0) - amountBase)
+        }
+      }
+    }
+
+    if (account.archived && balanceLast > 0 && lastIdx < dates.length - 1) {
+      const firstAfter = dates[lastIdx + 1]!
+      if (compareDate(firstAfter, t0) > 0 && compareDate(firstAfter, t1) <= 0) {
+        const explained = selectedNetCashTransfersIn(
+          account.id,
+          lastDate,
+          firstAfter,
+          transfers,
+          allAccounts,
+          settings,
+          rateBook,
+        )
+        const unexplained = Math.max(0, balanceLast + Math.min(0, explained))
+        if (unexplained > 0) {
+          const amountBase = toBase(
+            unexplained,
+            account.currency,
+            settings.baseCurrency,
+            settings.exchangeRates,
+            resolvePivotForDate(firstAfter, rateBook ?? {}),
+          )
+          byDate.set(firstAfter, (byDate.get(firstAfter) ?? 0) - amountBase)
+        }
+      }
+    }
+  }
+
+  return [...byDate.entries()]
+    .filter(([, amount]) => amount !== 0)
+    .sort(([a], [b]) => compareDate(a, b))
+    .map(([date, amount]) => ({ date, amount }))
+}
+
+function buildSelectedTotalSeries(
+  selectedAccounts: Account[],
+  selectedIdSet: Set<string>,
+  allAccounts: Account[],
+  snapshots: BalanceSnapshot[],
+  settings: WalletSettings,
+  rateBook?: RateBook,
+  transfers: Transfer[] = [],
+): Array<{ date: string; total: number; growth: number }> {
+  const dates = snapshotDates(snapshots)
+  if (dates.length === 0 || selectedAccounts.length === 0) return []
+
+  const balanceIndex = buildBalanceIndex(snapshots)
+  const cashflowByDate = new Map<string, number>()
+  for (const flow of selectedCapitalFlows(
+    dates[0]!,
+    dates[dates.length - 1]!,
+    selectedAccounts,
+    selectedIdSet,
+    snapshots,
+    transfers,
+    allAccounts,
+    settings,
+    rateBook,
+  )) {
+    cashflowByDate.set(flow.date, (cashflowByDate.get(flow.date) ?? 0) + flow.amount)
+  }
+
+  const points: Array<{ date: string; total: number; growth: number }> = []
+  let baseline: number | null = null
+  let cumulativeFlow = 0
+  let previousDate: string | null = null
+  for (const date of dates) {
+    const total = selectedTotalOnDate(
+      date,
+      selectedAccounts,
+      snapshots,
+      settings,
+      balanceIndex,
+      rateBook,
+    )
+    if (baseline == null || previousDate == null) {
+      baseline = total
+      previousDate = date
+      points.push({ date, total, growth: 0 })
+      continue
+    }
+    for (const [flowDate, amount] of cashflowByDate) {
+      if (compareDate(flowDate, previousDate) > 0 && compareDate(flowDate, date) <= 0) {
+        cumulativeFlow += amount
+      }
+    }
+    points.push({
+      date,
+      total,
+      growth: total - baseline - cumulativeFlow,
+    })
+    previousDate = date
+  }
+  return points
+}
+
 export function buildIndexComparison(input: {
   index: MarketIndex
   indices: MarketIndex[]
@@ -52,12 +294,23 @@ export function buildIndexComparison(input: {
   settings: WalletSettings
   rateBook?: RateBook
   range?: { startDate: string; endDate: string } | null
+  selectedAccountIds?: string[]
 }): IndexComparisonPoint[] {
   const observations = resolveIndexValues(input.index.id, input.indices, input.indexValues)
   if (observations.length === 0) return []
-  const indexCurrency = resolveIndexCurrency(input.index, input.indices)
 
-  const actualAll = buildTotalSeries(
+  const indexCurrency = resolveIndexCurrency(input.index, input.indices)
+  const selectedAccountIds =
+    input.selectedAccountIds && input.selectedAccountIds.length > 0
+      ? input.selectedAccountIds
+      : input.accounts.filter(isGrowthPortfolioAccount).map((account) => account.id)
+  const selectedIdSet = new Set(selectedAccountIds)
+  const selectedAccounts = input.accounts.filter((account) => selectedIdSet.has(account.id))
+  if (selectedAccounts.length === 0) return []
+
+  const actualAll = buildSelectedTotalSeries(
+    selectedAccounts,
+    selectedIdSet,
     input.accounts,
     input.snapshots,
     input.settings,
@@ -86,9 +339,11 @@ export function buildIndexComparison(input: {
 
   const start = actual[0]!
   const end = actual[actual.length - 1]!
-  const flows = growthCapitalFlows(
+  const flows = selectedCapitalFlows(
     start.date,
     end.date,
+    selectedAccounts,
+    selectedIdSet,
     input.snapshots,
     input.transfers,
     input.accounts,
@@ -105,7 +360,7 @@ export function buildIndexComparison(input: {
       ? buildRateTotals(
           start.date,
           start.total,
-          actual.map((p) => p.date),
+          actual.map((point) => point.date),
           observations,
           flowByDate,
           basePerIndexUnit,
@@ -113,7 +368,7 @@ export function buildIndexComparison(input: {
       : buildAmountTotals(
           start.date,
           start.total,
-          actual.map((p) => p.date),
+          actual.map((point) => point.date),
           observations,
           flows,
           basePerIndexUnit,
