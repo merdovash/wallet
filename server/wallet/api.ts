@@ -382,13 +382,15 @@ export async function handleWalletApi(
         name?: string
         kind?: store.DbIndexKind
         currency?: string
+        baseIndexId?: string | null
+        rateSpreadPct?: number | null
         color?: string
       }>(req)
       if (!body.name?.trim() || !body.kind || !body.currency || !body.color) {
         sendJson(res, 400, { error: 'Нужны name, kind, currency и color' })
         return true
       }
-      if (body.kind !== 'amount' && body.kind !== 'annual_rate') {
+      if (body.kind !== 'amount' && body.kind !== 'annual_rate' && body.kind !== 'derived_rate') {
         sendJson(res, 400, { error: 'Некорректный тип индекса' })
         return true
       }
@@ -400,6 +402,11 @@ export async function handleWalletApi(
         name: body.name,
         kind: body.kind,
         currency: body.currency,
+        baseIndexId: body.baseIndexId,
+        rateSpreadPct:
+          body.rateSpreadPct == null || body.rateSpreadPct === undefined
+            ? undefined
+            : Number(body.rateSpreadPct),
         color: body.color,
       })
       sendJson(res, 201, { index })
@@ -414,9 +421,16 @@ export async function handleWalletApi(
             name?: string
             kind?: store.DbIndexKind
             currency?: string
+            baseIndexId?: string | null
+            rateSpreadPct?: number | null
             color?: string
           }>(req)
-          if (body.kind !== undefined && body.kind !== 'amount' && body.kind !== 'annual_rate') {
+          if (
+            body.kind !== undefined &&
+            body.kind !== 'amount' &&
+            body.kind !== 'annual_rate' &&
+            body.kind !== 'derived_rate'
+          ) {
             sendJson(res, 400, { error: 'Некорректный тип индекса' })
             return true
           }
@@ -424,7 +438,13 @@ export async function handleWalletApi(
             sendJson(res, 400, { error: 'Некорректная валюта индекса' })
             return true
           }
-          const index = await store.updateMarketIndex(user.id, params.id!, body)
+          const index = await store.updateMarketIndex(user.id, params.id!, {
+            ...body,
+            rateSpreadPct:
+              body.rateSpreadPct == null || body.rateSpreadPct === undefined
+                ? body.rateSpreadPct
+                : Number(body.rateSpreadPct),
+          })
           if (!index) {
             sendJson(res, 404, { error: 'Индекс не найден' })
             return true

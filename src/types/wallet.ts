@@ -108,8 +108,8 @@ export interface AccountFund {
   monthlyExpenses?: { yearMonth: string; amount: number }[]
 }
 
-/** amount = quoted level/points; annual_rate = annual percentage rate as decimal. */
-export type IndexKind = 'amount' | 'annual_rate'
+/** amount = quoted level/points; annual_rate = annual percentage rate; derived_rate = base rate plus spread. */
+export type IndexKind = 'amount' | 'annual_rate' | 'derived_rate'
 
 export interface MarketIndex {
   id: string
@@ -117,6 +117,10 @@ export interface MarketIndex {
   kind: IndexKind
   /** Currency in which the level or rate-bearing balance is quoted. */
   currency: string
+  /** For derived_rate: source percent index to inherit the dated rate series from. */
+  baseIndexId?: string | null
+  /** For derived_rate: added spread as decimal fraction (0.01 = +1 p.p.). */
+  rateSpreadPct?: number | null
   color: string
 }
 

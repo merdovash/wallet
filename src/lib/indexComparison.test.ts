@@ -55,6 +55,7 @@ describe('buildIndexComparison', () => {
     }
     const points = buildIndexComparison({
       index,
+      indices: [index],
       indexValues: [
         { indexId: index.id, date: '2025-01-01', value: 10 },
         { indexId: index.id, date: '2025-02-01', value: 20 },
@@ -95,6 +96,7 @@ describe('buildIndexComparison', () => {
     }
     const points = buildIndexComparison({
       index,
+      indices: [index],
       indexValues: [{ indexId: index.id, date: '2025-01-01', value: 0.1 }],
       accounts: [fund],
       snapshots: [
@@ -119,6 +121,7 @@ describe('buildIndexComparison', () => {
     }
     const points = buildIndexComparison({
       index,
+      indices: [index],
       indexValues: [
         { indexId: index.id, date: '2025-01-01', value: 10 },
         { indexId: index.id, date: '2025-02-01', value: 10 },
@@ -138,5 +141,39 @@ describe('buildIndexComparison', () => {
 
     expect(points.at(-1)?.indexTotal).toBeCloseTo(125, 8)
     expect(points.at(-1)?.indexGrowth).toBeCloseTo(25, 8)
+  })
+
+  it('derives a rate series from the base index plus spread', () => {
+    const baseIndex: MarketIndex = {
+      id: 'base',
+      name: 'Ключевая ставка',
+      kind: 'annual_rate',
+      currency: 'RUB',
+      color: '#2563eb',
+    }
+    const derivedIndex: MarketIndex = {
+      id: 'derived',
+      name: 'Депозит +1',
+      kind: 'derived_rate',
+      currency: 'RUB',
+      baseIndexId: baseIndex.id,
+      rateSpreadPct: 0.01,
+      color: '#059669',
+    }
+    const points = buildIndexComparison({
+      index: derivedIndex,
+      indices: [baseIndex, derivedIndex],
+      indexValues: [{ indexId: baseIndex.id, date: '2025-01-01', value: 0.1 }],
+      accounts: [fund],
+      snapshots: [
+        snapshot('s1', '2025-01-01', 100),
+        snapshot('s2', '2026-01-01', 100),
+      ],
+      transfers: [],
+      settings,
+    })
+
+    expect(points.at(-1)?.indexTotal).toBeCloseTo(111, 8)
+    expect(points.at(-1)?.indexGrowth).toBeCloseTo(11, 8)
   })
 })

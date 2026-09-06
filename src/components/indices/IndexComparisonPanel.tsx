@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { buildIndexComparison } from '../../lib/indexComparison'
+import { latestIndexValue, resolveIndexCurrency } from '../../lib/marketIndex'
 import { paddedDataDomain } from '../../lib/chartAxisDomain'
 import { chartActiveDot, chartDot, chartTooltipStyles, getChartTheme } from '../../lib/chartTheme'
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
@@ -38,7 +39,7 @@ export function IndexComparisonPanel() {
   const available = useMemo(
     () =>
       indices
-        .filter((index) => indexValues.some((value) => value.indexId === index.id))
+        .filter((index) => latestIndexValue(index.id, indices, indexValues) != null)
         .sort((a, b) => a.name.localeCompare(b.name)),
     [indices, indexValues],
   )
@@ -55,6 +56,7 @@ export function IndexComparisonPanel() {
       selected
         ? buildIndexComparison({
             index: selected,
+            indices,
             indexValues,
             accounts,
             snapshots,
@@ -64,7 +66,7 @@ export function IndexComparisonPanel() {
             range,
           })
         : [],
-    [selected, indexValues, accounts, snapshots, transfers, settings, rateBook, range],
+    [selected, indices, indexValues, accounts, snapshots, transfers, settings, rateBook, range],
   )
   const rows = useMemo(
     () => points.map((point) => ({ ...point, label: formatShortDate(point.date) })),
@@ -94,7 +96,9 @@ export function IndexComparisonPanel() {
               <span>Индекс</span>
               <Select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className="w-full sm:w-auto sm:min-w-56" dataQa="index-comparison-select">
                 {available.map((index) => (
-                  <option key={index.id} value={index.id}>{index.name} · {index.currency}</option>
+                  <option key={index.id} value={index.id}>
+                    {index.name} · {resolveIndexCurrency(index, indices)}
+                  </option>
                 ))}
               </Select>
             </label>

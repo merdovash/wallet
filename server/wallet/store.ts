@@ -107,13 +107,15 @@ export interface DbAccountFund {
   monthlyExpenses: DbFundMonthlyExpense[]
 }
 
-export type DbIndexKind = 'amount' | 'annual_rate'
+export type DbIndexKind = 'amount' | 'annual_rate' | 'derived_rate'
 
 export interface DbMarketIndex {
   id: string
   name: string
   kind: DbIndexKind
   currency: string
+  baseIndexId?: string | null
+  rateSpreadPct?: number | null
   color: string
 }
 
@@ -1040,27 +1042,33 @@ type MarketIndexRow = {
   name: string
   kind: string
   currency: string
+  base_index_id: string | null
+  rate_spread_pct: number | string | null
   color: string
 }
 
 function normalizeIndexKind(kind: unknown): DbIndexKind {
+  if (kind === 'derived_rate') return 'derived_rate'
   return kind === 'annual_rate' ? 'annual_rate' : 'amount'
 }
 
 function mapMarketIndex(row: MarketIndexRow): DbMarketIndex {
-  return {
+  const mapped: DbMarketIndex = {
     id: String(row.id),
     name: String(row.name),
     kind: normalizeIndexKind(row.kind),
     currency: String(row.currency),
     color: String(row.color),
   }
+  if (row.base_index_id) mapped.baseIndexId = String(row.base_index_id)
+  if (row.rate_spread_pct != null) mapped.rateSpreadPct = num(row.rate_spread_pct)
+  return mapped
 }
 
 export async function listMarketIndices(userId: string): Promise<DbMarketIndex[]> {
   const pool = getPool()
   const result = await pool.query<MarketIndexRow>(
-    `SELECT id, name, kind, currency, color
+    `SELECT id, name, kind, currency, base_index_id, rate_spread_pct, color
      FROM wallet_market_indices
      WHERE user_id = $1
      ORDER BY name ASC`,
@@ -1069,18 +1077,90 @@ export async function listMarketIndices(userId: string): Promise<DbMarketIndex[]
   return result.rows.map(mapMarketIndex)
 }
 
+async function loadMarketIndexRow(
+  userId: string,
+  indexId: string,
+): Promise<MarketIndexRow | null> {
+  const pool = getPool()
+  const result = await pool.query<MarketIndexRow>(
+    `SELECT id, name, kind, currency, base_index_id, rate_spread_pct, color
+     FROM wallet_market_indices
+     WHERE id = $1 AND user_id = $2`,
+    [indexId, userId],
+  )
+  return result.rows[0] ?? null
+}
+
+async function assertDerivedBase(
+  userId: string,
+  currentId: string | null,
+  baseIndexId: string | null | undefined,
+): Promise<{ currency: string }> {
+  if (!baseIndexId) throw new Error('Для расчетного процента нужен базовый индекс')
+  if (currentId && baseIndexId === currentId) {
+    throw new Error('Базовый индекс не может ссылаться сам на себя')
+  }
+  const base = await loadMarketIndexRow(userId, baseIndexId)
+  if (!base) throw new Error('Базовый индекс не найден')
+  if (normalizeIndexKind(base.kind) === 'amount') {
+    throw new Error('Базовый индекс должен быть процентным')
+  }
+
+  if (currentId) {
+    let nextBaseId: string | null = base.base_index_id
+    const seen = new Set<string>([currentId, baseIndexId])
+    while (nextBaseId) {
+      if (nextBaseId === currentId) {
+        throw new Error('Нельзя зациклить расчетные индексы')
+      }
+      if (seen.has(nextBaseId)) break
+      seen.add(nextBaseId)
+      const nextBase = await loadMarketIndexRow(userId, nextBaseId)
+      nextBaseId = nextBase?.base_index_id ?? null
+    }
+  }
+
+  return { currency: String(base.currency) }
+}
+
 export async function createMarketIndex(
   userId: string,
-  input: { name: string; kind: DbIndexKind; currency: string; color: string },
+  input: {
+    name: string
+    kind: DbIndexKind
+    currency: string
+    baseIndexId?: string | null
+    rateSpreadPct?: number | null
+    color: string
+  },
 ): Promise<DbMarketIndex> {
   const name = input.name.trim()
   if (!name) throw new Error('Нужно название индекса')
+  let currency = input.currency.toUpperCase()
+  let baseIndexId: string | null = null
+  let rateSpreadPct: number | null = null
+  if (normalizeIndexKind(input.kind) === 'derived_rate') {
+    const base = await assertDerivedBase(userId, null, input.baseIndexId)
+    currency = base.currency
+    baseIndexId = input.baseIndexId ?? null
+    rateSpreadPct = input.rateSpreadPct == null ? 0 : num(input.rateSpreadPct)
+    if (!Number.isFinite(rateSpreadPct)) throw new Error('Некорректная дельта ставки')
+  }
   const pool = getPool()
   const result = await pool.query<MarketIndexRow>(
-    `INSERT INTO wallet_market_indices (user_id, name, kind, currency, color)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, name, kind, currency, color`,
-    [userId, name, normalizeIndexKind(input.kind), input.currency.toUpperCase(), input.color],
+    `INSERT INTO wallet_market_indices
+       (user_id, name, kind, currency, base_index_id, rate_spread_pct, color)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, name, kind, currency, base_index_id, rate_spread_pct, color`,
+    [
+      userId,
+      name,
+      normalizeIndexKind(input.kind),
+      currency,
+      baseIndexId,
+      rateSpreadPct,
+      input.color,
+    ],
   )
   return mapMarketIndex(result.rows[0]!)
 }
@@ -1088,44 +1168,72 @@ export async function createMarketIndex(
 export async function updateMarketIndex(
   userId: string,
   id: string,
-  patch: Partial<{ name: string; kind: DbIndexKind; currency: string; color: string }>,
+  patch: Partial<{
+    name: string
+    kind: DbIndexKind
+    currency: string
+    baseIndexId: string | null
+    rateSpreadPct: number | null
+    color: string
+  }>,
 ): Promise<DbMarketIndex | null> {
   const pool = getPool()
-  const existing = await pool.query<MarketIndexRow>(
-    `SELECT id, name, kind, currency, color FROM wallet_market_indices WHERE id = $1 AND user_id = $2`,
-    [id, userId],
-  )
-  const current = existing.rows[0]
+  const current = await loadMarketIndexRow(userId, id)
   if (!current) return null
   const name = patch.name !== undefined ? patch.name.trim() : current.name
   if (!name) throw new Error('Нужно название индекса')
   const nextKind =
     patch.kind !== undefined ? normalizeIndexKind(patch.kind) : normalizeIndexKind(current.kind)
-  const nextCurrency = patch.currency?.toUpperCase() ?? current.currency
-  if (
-    nextKind !== normalizeIndexKind(current.kind) ||
-    nextCurrency !== current.currency
-  ) {
+  if (nextKind !== normalizeIndexKind(current.kind)) {
     const values = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count FROM wallet_market_index_values
        WHERE index_id = $1 AND user_id = $2`,
       [id, userId],
     )
     if (num(values.rows[0]?.count ?? 0) > 0) {
-      throw new Error('Нельзя изменить тип или валюту индекса после фиксации значений')
+      throw new Error('Нельзя изменить тип индекса после фиксации значений')
     }
+  }
+  let nextCurrency = patch.currency?.toUpperCase() ?? current.currency
+  let nextBaseIndexId =
+    nextKind === 'derived_rate'
+      ? patch.baseIndexId !== undefined
+        ? patch.baseIndexId
+        : current.base_index_id
+      : null
+  let nextRateSpreadPct =
+    nextKind === 'derived_rate'
+      ? patch.rateSpreadPct !== undefined
+        ? patch.rateSpreadPct
+        : (current.rate_spread_pct == null ? 0 : num(current.rate_spread_pct))
+      : null
+  if (nextKind === 'derived_rate') {
+    const base = await assertDerivedBase(userId, id, nextBaseIndexId)
+    nextCurrency = base.currency
+    if (nextRateSpreadPct == null || !Number.isFinite(Number(nextRateSpreadPct))) {
+      throw new Error('Некорректная дельта ставки')
+    }
+    nextRateSpreadPct = num(nextRateSpreadPct)
   }
   const result = await pool.query<MarketIndexRow>(
     `UPDATE wallet_market_indices
-     SET name = $3, kind = $4, currency = $5, color = $6, updated_at = now()
+     SET name = $3,
+         kind = $4,
+         currency = $5,
+         base_index_id = $6,
+         rate_spread_pct = $7,
+         color = $8,
+         updated_at = now()
      WHERE id = $1 AND user_id = $2
-     RETURNING id, name, kind, currency, color`,
+     RETURNING id, name, kind, currency, base_index_id, rate_spread_pct, color`,
     [
       id,
       userId,
       name,
       nextKind,
       nextCurrency,
+      nextBaseIndexId,
+      nextRateSpreadPct,
       patch.color ?? current.color,
     ],
   )
@@ -1177,6 +1285,9 @@ export async function upsertIndexValues(
       )
       const row = owned.rows[0]
       if (!row) throw new Error('Индекс не найден')
+      if (normalizeIndexKind(row.kind) === 'derived_rate') {
+        throw new Error('Расчетные проценты обновляются от базового индекса')
+      }
       if (!Number.isFinite(value)) throw new Error('Некорректное значение индекса')
       if (normalizeIndexKind(row.kind) === 'amount' && value <= 0) {
         throw new Error('Значение суммового индекса должно быть больше 0')

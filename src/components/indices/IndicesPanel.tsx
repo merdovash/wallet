@@ -3,6 +3,14 @@ import { ACCOUNT_COLORS, type IndexKind, type MarketIndex } from '../../types/wa
 import { dataQa } from '../../lib/dataQa'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { formatIsoToRu, todayIsoDate } from '../../lib/format'
+import {
+  formatIndexKindLabel,
+  formatRateSpreadPoints,
+  isManualIndex,
+  isRateIndex,
+  latestIndexValue,
+  resolveIndexCurrency,
+} from '../../lib/marketIndex'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useWalletStore } from '../../store/walletStore'
@@ -12,15 +20,16 @@ import { EntityEditPanel } from '../ui/EntityEditPanel'
 const KIND_LABELS: Record<IndexKind, string> = {
   amount: 'Суммовой (уровень / пункты)',
   annual_rate: 'Процентный (ставка годовых)',
+  derived_rate: 'Расчетный процент (база +/- п.п.)',
 }
 
 function toInput(value: number, kind: IndexKind): string {
-  const shown = kind === 'annual_rate' ? value * 100 : value
+  const shown = kind === 'annual_rate' || kind === 'derived_rate' ? value * 100 : value
   return formatMoneyInput(String(shown).replace('.', ','))
 }
 
 function formatValue(value: number, kind: IndexKind): string {
-  if (kind === 'annual_rate') {
+  if (kind === 'annual_rate' || kind === 'derived_rate') {
     return `${(value * 100).toLocaleString('ru-RU', { maximumFractionDigits: 4 })} %`
   }
   return value.toLocaleString('ru-RU', { maximumFractionDigits: 4 })
@@ -40,6 +49,8 @@ export function IndicesPanel({ active }: { active: boolean }) {
   const [name, setName] = useState('')
   const [kind, setKind] = useState<IndexKind>('amount')
   const [currency, setCurrency] = useState(settings.baseCurrency)
+  const [baseIndexId, setBaseIndexId] = useState('')
+  const [rateSpreadPoints, setRateSpreadPoints] = useState('')
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
   const [updateOpen, setUpdateOpen] = useState(false)
   const [date, setDate] = useState(todayIsoDate)
@@ -50,20 +61,31 @@ export function IndicesPanel({ active }: { active: boolean }) {
     () => [...indices].sort((a, b) => a.name.localeCompare(b.name)),
     [indices],
   )
+  const rateBaseOptions = useMemo(
+    () => ordered.filter((index) => isRateIndex(index.kind) && index.id !== editing?.id),
+    [ordered, editing],
+  )
+  const updatable = useMemo(
+    () => ordered.filter((index) => isManualIndex(index.kind)),
+    [ordered],
+  )
   const latestById = useMemo(() => {
     const map = new Map<string, { date: string; value: number }>()
-    for (const value of indexValues) {
-      const current = map.get(value.indexId)
-      if (!current || value.date >= current.date) map.set(value.indexId, value)
+    for (const index of ordered) {
+      const latest = latestIndexValue(index.id, ordered, indexValues)
+      if (latest) map.set(index.id, { date: latest.date, value: latest.value })
     }
     return map
-  }, [indexValues])
+  }, [ordered, indexValues])
 
   function openCreate() {
+    const defaultBase = rateBaseOptions[0]
     setEditing(null)
     setName('')
     setKind('amount')
     setCurrency(settings.baseCurrency)
+    setBaseIndexId(defaultBase?.id ?? '')
+    setRateSpreadPoints('')
     setColor(ACCOUNT_COLORS[indices.length % ACCOUNT_COLORS.length]!)
     setFormOpen(true)
   }
@@ -73,6 +95,12 @@ export function IndicesPanel({ active }: { active: boolean }) {
     setName(index.name)
     setKind(index.kind)
     setCurrency(index.currency)
+    setBaseIndexId(index.baseIndexId ?? '')
+    setRateSpreadPoints(
+      index.rateSpreadPct != null
+        ? formatMoneyInput(String(index.rateSpreadPct * 100).replace('.', ','))
+        : '',
+    )
     setColor(index.color)
     setFormOpen(true)
   }
@@ -99,10 +127,22 @@ export function IndicesPanel({ active }: { active: boolean }) {
   async function saveDefinition() {
     const trimmed = name.trim()
     if (!trimmed || saving) return
+    const spreadInput = parseMoneyInput(rateSpreadPoints)
     setSaving(true)
     try {
-      if (editing) await updateMarketIndex(editing.id, { name: trimmed, kind, currency, color })
-      else await addMarketIndex({ name: trimmed, kind, currency, color })
+      const payload = {
+        name: trimmed,
+        kind,
+        currency,
+        baseIndexId: kind === 'derived_rate' ? (baseIndexId || null) : null,
+        rateSpreadPct: kind === 'derived_rate' ? (spreadInput ?? 0) / 100 : null,
+        color,
+      }
+      if (kind === 'derived_rate' && !baseIndexId) {
+        throw new Error('Выберите базовый индекс')
+      }
+      if (editing) await updateMarketIndex(editing.id, payload)
+      else await addMarketIndex(payload)
       setFormOpen(false)
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось сохранить индекс')
@@ -113,7 +153,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
 
   async function saveValues() {
     if (saving) return
-    const values = ordered.flatMap((index) => {
+    const values = updatable.flatMap((index) => {
       const raw = amounts[index.id]?.trim()
       if (!raw) return []
       const parsed = parseMoneyInput(raw)
@@ -139,7 +179,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
     <div className="space-y-3" {...dataQa('indices-registry')}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Уровни и годовые ставки вводятся вручную. История используется в сравнительном отчёте.
+          Ручные уровни и ставки используются в сравнительном отчёте. Расчетные проценты считаются от базового индекса.
         </p>
         <Button type="button" variant="secondary" onClick={openCreate} dataQa="index-add">
           Добавить индекс
@@ -163,7 +203,15 @@ export function IndicesPanel({ active }: { active: boolean }) {
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openEdit(index)} {...dataQa(`index-edit-${index.id}`)}>
                     <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{index.name}</span>
                     <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      {index.kind === 'amount' ? 'суммовой' : 'процентный'} · {index.currency}
+                      {formatIndexKindLabel(index.kind)} · {resolveIndexCurrency(index, ordered)}
+                      {index.kind === 'derived_rate' && index.baseIndexId ? (
+                        <>
+                          {' · '}
+                          {ordered.find((item) => item.id === index.baseIndexId)?.name ?? 'базовый индекс'}
+                          {' '}
+                          {formatRateSpreadPoints(index.rateSpreadPct)}
+                        </>
+                      ) : null}
                     </span>
                   </button>
                   <span className="shrink-0 text-right tabular-nums">
@@ -198,20 +246,46 @@ export function IndicesPanel({ active }: { active: boolean }) {
             <Select value={kind} onChange={(event) => setKind(event.target.value as IndexKind)} disabled={Boolean(editing && indexValues.some((item) => item.indexId === editing.id))} dataQa="index-kind">
               <option value="amount">{KIND_LABELS.amount}</option>
               <option value="annual_rate">{KIND_LABELS.annual_rate}</option>
+              <option value="derived_rate">{KIND_LABELS.derived_rate}</option>
             </Select>
           </Field>
-          <Field label="Валюта">
-            <Select
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value)}
-              disabled={Boolean(editing && indexValues.some((item) => item.indexId === editing.id))}
-              dataQa="index-currency"
-            >
-              {CURRENCY_OPTIONS.filter((item) => item.code !== 'CBK').map((item) => (
-                <option key={item.code} value={item.code}>{item.code} — {item.name}</option>
-              ))}
-            </Select>
-          </Field>
+          {kind === 'derived_rate' ? (
+            <>
+              <Field label="Базовый индекс">
+                <Select value={baseIndexId} onChange={(event) => setBaseIndexId(event.target.value)} dataQa="index-base">
+                  <option value="">Выберите базовый индекс</option>
+                  {rateBaseOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {resolveIndexCurrency(item, ordered)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Дельта, п.п.">
+                <MoneyInput
+                  value={rateSpreadPoints}
+                  onChange={setRateSpreadPoints}
+                  placeholder="1"
+                  dataQa="index-rate-spread"
+                />
+              </Field>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Валюта расчетного процента наследуется от базового индекса.
+              </p>
+            </>
+          ) : (
+            <Field label="Валюта">
+              <Select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value)}
+                dataQa="index-currency"
+              >
+                {CURRENCY_OPTIONS.filter((item) => item.code !== 'CBK').map((item) => (
+                  <option key={item.code} value={item.code}>{item.code} — {item.name}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="Цвет">
             <div className="flex flex-wrap gap-2">
               {ACCOUNT_COLORS.map((item) => (
@@ -255,7 +329,14 @@ export function IndicesPanel({ active }: { active: boolean }) {
           <Field label="Дата">
             <DateInput value={date} onChange={setDate} dataQa="indices-update-date" />
           </Field>
-          {ordered.map((index) => {
+          {updatable.length === 0 ? (
+            <EmptyState
+              title="Нет ручных индексов для обновления"
+              description="Расчетные проценты считаются от базовых индексов и не вводятся вручную."
+              dataQa="indices-update-empty"
+            />
+          ) : null}
+          {updatable.map((index) => {
             const saved = indexValues.find((item) => item.indexId === index.id && item.date === date)
             const previous = [...indexValues]
               .filter((item) => item.indexId === index.id && item.date <= date)

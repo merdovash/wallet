@@ -3,6 +3,7 @@ import {
   growthCapitalFlows,
   type RateBook,
 } from '../engine/growthEngine'
+import { resolveIndexCurrency, resolveIndexValues } from './marketIndex'
 import { resolvePivotForDate } from './cbrRates'
 import { toBase } from './currency'
 import type {
@@ -41,16 +42,9 @@ function valueOnDate(values: IndexValue[], date: string): number | null {
   return current
 }
 
-function normalizedValues(indexId: string, values: IndexValue[]): IndexValue[] {
-  const byDate = new Map<string, IndexValue>()
-  for (const item of values) {
-    if (item.indexId === indexId && Number.isFinite(item.value)) byDate.set(item.date, item)
-  }
-  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
-}
-
 export function buildIndexComparison(input: {
   index: MarketIndex
+  indices: MarketIndex[]
   indexValues: IndexValue[]
   accounts: Account[]
   snapshots: BalanceSnapshot[]
@@ -59,8 +53,9 @@ export function buildIndexComparison(input: {
   rateBook?: RateBook
   range?: { startDate: string; endDate: string } | null
 }): IndexComparisonPoint[] {
-  const observations = normalizedValues(input.index.id, input.indexValues)
+  const observations = resolveIndexValues(input.index.id, input.indices, input.indexValues)
   if (observations.length === 0) return []
+  const indexCurrency = resolveIndexCurrency(input.index, input.indices)
 
   const actualAll = buildTotalSeries(
     input.accounts,
@@ -74,7 +69,7 @@ export function buildIndexComparison(input: {
   const basePerIndexUnit = (date: string): number =>
     toBase(
       1,
-      input.index.currency,
+      indexCurrency,
       input.settings.baseCurrency,
       input.settings.exchangeRates,
       resolvePivotForDate(date, input.rateBook ?? {}),
@@ -106,7 +101,7 @@ export function buildIndexComparison(input: {
   }
 
   const indexTotalByDate =
-    input.index.kind === 'annual_rate'
+    input.index.kind === 'annual_rate' || input.index.kind === 'derived_rate'
       ? buildRateTotals(
           start.date,
           start.total,
