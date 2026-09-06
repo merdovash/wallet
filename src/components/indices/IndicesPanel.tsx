@@ -9,6 +9,8 @@ import {
   isManualIndex,
   isRateIndex,
   latestIndexValue,
+  pointsToRatePct,
+  ratePctToPoints,
   resolveIndexCurrency,
 } from '../../lib/marketIndex'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
@@ -24,13 +26,13 @@ const KIND_LABELS: Record<IndexKind, string> = {
 }
 
 function toInput(value: number, kind: IndexKind): string {
-  const shown = kind === 'annual_rate' || kind === 'derived_rate' ? value * 100 : value
+  const shown = kind === 'annual_rate' || kind === 'derived_rate' ? ratePctToPoints(value) : value
   return formatMoneyInput(String(shown).replace('.', ','))
 }
 
 function formatValue(value: number, kind: IndexKind): string {
   if (kind === 'annual_rate' || kind === 'derived_rate') {
-    return `${(value * 100).toLocaleString('ru-RU', { maximumFractionDigits: 4 })} %`
+    return `${ratePctToPoints(value).toLocaleString('ru-RU', { maximumFractionDigits: 4 })} %`
   }
   return value.toLocaleString('ru-RU', { maximumFractionDigits: 4 })
 }
@@ -98,7 +100,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
     setBaseIndexId(index.baseIndexId ?? '')
     setRateSpreadPoints(
       index.rateSpreadPct != null
-        ? formatMoneyInput(String(index.rateSpreadPct * 100).replace('.', ','))
+        ? formatMoneyInput(String(ratePctToPoints(index.rateSpreadPct)).replace('.', ','))
         : '',
     )
     setColor(index.color)
@@ -135,7 +137,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
         kind,
         currency,
         baseIndexId: kind === 'derived_rate' ? (baseIndexId || null) : null,
-        rateSpreadPct: kind === 'derived_rate' ? (spreadInput ?? 0) / 100 : null,
+        rateSpreadPct: kind === 'derived_rate' ? pointsToRatePct(spreadInput ?? 0) : null,
         color,
       }
       if (kind === 'derived_rate' && !baseIndexId) {
@@ -158,7 +160,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
       if (!raw) return []
       const parsed = parseMoneyInput(raw)
       if (parsed == null) return []
-      return [{ indexId: index.id, value: index.kind === 'annual_rate' ? parsed / 100 : parsed }]
+      return [{ indexId: index.id, value: index.kind === 'annual_rate' ? pointsToRatePct(parsed) : parsed }]
     })
     if (!date || values.length === 0) {
       alert('Укажите дату и хотя бы одно значение')

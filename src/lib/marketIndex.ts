@@ -1,5 +1,22 @@
 import type { IndexValue, MarketIndex } from '../types/wallet'
 
+function round(value: number, digits: number): number {
+  const factor = 10 ** digits
+  return Math.round(value * factor) / factor
+}
+
+export function normalizeRatePct(value: number): number {
+  return round(value, 12)
+}
+
+export function ratePctToPoints(value: number): number {
+  return round(normalizeRatePct(value) * 100, 8)
+}
+
+export function pointsToRatePct(value: number): number {
+  return normalizeRatePct(value / 100)
+}
+
 export function isManualIndex(kind: MarketIndex['kind']): boolean {
   return kind !== 'derived_rate'
 }
@@ -45,11 +62,11 @@ export function resolveIndexValues(
   const nextVisiting = new Set(visiting)
   nextVisiting.add(index.id)
   const baseValues = resolveIndexValues(base.id, indices, values, nextVisiting)
-  const spread = index.rateSpreadPct ?? 0
+  const spread = normalizeRatePct(index.rateSpreadPct ?? 0)
   return baseValues.map((value) => ({
     indexId,
     date: value.date,
-    value: value.value + spread,
+    value: normalizeRatePct(value.value + spread),
   }))
 }
 
@@ -69,7 +86,7 @@ export function formatIndexKindLabel(kind: MarketIndex['kind']): string {
 }
 
 export function formatRateSpreadPoints(spreadPct: number | null | undefined): string {
-  const points = (spreadPct ?? 0) * 100
+  const points = ratePctToPoints(spreadPct ?? 0)
   const sign = points > 0 ? '+' : ''
   return `${sign}${points.toLocaleString('ru-RU', { maximumFractionDigits: 4 })} п.п.`
 }
