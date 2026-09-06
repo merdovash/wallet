@@ -3,9 +3,11 @@ import { convertAmount } from '../../engine/growthEngine'
 import { dataQa } from '../../lib/dataQa'
 import { todayIsoDate, formatCurrency } from '../../lib/format'
 import { previewInboundAllocation } from '../../lib/fundBalances'
-import { parseMoneyInput } from '../../lib/moneyInput'
+import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
+import { buildTransferSnapshotLines } from '../../lib/transferCheckIn'
 import { transferReceivedAmount, transferSpreadBase } from '../../lib/transferAmounts'
 import { useRatesStore } from '../../store/ratesStore'
+import type { CheckInPrefill } from '../../store/checkInUiStore'
 import { useWalletStore } from '../../store/walletStore'
 import { DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
@@ -14,7 +16,7 @@ import { TransferSpreadLine } from './TransferSpreadLine'
 interface TransferCreatePanelProps {
   open: boolean
   onClose: () => void
-  onCreated?: (snapshotId: string) => void
+  onCreated?: (prefill: CheckInPrefill) => void
 }
 
 export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreatePanelProps) {
@@ -23,7 +25,6 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   const transfers = useWalletStore((s) => s.transfers)
   const funds = useWalletStore((s) => s.funds)
   const settings = useWalletStore((s) => s.settings)
-  const addTransferCheckIn = useWalletStore((s) => s.addTransferCheckIn)
   const rateBook = useRatesStore((s) => s.byDate)
 
   const activeAccounts = useMemo(
@@ -40,7 +41,6 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   const [amount, setAmount] = useState('')
   const [toAmount, setToAmount] = useState('')
   const [note, setNote] = useState('')
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -109,30 +109,43 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     ? parsedToAmount != null && parsedToAmount > 0
     : parsedToAmount == null || parsedToAmount > 0
 
-  async function handleSave() {
+  function amountToInput(value: number): string {
+    return formatMoneyInput(String(value).replace('.', ','))
+  }
+
+  function handleSave() {
     const value = parseMoneyInput(amount)
     if (!date || !fromAccountId || !toAccountId || fromAccountId === toAccountId) return
     if (value == null || value <= 0) return
     if (!receiveOk) return
-    setSaving(true)
-    try {
-      const { snapshotId } = await addTransferCheckIn(
+
+    const lines = buildTransferSnapshotLines({
+      date,
+      fromAccountId,
+      toAccountId,
+      amount: value,
+      toAmount: parsedToAmount != null && parsedToAmount > 0 ? parsedToAmount : undefined,
+      accounts,
+      snapshots,
+      settings,
+      rateBook,
+    })
+
+    onClose()
+    onCreated?.({
+      date,
+      amounts: Object.fromEntries(lines.map((line) => [line.accountId, amountToInput(line.amount)])),
+      pendingTransfers: [
         {
-          date,
           fromAccountId,
           toAccountId,
-          amount: value,
+          amount: amountToInput(value),
           toAmount:
-            parsedToAmount != null && parsedToAmount > 0 ? parsedToAmount : undefined,
-          note: note.trim() || undefined,
+            parsedToAmount != null && parsedToAmount > 0 ? amountToInput(parsedToAmount) : '',
+          note: note.trim(),
         },
-        rateBook,
-      )
-      onClose()
-      onCreated?.(snapshotId)
-    } finally {
-      setSaving(false)
-    }
+      ],
+    })
   }
 
   const canSave =
@@ -185,14 +198,14 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
       title="Новый перевод"
       onClose={onClose}
       onSave={handleSave}
-      saveDisabled={!canSave || saving}
+      saveDisabled={!canSave}
       saveActionId="transfer-form-save"
       dataQa="transfer-create"
     >
       <div className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Будет создан чек-ин с обновлёнными остатками. Суммы в нём нельзя менять вручную —
-          только удалить перевод или весь чек-ин.
+          После сохранения откроется обычный чек-ин, где для двух счетов уже будут подставлены
+          остатки на основе этого перевода.
           {crossCurrency ? ' Для разных валют сумма получения обязательна.' : ''}
         </p>
         <Field label="Дата">

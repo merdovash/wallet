@@ -41,7 +41,7 @@ function useSectionPrimary(section: AppSection) {
   const label = sectionOverride?.label ?? 'Чек-ин'
   const disabled = sectionOverride?.disabled ?? false
   const title = sectionOverride?.title ?? (sectionOverride ? undefined : 'Новый чек-ин')
-  const onClick = sectionOverride?.onClick ?? openCreate
+  const onClick = sectionOverride?.onClick ?? (() => openCreate())
   const showCheckIcon = !sectionOverride
 
   const hidden =

@@ -34,9 +34,10 @@ import {
 import { latestIndexValue, resolveIndexCurrency } from '../../lib/marketIndex'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
+import { useAuthStore } from '../../store/authStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
-import type { MarketIndex } from '../../types/wallet'
+import type { Account, MarketIndex } from '../../types/wallet'
 import { Card, EmptyState } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
@@ -68,6 +69,13 @@ interface ChartSeriesLine {
   color: string
 }
 
+interface StoredComparisonFilters {
+  selectedIndexIds?: string[]
+  selectedAccountIds?: string[]
+}
+
+const FILTER_STORAGE_KEY = 'wallet-index-comparison-filters'
+
 function buildSeriesKey(prefix: 'capital' | 'growth', indexId: string): string {
   return `${prefix}:${indexId}`
 }
@@ -76,11 +84,49 @@ function indexLineColor(index: MarketIndex, position: number): string {
   return index.color || INDEX_LINE_COLORS[position % INDEX_LINE_COLORS.length] || '#d97706'
 }
 
+function accountChipColor(account: Account): string {
+  return account.color || '#2563eb'
+}
+
 function defaultIndexIds(indices: MarketIndex[]): string[] {
   return indices[0] ? [indices[0].id] : []
 }
 
+function sanitizeSelectedIds(ids: string[] | undefined, allowed: Set<string>): string[] {
+  if (!ids) return []
+  const unique: string[] = []
+  for (const id of ids) {
+    if (!allowed.has(id) || unique.includes(id)) continue
+    unique.push(id)
+  }
+  return unique
+}
+
+function readStoredFilters(userId: string | null): StoredComparisonFilters | null {
+  if (!userId) return null
+  try {
+    const raw = localStorage.getItem(`${FILTER_STORAGE_KEY}:${userId}`)
+    if (!raw) return null
+    return JSON.parse(raw) as StoredComparisonFilters
+  } catch {
+    return null
+  }
+}
+
+function writeStoredFilters(
+  userId: string | null,
+  value: StoredComparisonFilters,
+): void {
+  if (!userId) return
+  try {
+    localStorage.setItem(`${FILTER_STORAGE_KEY}:${userId}`, JSON.stringify(value))
+  } catch {
+    /* ignore */
+  }
+}
+
 export function IndexComparisonPanel() {
+  const user = useAuthStore((s) => s.user)
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
@@ -120,24 +166,40 @@ export function IndexComparisonPanel() {
     defaultIndexIds(available),
   )
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(defaultAccountIds)
+  const [filtersOwnerId, setFiltersOwnerId] = useState<string | null>(null)
 
   useEffect(() => {
-    const allowed = new Set(available.map((index) => index.id))
-    setSelectedIndexIds((current) => {
-      const filtered = current.filter((id) => allowed.has(id))
-      if (filtered.length > 0) return filtered
-      return defaultIndexIds(available)
-    })
-  }, [available])
+    const userId = user?.id ?? null
+    const indexAllowed = new Set(available.map((index) => index.id))
+    const accountAllowed = new Set(accountOptions.map((account) => account.id))
+    if (filtersOwnerId !== userId) {
+      const stored = readStoredFilters(userId)
+      setSelectedIndexIds(
+        stored?.selectedIndexIds
+          ? sanitizeSelectedIds(stored.selectedIndexIds, indexAllowed)
+          : defaultIndexIds(available),
+      )
+      setSelectedAccountIds(
+        stored?.selectedAccountIds
+          ? sanitizeSelectedIds(stored.selectedAccountIds, accountAllowed)
+          : defaultAccountIds,
+      )
+      setFiltersOwnerId(userId)
+      return
+    }
+
+    setSelectedIndexIds((current) => sanitizeSelectedIds(current, indexAllowed))
+    setSelectedAccountIds((current) => sanitizeSelectedIds(current, accountAllowed))
+  }, [user?.id, filtersOwnerId, available, accountOptions, defaultAccountIds])
 
   useEffect(() => {
-    const allowed = new Set(accountOptions.map((account) => account.id))
-    setSelectedAccountIds((current) => {
-      const filtered = current.filter((id) => allowed.has(id))
-      if (filtered.length > 0) return filtered
-      return defaultAccountIds
+    const userId = user?.id ?? null
+    if (filtersOwnerId !== userId) return
+    writeStoredFilters(userId, {
+      selectedIndexIds,
+      selectedAccountIds,
     })
-  }, [accountOptions, defaultAccountIds])
+  }, [user?.id, filtersOwnerId, selectedIndexIds, selectedAccountIds])
 
   const selectedIndices = useMemo(
     () => available.filter((index) => selectedIndexIds.includes(index.id)),
@@ -318,15 +380,17 @@ export function IndexComparisonPanel() {
                       aria-pressed={active}
                       onClick={() => toggleIndex(index.id)}
                       className={`rounded-lg border px-3 py-1.5 text-left text-xs transition ${
-                        active
-                          ? 'text-white'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                        active ? 'text-white' : 'hover:opacity-85'
                       }`}
-                      style={active ? { borderColor: accent, backgroundColor: accent } : undefined}
+                      style={{
+                        borderColor: accent,
+                        backgroundColor: active ? accent : 'transparent',
+                        color: active ? '#ffffff' : accent,
+                      }}
                       data-qa={`index-comparison-index-${index.id}`}
                     >
                       <div className="font-medium">{index.name}</div>
-                      <div className={active ? 'text-white/80' : 'text-slate-400 dark:text-slate-500'}>
+                      <div style={{ color: active ? 'rgba(255,255,255,0.8)' : accent }}>
                         {resolveIndexCurrency(index, indices)}
                       </div>
                     </button>
@@ -363,6 +427,7 @@ export function IndexComparisonPanel() {
             <div className="flex flex-wrap gap-2" data-qa="index-comparison-wallets">
               {accountOptions.map((account) => {
                 const active = selectedAccountIds.includes(account.id)
+                const accent = accountChipColor(account)
                 return (
                   <button
                     key={account.id}
@@ -370,14 +435,17 @@ export function IndexComparisonPanel() {
                     aria-pressed={active}
                     onClick={() => toggleAccount(account.id)}
                     className={`rounded-lg border px-3 py-1.5 text-left text-xs transition ${
-                      active
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                      active ? 'text-white' : 'hover:opacity-85'
                     }`}
+                    style={{
+                      borderColor: accent,
+                      backgroundColor: active ? accent : 'transparent',
+                      color: active ? '#ffffff' : accent,
+                    }}
                     data-qa={`index-comparison-wallet-${account.id}`}
                   >
                     <div className="font-medium">{account.name}</div>
-                    <div className={active ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'}>
+                    <div style={{ color: active ? 'rgba(255,255,255,0.8)' : accent }}>
                       {account.currency}
                       {account.archived ? ' · архив' : ''}
                     </div>

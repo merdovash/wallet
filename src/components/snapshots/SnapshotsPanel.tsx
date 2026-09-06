@@ -17,6 +17,7 @@ export function SnapshotsPanel() {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const ensureRates = useRatesStore((s) => s.ensureRates)
+  const openCreate = useCheckInUiStore((s) => s.openCreate)
   const openEdit = useCheckInUiStore((s) => s.openEdit)
   const [transferOpen, setTransferOpen] = useState(false)
 
@@ -63,7 +64,7 @@ export function SnapshotsPanel() {
       {sortedSnapshots.length === 0 ? (
         <EmptyState
           title="Чек-инов пока нет"
-          description="Нажмите «Чек-ин» для остатков или «Перевод» — тогда создастся чек-ин с обновлёнными суммами."
+          description="Нажмите «Чек-ин» для остатков или «Перевод», чтобы открыть чек-ин с уже подставленными суммами."
           dataQa="snapshots-empty"
         />
       ) : (
@@ -144,8 +145,8 @@ export function SnapshotsPanel() {
       <TransferCreatePanel
         open={transferOpen}
         onClose={() => setTransferOpen(false)}
-        onCreated={(snapshotId) => {
-          openEdit(snapshotId)
+        onCreated={(prefill) => {
+          openCreate(prefill)
         }}
       />
     </div>

@@ -5,3 +5,8 @@ logs
 .env
 .DS_Store
 node_modules/.tmp
+
+# Local agent secrets (credentials, machine-only Cursor rules/skills)
+.cursor/**/*.local.mdc
+.cursor/**/*.local.md
+.cursor/**/*.local/

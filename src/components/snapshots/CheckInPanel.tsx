@@ -6,6 +6,7 @@ import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
 import { formatTransferLabel, suggestedReceiveAmount } from '../../lib/transferCheckIn'
 import { transferSpreadBase } from '../../lib/transferAmounts'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
+import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { RateBook } from '../../engine/growthEngine'
@@ -116,6 +117,7 @@ export function CheckInPanel({
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
+  const prefill = useCheckInUiStore((s) => s.prefill)
   const addSnapshot = useWalletStore((s) => s.addSnapshot)
   const updateSnapshot = useWalletStore((s) => s.updateSnapshot)
   const deleteSnapshot = useWalletStore((s) => s.deleteSnapshot)
@@ -183,19 +185,25 @@ export function CheckInPanel({
       setExpense('')
       setIncomeManual(true)
       setAmounts({})
+      setPendingTransfers([])
     } else {
-      setDate(todayIsoDate())
+      setDate(prefill?.date ?? todayIsoDate())
       setNote('')
       setIncome('')
       setExpense('')
       setIncomeManual(false)
-      setAmounts({})
+      setAmounts(prefill?.amounts ?? {})
+      setPendingTransfers(
+        (prefill?.pendingTransfers ?? []).map((transfer, index) => ({
+          key: `prefill-${index}-${transfer.fromAccountId}-${transfer.toAccountId}`,
+          ...transfer,
+        })),
+      )
     }
-    setPendingTransfers([])
     setTransferEditor(null)
     setScrollToTransferId(null)
     setShowHelp(false)
-  }, [open, editing]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on open
+  }, [open, editing, prefill]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on open
 
   const dateTransfers = useMemo(
     () =>
