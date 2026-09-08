@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   appendComparisonDiagnosis,
   buildIndexComparison,
+  chartIndexComparisonValue,
   diagnoseIndexComparison,
   formatComparisonDiagnosis,
 } from './indexComparison'
@@ -242,6 +243,47 @@ describe('buildIndexComparison', () => {
 
     expect(points.at(-1)?.indexTotal).toBeCloseTo(111, 8)
     expect(points.at(-1)?.indexGrowth).toBeCloseTo(11, 8)
+  })
+
+  it('marks index observation dates and linearly interpolates chart values between them', () => {
+    const index: MarketIndex = {
+      id: 'imoex',
+      name: 'Мосбиржа',
+      kind: 'amount',
+      currency: 'RUB',
+      color: '#2563eb',
+    }
+    const points = buildIndexComparison({
+      index,
+      indices: [index],
+      indexValues: [
+        { indexId: index.id, date: '2025-01-01', value: 10 },
+        { indexId: index.id, date: '2025-03-01', value: 30 },
+      ],
+      accounts: [fund],
+      snapshots: [
+        snapshot('s1', '2025-01-01', 100),
+        snapshot('s2', '2025-02-01', 100),
+        snapshot('s3', '2025-03-01', 100),
+      ],
+      transfers: [],
+      settings,
+    })
+
+    expect(points.map((point) => point.indexObserved)).toEqual([true, false, true])
+    expect(chartIndexComparisonValue(points, 0, 'indexTotal')).toEqual({
+      value: points[0]!.indexTotal,
+      calculated: false,
+    })
+    expect(chartIndexComparisonValue(points, 1, 'indexTotal').calculated).toBe(true)
+    const interpolated = chartIndexComparisonValue(points, 1, 'indexTotal')
+    const janMs = Date.parse('2025-01-01T00:00:00Z')
+    const febMs = Date.parse('2025-02-01T00:00:00Z')
+    const marMs = Date.parse('2025-03-01T00:00:00Z')
+    const ratio = (febMs - janMs) / (marMs - janMs)
+    const expected =
+      points[0]!.indexTotal + (points[2]!.indexTotal - points[0]!.indexTotal) * ratio
+    expect(interpolated.value).toBeCloseTo(expected, 8)
   })
 
   it('diagnoses wallets and indices missing comparison data', () => {

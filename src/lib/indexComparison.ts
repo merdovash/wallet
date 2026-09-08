@@ -29,6 +29,52 @@ export interface IndexComparisonPoint {
   actualGrowth: number
   indexGrowth: number
   difference: number
+  /** Есть зафиксированное значение индекса именно на эту дату. */
+  indexObserved: boolean
+}
+
+export function chartIndexComparisonValue(
+  points: IndexComparisonPoint[],
+  pointIndex: number,
+  field: 'indexTotal' | 'indexGrowth',
+): { value: number; calculated: boolean } {
+  const point = points[pointIndex]
+  if (!point) return { value: 0, calculated: true }
+  if (point.indexObserved) return { value: point[field], calculated: false }
+
+  let previousIndex = -1
+  let nextIndex = -1
+  for (let index = pointIndex - 1; index >= 0; index -= 1) {
+    if (points[index]?.indexObserved) {
+      previousIndex = index
+      break
+    }
+  }
+  for (let index = pointIndex + 1; index < points.length; index += 1) {
+    if (points[index]?.indexObserved) {
+      nextIndex = index
+      break
+    }
+  }
+  if (previousIndex < 0 || nextIndex < 0) {
+    return { value: point[field], calculated: true }
+  }
+
+  const previous = points[previousIndex]!
+  const next = points[nextIndex]!
+  const startMs = Date.parse(`${previous.date}T00:00:00Z`)
+  const endMs = Date.parse(`${next.date}T00:00:00Z`)
+  const currentMs = Date.parse(`${point.date}T00:00:00Z`)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || !Number.isFinite(currentMs)) {
+    return { value: point[field], calculated: true }
+  }
+  if (endMs === startMs) return { value: previous[field], calculated: true }
+
+  const ratio = (currentMs - startMs) / (endMs - startMs)
+  return {
+    value: previous[field] + (next[field] - previous[field]) * ratio,
+    calculated: true,
+  }
 }
 
 const DAY_MS = 86_400_000
@@ -374,6 +420,7 @@ export function buildIndexComparison(input: {
           basePerIndexUnit,
         )
 
+  const observationDates = new Set(observations.map((item) => item.date))
   let cumulativeFlow = 0
   let previousDate = start.date
   return actual.map((point, position) => {
@@ -393,6 +440,7 @@ export function buildIndexComparison(input: {
       actualGrowth,
       indexGrowth,
       difference: actualGrowth - indexGrowth,
+      indexObserved: observationDates.has(point.date),
     }
   })
 }

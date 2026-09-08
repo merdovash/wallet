@@ -12,6 +12,7 @@ import {
 import {
   appendComparisonDiagnosis,
   buildIndexComparison,
+  chartIndexComparisonValue,
   diagnoseIndexComparison,
   type IndexComparisonPoint,
 } from '../../lib/indexComparison'
@@ -63,12 +64,14 @@ type ChartRow = {
   label: string
   actualTotal: number
   actualGrowth: number
-} & Record<string, number | string>
+} & Record<string, number | string | boolean>
 
 interface ChartSeriesLine {
   key: string
   label: string
   color: string
+  observedKey: string
+  calculatedKey: string
 }
 
 interface StoredComparisonFilters {
@@ -80,6 +83,14 @@ const FILTER_STORAGE_KEY = 'wallet-index-comparison-filters'
 
 function buildSeriesKey(prefix: 'capital' | 'growth', indexId: string): string {
   return `${prefix}:${indexId}`
+}
+
+function buildSeriesObservedKey(prefix: 'capital' | 'growth', indexId: string): string {
+  return `${buildSeriesKey(prefix, indexId)}:observed`
+}
+
+function buildSeriesCalculatedKey(prefix: 'capital' | 'growth', indexId: string): string {
+  return `${buildSeriesKey(prefix, indexId)}:calculated`
 }
 
 function indexLineColor(index: MarketIndex, position: number): string {
@@ -276,7 +287,8 @@ export function IndexComparisonPanel() {
 
   const rows = useMemo<ChartRow[]>(() => {
     if (comparisons.length === 0) return []
-    return comparisons[0]!.points
+    const basePoints = comparisons[0]!.points
+    return basePoints
       .map((point) => {
         const row: ChartRow = {
           date: point.date,
@@ -285,10 +297,28 @@ export function IndexComparisonPanel() {
           actualGrowth: point.actualGrowth,
         }
         for (const comparison of comparisons) {
-          const match = comparison.points.find((candidate) => candidate.date === point.date)
-          if (!match) return null
-          row[buildSeriesKey('capital', comparison.index.id)] = match.indexTotal
-          row[buildSeriesKey('growth', comparison.index.id)] = match.indexGrowth
+          const matchIndex = comparison.points.findIndex((candidate) => candidate.date === point.date)
+          if (matchIndex < 0) return null
+          const capital = chartIndexComparisonValue(
+            comparison.points,
+            matchIndex,
+            'indexTotal',
+          )
+          const growth = chartIndexComparisonValue(
+            comparison.points,
+            matchIndex,
+            'indexGrowth',
+          )
+          const capitalKey = buildSeriesKey('capital', comparison.index.id)
+          const growthKey = buildSeriesKey('growth', comparison.index.id)
+          row[capitalKey] = capital.value
+          row[growthKey] = growth.value
+          row[buildSeriesObservedKey('capital', comparison.index.id)] =
+            comparison.points[matchIndex]?.indexObserved ?? false
+          row[buildSeriesObservedKey('growth', comparison.index.id)] =
+            comparison.points[matchIndex]?.indexObserved ?? false
+          row[buildSeriesCalculatedKey('capital', comparison.index.id)] = capital.calculated
+          row[buildSeriesCalculatedKey('growth', comparison.index.id)] = growth.calculated
         }
         return row
       })
@@ -304,6 +334,8 @@ export function IndexComparisonPanel() {
         key: buildSeriesKey('capital', comparison.index.id),
         label: comparison.index.name,
         color: indexLineColor(comparison.index, position),
+        observedKey: buildSeriesObservedKey('capital', comparison.index.id),
+        calculatedKey: buildSeriesCalculatedKey('capital', comparison.index.id),
       })),
     [comparisons],
   )
@@ -313,6 +345,8 @@ export function IndexComparisonPanel() {
         key: buildSeriesKey('growth', comparison.index.id),
         label: comparison.index.name,
         color: indexLineColor(comparison.index, position),
+        observedKey: buildSeriesObservedKey('growth', comparison.index.id),
+        calculatedKey: buildSeriesCalculatedKey('growth', comparison.index.id),
       })),
     [comparisons],
   )
@@ -663,6 +697,11 @@ function ComparisonChart({
   series: ChartSeriesLine[]
   dataQa: string
 }) {
+  const calculatedKeys = useMemo(
+    () => new Map(series.map((line) => [line.key, line.calculatedKey])),
+    [series],
+  )
+
   return (
     <Card className="!p-3 sm:!p-4" dataQa={qa}>
       <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</h2>
@@ -683,8 +722,37 @@ function ComparisonChart({
             />
             <Tooltip
               {...chartTooltipStyles(chartTheme)}
-              formatter={(value: number, name: string) => [formatCurrency(value, currency), name]}
-              labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ''}
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null
+                const row = payload[0]?.payload as ChartRow | undefined
+                return (
+                  <div
+                    className="rounded-lg border px-3 py-2 text-xs shadow-sm"
+                    style={{
+                      backgroundColor: chartTheme.tooltipBg,
+                      borderColor: chartTheme.tooltipBorder,
+                      color: chartTheme.tooltipText,
+                    }}
+                  >
+                    <p className="mb-1 font-medium">{row?.date ?? label}</p>
+                    {payload.map((entry) => {
+                      const value = Number(entry.value)
+                      if (!Number.isFinite(value)) return null
+                      const calculatedKey = calculatedKeys.get(String(entry.dataKey))
+                      const calculated = calculatedKey ? row?.[calculatedKey] === true : false
+                      const name = calculated
+                        ? `${String(entry.name)} (расчётное)`
+                        : String(entry.name)
+                      return (
+                        <p key={String(entry.dataKey)} className="tabular-nums">
+                          <span style={{ color: entry.color }}>{name}: </span>
+                          {formatCurrency(value, currency)}
+                        </p>
+                      )
+                    })}
+                  </div>
+                )
+              }}
             />
             <Legend />
             <Line
@@ -699,12 +767,29 @@ function ComparisonChart({
             {series.map((line) => (
               <Line
                 key={line.key}
-                type="monotone"
+                type="linear"
                 dataKey={line.key}
                 name={line.label}
                 stroke={line.color}
                 strokeWidth={2}
-                dot={chartDot(chartTheme, line.color)}
+                dot={(props) => {
+                  const { cx, cy, payload, key } = props
+                  if (cx == null || cy == null || !payload?.[line.observedKey]) {
+                    return <g key={key} />
+                  }
+                  const dot = chartDot(chartTheme, line.color)
+                  return (
+                    <circle
+                      key={key}
+                      cx={cx}
+                      cy={cy}
+                      r={dot.r}
+                      fill={dot.fill}
+                      stroke={dot.stroke}
+                      strokeWidth={dot.strokeWidth}
+                    />
+                  )
+                }}
                 activeDot={chartActiveDot(chartTheme, line.color)}
               />
             ))}
