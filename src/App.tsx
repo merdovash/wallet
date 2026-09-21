@@ -12,6 +12,7 @@ import { CurrenciesPanel } from './components/currencies/CurrenciesPanel'
 import { MonthlyPanel } from './components/monthly/MonthlyPanel'
 import { DailyGrowthPanel } from './components/daily/DailyGrowthPanel'
 import { CashbackPanel } from './components/cashback/CashbackPanel'
+import { CommissionsPanel } from './components/commissions/CommissionsPanel'
 import { IndexComparisonPanel } from './components/indices/IndexComparisonPanel'
 import { EmptyState } from './components/ui/FormControls'
 import { PrimaryFab } from './components/ui/PrimaryFab'
@@ -227,6 +228,13 @@ function SectionContent({
         <>
           {analyticsCrumb}
           <CashbackPanel />
+        </>
+      )
+    case 'commissions':
+      return (
+        <>
+          {analyticsCrumb}
+          <CommissionsPanel />
         </>
       )
     case 'index-comparison':

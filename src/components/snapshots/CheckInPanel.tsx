@@ -130,6 +130,7 @@ export function CheckInPanel({
   const upsertIndexValues = useWalletStore((s) => s.upsertIndexValues)
   const rateBook = useRatesStore((s) => s.byDate)
   const settings = useWalletStore((s) => s.settings)
+  const manualRates = useWalletStore((s) => s.manualRates)
 
   const editing = useMemo(
     () => (snapshotId ? snapshots.find((s) => s.id === snapshotId) ?? null : null),
@@ -384,7 +385,15 @@ export function CheckInPanel({
     const to = accounts.find((a) => a.id === t.toAccountId)
     let toAmountInput = t.toAmount != null ? amountToInput(t.toAmount) : ''
     if (!toAmountInput && from && to && from.currency !== to.currency) {
-      const suggested = suggestedReceiveAmount(t.amount, from, to, settings, t.date, rateBook)
+      const suggested = suggestedReceiveAmount(
+        t.amount,
+        from,
+        to,
+        settings,
+        t.date,
+        rateBook,
+        manualRates,
+      )
       if (suggested != null) toAmountInput = amountToInput(suggested)
     }
     setTransferEditor({

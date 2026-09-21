@@ -8,6 +8,7 @@ import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
+import { ExpenseCreatePanel } from './ExpenseCreatePanel'
 import { TransferCreatePanel } from './TransferCreatePanel'
 
 export function SnapshotsPanel() {
@@ -20,6 +21,7 @@ export function SnapshotsPanel() {
   const openCreate = useCheckInUiStore((s) => s.openCreate)
   const openEdit = useCheckInUiStore((s) => s.openEdit)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [expenseOpen, setExpenseOpen] = useState(false)
 
   const dates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const activeCount = useMemo(() => accounts.filter((a) => !a.archived).length, [accounts])
@@ -49,15 +51,26 @@ export function SnapshotsPanel() {
         title="Чек-ины"
         description="Остатки по датам и переводы между счетами"
         actions={
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setTransferOpen(true)}
-            disabled={activeCount < 2}
-            dataQa="transfer-create"
-          >
-            Перевод
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setExpenseOpen(true)}
+              disabled={activeCount < 1}
+              dataQa="expense-create-open"
+            >
+              Расход
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setTransferOpen(true)}
+              disabled={activeCount < 2}
+              dataQa="transfer-create"
+            >
+              Перевод
+            </Button>
+          </>
         }
       />
 
@@ -149,6 +162,8 @@ export function SnapshotsPanel() {
           openCreate(prefill)
         }}
       />
+
+      <ExpenseCreatePanel open={expenseOpen} onClose={() => setExpenseOpen(false)} />
     </div>
   )
 }

@@ -125,6 +125,26 @@ export interface DbIndexValue {
   value: number
 }
 
+/** 1 fromCurrency = rate × toCurrency. One current value per pair. */
+export interface DbManualRate {
+  fromCurrency: string
+  toCurrency: string
+  rate: number
+  updatedAt?: string
+}
+
+export interface DbExpense {
+  id: string
+  date: string
+  accountId: string
+  currency: string
+  amount: number
+  accountAmount: number
+  commission: number
+  note?: string
+  createdAt?: string
+}
+
 export interface WalletBundle {
   settings: DbSettings
   accounts: DbAccount[]
@@ -133,6 +153,8 @@ export interface WalletBundle {
   funds: DbAccountFund[]
   indices: DbMarketIndex[]
   indexValues: DbIndexValue[]
+  manualRates: DbManualRate[]
+  expenses: DbExpense[]
 }
 
 function num(value: unknown): number {
@@ -732,6 +754,175 @@ export async function deleteTransfer(userId: string, id: string): Promise<boolea
   return result.rowCount > 0
 }
 
+const CURRENCY_RE = /^[A-Z]{3,8}$/
+
+export async function listManualRates(userId: string): Promise<DbManualRate[]> {
+  const pool = getPool()
+  const result = await pool.query<{
+    from_currency: string
+    to_currency: string
+    rate: number | string
+    updated_at: Date | string | null
+  }>(
+    `SELECT from_currency, to_currency, rate, updated_at
+     FROM wallet_manual_rates
+     WHERE user_id = $1
+     ORDER BY from_currency ASC, to_currency ASC`,
+    [userId],
+  )
+  return result.rows.map((row) => ({
+    fromCurrency: String(row.from_currency),
+    toCurrency: String(row.to_currency),
+    rate: num(row.rate),
+    updatedAt: isoTs(row.updated_at),
+  }))
+}
+
+export async function upsertManualRate(
+  userId: string,
+  input: { fromCurrency: string; toCurrency: string; rate: number },
+): Promise<DbManualRate> {
+  const fromCurrency = input.fromCurrency.toUpperCase()
+  const toCurrency = input.toCurrency.toUpperCase()
+  if (!CURRENCY_RE.test(fromCurrency) || !CURRENCY_RE.test(toCurrency)) {
+    throw new Error('Некорректный код валюты')
+  }
+  if (fromCurrency === toCurrency) throw new Error('Валюты пары должны отличаться')
+  if (!Number.isFinite(input.rate) || !(input.rate > 0)) {
+    throw new Error('Курс должен быть больше 0')
+  }
+  const pool = getPool()
+  const result = await pool.query<{
+    from_currency: string
+    to_currency: string
+    rate: number | string
+    updated_at: Date | string | null
+  }>(
+    `INSERT INTO wallet_manual_rates (user_id, from_currency, to_currency, rate, updated_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (user_id, from_currency, to_currency) DO UPDATE
+     SET rate = EXCLUDED.rate, updated_at = now()
+     RETURNING from_currency, to_currency, rate, updated_at`,
+    [userId, fromCurrency, toCurrency, input.rate],
+  )
+  const row = result.rows[0]!
+  return {
+    fromCurrency: String(row.from_currency),
+    toCurrency: String(row.to_currency),
+    rate: num(row.rate),
+    updatedAt: isoTs(row.updated_at),
+  }
+}
+
+export async function deleteManualRate(
+  userId: string,
+  fromCurrency: string,
+  toCurrency: string,
+): Promise<boolean> {
+  const pool = getPool()
+  const result = await pool.query(
+    `DELETE FROM wallet_manual_rates
+     WHERE user_id = $1 AND from_currency = $2 AND to_currency = $3`,
+    [userId, fromCurrency.toUpperCase(), toCurrency.toUpperCase()],
+  )
+  return result.rowCount > 0
+}
+
+type ExpenseRow = {
+  id: string
+  expense_date: string
+  account_id: string
+  currency: string
+  amount: number | string
+  account_amount: number | string
+  commission: number | string | null
+  note: string | null
+  created_at: Date | string | null
+}
+
+const EXPENSE_SELECT = `id, expense_date::text AS expense_date, account_id, currency, amount, account_amount, commission, note, created_at`
+
+function mapExpense(row: ExpenseRow): DbExpense {
+  return {
+    id: String(row.id),
+    date: String(row.expense_date).slice(0, 10),
+    accountId: String(row.account_id),
+    currency: String(row.currency),
+    amount: num(row.amount),
+    accountAmount: num(row.account_amount),
+    commission: row.commission == null ? 0 : num(row.commission),
+    note: row.note ? String(row.note) : undefined,
+    createdAt: isoTs(row.created_at),
+  }
+}
+
+export async function listExpenses(userId: string): Promise<DbExpense[]> {
+  const pool = getPool()
+  const result = await pool.query<ExpenseRow>(
+    `SELECT ${EXPENSE_SELECT}
+     FROM wallet_expenses
+     WHERE user_id = $1
+     ORDER BY expense_date ASC, id ASC`,
+    [userId],
+  )
+  return result.rows.map(mapExpense)
+}
+
+export async function createExpense(
+  userId: string,
+  input: {
+    date: string
+    accountId: string
+    currency: string
+    amount: number
+    accountAmount: number
+    commission?: number
+    note?: string
+  },
+): Promise<DbExpense> {
+  if (!(await assertAccountOwned(userId, input.accountId))) {
+    throw new Error('Счёт не найден')
+  }
+  const currency = input.currency.toUpperCase()
+  if (!CURRENCY_RE.test(currency)) throw new Error('Некорректная валюта расхода')
+  if (!Number.isFinite(input.amount) || !(input.amount > 0)) {
+    throw new Error('Сумма расхода должна быть больше 0')
+  }
+  if (!Number.isFinite(input.accountAmount) || !(input.accountAmount > 0)) {
+    throw new Error('Сумма списания со счёта должна быть больше 0')
+  }
+  const commission =
+    input.commission != null && Number.isFinite(input.commission) ? input.commission : 0
+
+  const pool = getPool()
+  const result = await pool.query<ExpenseRow>(
+    `INSERT INTO wallet_expenses
+       (user_id, expense_date, account_id, currency, amount, account_amount, commission, note)
+     VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8)
+     RETURNING ${EXPENSE_SELECT}`,
+    [
+      userId,
+      input.date,
+      input.accountId,
+      currency,
+      input.amount,
+      input.accountAmount,
+      commission,
+      input.note ?? null,
+    ],
+  )
+  return mapExpense(result.rows[0]!)
+}
+
+export async function deleteExpense(userId: string, id: string): Promise<boolean> {
+  const pool = getPool()
+  const result = await pool.query(
+    `DELETE FROM wallet_expenses WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  return result.rowCount > 0
+}
+
 const FREE_MONEY_NAME = 'Свободные деньги'
 const FREE_MONEY_PRIORITY = -1_000_000
 
@@ -1308,16 +1499,19 @@ export async function upsertIndexValues(
 }
 
 export async function loadWalletBundle(userId: string): Promise<WalletBundle> {
-  const [settings, accounts, snapshots, transfers, funds, indices, indexValues] = await Promise.all([
-    ensureUserSettings(userId),
-    listAccounts(userId),
-    listSnapshots(userId),
-    listTransfers(userId),
-    listAccountFunds(userId),
-    listMarketIndices(userId),
-    listIndexValues(userId),
-  ])
-  return { settings, accounts, snapshots, transfers, funds, indices, indexValues }
+  const [settings, accounts, snapshots, transfers, funds, indices, indexValues, manualRates, expenses] =
+    await Promise.all([
+      ensureUserSettings(userId),
+      listAccounts(userId),
+      listSnapshots(userId),
+      listTransfers(userId),
+      listAccountFunds(userId),
+      listMarketIndices(userId),
+      listIndexValues(userId),
+      listManualRates(userId),
+      listExpenses(userId),
+    ])
+  return { settings, accounts, snapshots, transfers, funds, indices, indexValues, manualRates, expenses }
 }
 
 export async function isWalletEmpty(userId: string): Promise<boolean> {
