@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { convertAmount, type RateBook } from '../../engine/growthEngine'
+import { type RateBook } from '../../engine/growthEngine'
 import { parseMoneyInput } from '../../lib/moneyInput'
+import { suggestedReceiveAmount } from '../../lib/transferCheckIn'
 import { transferSpreadBase } from '../../lib/transferAmounts'
+import { useWalletStore } from '../../store/walletStore'
 import type { Account, WalletSettings } from '../../types/wallet'
 import { Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
@@ -54,6 +56,7 @@ export function CheckInTransferPanel({
   const [toAmount, setToAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const manualRates = useWalletStore((s) => s.manualRates)
 
   useEffect(() => {
     if (!open || !initial) return
@@ -113,15 +116,16 @@ export function CheckInTransferPanel({
         )
       : 0
 
-  const officialHint =
-    crossCurrency && parsedAmount != null && parsedAmount > 0 && fromAccount && toAccount
-      ? convertAmount(
+  const receiveHint =
+    crossCurrency && parsedAmount != null && parsedAmount > 0
+      ? suggestedReceiveAmount(
           parsedAmount,
-          fromAccount.currency,
-          toAccount.currency,
+          fromAccount,
+          toAccount,
           settings,
           date,
           rateBook,
+          manualRates,
         )
       : null
 
@@ -193,8 +197,8 @@ export function CheckInTransferPanel({
             onChange={setToAmount}
             allowNegative={false}
             placeholder={
-              officialHint != null && Number.isFinite(officialHint)
-                ? officialHint.toLocaleString('ru-RU', { maximumFractionDigits: 2 })
+              receiveHint != null && Number.isFinite(receiveHint)
+                ? receiveHint.toLocaleString('ru-RU', { maximumFractionDigits: 2 })
                 : '0'
             }
             dataQa="check-in-transfer-to-amount"

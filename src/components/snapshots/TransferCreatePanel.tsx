@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { convertAmount } from '../../engine/growthEngine'
 import { dataQa } from '../../lib/dataQa'
 import { todayIsoDate, formatCurrency } from '../../lib/format'
 import { previewInboundAllocation } from '../../lib/fundBalances'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
-import { buildTransferSnapshotLines } from '../../lib/transferCheckIn'
+import { buildTransferSnapshotLines, suggestedReceiveAmount } from '../../lib/transferCheckIn'
 import { transferReceivedAmount, transferSpreadBase } from '../../lib/transferAmounts'
 import { useRatesStore } from '../../store/ratesStore'
 import type { CheckInPrefill } from '../../store/checkInUiStore'
@@ -25,6 +24,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   const transfers = useWalletStore((s) => s.transfers)
   const funds = useWalletStore((s) => s.funds)
   const settings = useWalletStore((s) => s.settings)
+  const manualRates = useWalletStore((s) => s.manualRates)
   const rateBook = useRatesStore((s) => s.byDate)
 
   const activeAccounts = useMemo(
@@ -180,15 +180,16 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
         )
       : 0
 
-  const officialHint =
-    crossCurrency && parsedAmount != null && parsedAmount > 0 && fromAccount && toAccount
-      ? convertAmount(
+  const receiveHint =
+    crossCurrency && parsedAmount != null && parsedAmount > 0
+      ? suggestedReceiveAmount(
           parsedAmount,
-          fromAccount.currency,
-          toAccount.currency,
+          fromAccount,
+          toAccount,
           settings,
           date,
           rateBook,
+          manualRates,
         )
       : null
 
@@ -246,8 +247,8 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
             onChange={setToAmount}
             allowNegative={false}
             placeholder={
-              officialHint != null && Number.isFinite(officialHint)
-                ? officialHint.toLocaleString('ru-RU', { maximumFractionDigits: 2 })
+              receiveHint != null && Number.isFinite(receiveHint)
+                ? receiveHint.toLocaleString('ru-RU', { maximumFractionDigits: 2 })
                 : '0'
             }
             dataQa="transfer-create-to-amount"

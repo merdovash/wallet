@@ -20,6 +20,7 @@ import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Button, Card, Field, Input, Select } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
+import { ManualRatesCard } from './ManualRatesCard'
 import { RatesRegistryPanel } from './RatesRegistryPanel'
 
 export function SettingsPanel() {
@@ -171,6 +172,8 @@ export function SettingsPanel() {
           </p>
         </Field>
       </Card>
+
+      <ManualRatesCard />
 
       <Card className="space-y-4" dataQa="settings-rates">
         <div className="flex flex-wrap items-start justify-between gap-3">

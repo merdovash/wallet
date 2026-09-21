@@ -2,7 +2,9 @@ import type {
   Account,
   AccountFund,
   BalanceSnapshot,
+  Expense,
   IndexValue,
+  ManualRate,
   MarketIndex,
   SnapshotLine,
   SnapshotOrigin,
@@ -19,6 +21,8 @@ export interface WalletBundle {
   funds?: AccountFund[]
   indices?: MarketIndex[]
   indexValues?: IndexValue[]
+  manualRates?: ManualRate[]
+  expenses?: Expense[]
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -160,6 +164,48 @@ export async function createTransferApi(input: Omit<Transfer, 'id'>): Promise<Tr
 
 export async function deleteTransferApi(id: string): Promise<void> {
   await api(`/api/wallet/transfers/${id}`, { method: 'DELETE' })
+}
+
+export async function upsertManualRateApi(input: {
+  fromCurrency: string
+  toCurrency: string
+  rate: number
+}): Promise<ManualRate> {
+  const body = await api<{ manualRate: ManualRate }>('/api/wallet/manual-rates', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+  return body.manualRate
+}
+
+export async function deleteManualRateApi(
+  fromCurrency: string,
+  toCurrency: string,
+): Promise<void> {
+  await api(
+    `/api/wallet/manual-rates/${encodeURIComponent(fromCurrency)}/${encodeURIComponent(toCurrency)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export async function createExpenseApi(input: {
+  date: string
+  accountId: string
+  currency: string
+  amount: number
+  accountAmount: number
+  commission?: number
+  note?: string
+}): Promise<Expense> {
+  const body = await api<{ expense: Expense }>('/api/wallet/expenses', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return body.expense
+}
+
+export async function deleteExpenseApi(id: string): Promise<void> {
+  await api(`/api/wallet/expenses/${id}`, { method: 'DELETE' })
 }
 
 export async function createAccountFundApi(input: {

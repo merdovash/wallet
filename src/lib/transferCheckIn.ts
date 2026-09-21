@@ -2,11 +2,13 @@ import { balanceOnDate, convertAmount, type RateBook } from '../engine/growthEng
 import type {
   Account,
   BalanceSnapshot,
+  ManualRate,
   SnapshotLine,
   Transfer,
   WalletSettings,
 } from '../types/wallet'
 import { formatCurrency } from './format'
+import { convertViaManualRate } from './manualRates'
 import { transferReceivedAmount } from './transferAmounts'
 
 /** Lines for a transfer check-in: adjust from/to from current forward-filled balances. */
@@ -90,7 +92,10 @@ export function formatTransferLabel(
   return `${fromName} → ${toName}: ${sent}`
 }
 
-/** Official conversion of the sent amount into the destination currency. */
+/**
+ * Expected receipt in the destination currency: the user's manual pair rate
+ * when set, otherwise the official CBR conversion of the sent amount.
+ */
 export function suggestedReceiveAmount(
   amount: number,
   from: Pick<Account, 'currency'> | undefined,
@@ -98,9 +103,14 @@ export function suggestedReceiveAmount(
   settings: WalletSettings,
   date: string,
   rateBook?: RateBook,
+  manualRates?: ManualRate[],
 ): number | null {
   if (!from || !to || !(amount > 0)) return null
   if (from.currency === to.currency) return amount
+  if (manualRates && manualRates.length > 0) {
+    const manual = convertViaManualRate(amount, from.currency, to.currency, manualRates)
+    if (manual != null && Number.isFinite(manual)) return manual
+  }
   const converted = convertAmount(amount, from.currency, to.currency, settings, date, rateBook)
   return Number.isFinite(converted) ? converted : null
 }

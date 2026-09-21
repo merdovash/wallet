@@ -4,7 +4,9 @@ import type {
   Account,
   AccountFund,
   BalanceSnapshot,
+  Expense,
   IndexValue,
+  ManualRate,
   MarketIndex,
   SnapshotLine,
   SnapshotOrigin,
@@ -12,15 +14,19 @@ import type {
   WalletSettings,
 } from '../types/wallet'
 import { normalizeAccountKind } from '../lib/accountKinds'
+import { buildExpenseCheckInPlan } from '../lib/expenseCheckIn'
 import { buildTransferSnapshotLines } from '../lib/transferCheckIn'
 import type { RateBook } from '../engine/growthEngine'
 import {
   createAccountApi,
   createAccountFundApi,
+  createExpenseApi,
   createMarketIndexApi,
   createTransferApi,
   deleteAccountApi,
   deleteAccountFundApi,
+  deleteExpenseApi,
+  deleteManualRateApi,
   deleteMarketIndexApi,
   deleteSnapshotApi,
   deleteTransferApi,
@@ -32,6 +38,7 @@ import {
   updateAccountFundApi,
   updateMarketIndexApi,
   updateSnapshotApi,
+  upsertManualRateApi,
   upsertSnapshotApi,
   upsertIndexValuesApi,
   withFallbackRates,
@@ -47,6 +54,8 @@ interface WalletState {
   funds: AccountFund[]
   indices: MarketIndex[]
   indexValues: IndexValue[]
+  manualRates: ManualRate[]
+  expenses: Expense[]
   loaded: boolean
   loading: boolean
   error: string | null
@@ -92,6 +101,26 @@ interface WalletState {
     rateBook?: RateBook,
   ) => Promise<{ transferId: string; snapshotId: string }>
   deleteTransfer: (id: string) => Promise<void>
+  /** Set current exchange rate for a currency pair (1 from = rate × to). */
+  setManualRate: (input: {
+    fromCurrency: string
+    toCurrency: string
+    rate: number
+  }) => Promise<void>
+  removeManualRate: (fromCurrency: string, toCurrency: string) => Promise<void>
+  /** Create expense and immediately upsert a check-in with the reduced balance. */
+  addExpenseCheckIn: (
+    input: {
+      date: string
+      accountId: string
+      currency: string
+      amount: number
+      accountAmount?: number
+      note?: string
+    },
+    rateBook?: RateBook,
+  ) => Promise<{ expenseId: string; snapshotId: string }>
+  deleteExpense: (id: string) => Promise<void>
   addAccountFund: (input: {
     accountId: string
     name: string
@@ -195,6 +224,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   funds: [],
   indices: [],
   indexValues: [],
+  manualRates: [],
+  expenses: [],
   loaded: false,
   loading: false,
   error: null,
@@ -208,6 +239,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       funds: [],
       indices: [],
       indexValues: [],
+      manualRates: [],
+      expenses: [],
       loaded: false,
       loading: false,
       error: null,
@@ -240,6 +273,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         funds: bundle.funds ?? [],
         indices: bundle.indices ?? [],
         indexValues: bundle.indexValues ?? [],
+        manualRates: bundle.manualRates ?? [],
+        expenses: bundle.expenses ?? [],
         loaded: true,
         loading: false,
       })
@@ -312,6 +347,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         (t) => t.fromAccountId !== id && t.toAccountId !== id,
       ),
       funds: state.funds.filter((f) => f.accountId !== id),
+      expenses: state.expenses.filter((e) => e.accountId !== id),
     }))
   },
 
@@ -405,6 +441,92 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     await deleteTransferApi(id)
     set((state) => ({
       transfers: state.transfers.filter((t) => t.id !== id),
+    }))
+  },
+
+  setManualRate: async (input) => {
+    const manualRate = await upsertManualRateApi(input)
+    set((state) => {
+      const others = state.manualRates.filter(
+        (r) =>
+          !(
+            r.fromCurrency === manualRate.fromCurrency &&
+            r.toCurrency === manualRate.toCurrency
+          ),
+      )
+      return {
+        manualRates: [...others, manualRate].sort(
+          (a, b) =>
+            a.fromCurrency.localeCompare(b.fromCurrency) ||
+            a.toCurrency.localeCompare(b.toCurrency),
+        ),
+      }
+    })
+  },
+
+  removeManualRate: async (fromCurrency, toCurrency) => {
+    await deleteManualRateApi(fromCurrency, toCurrency)
+    set((state) => ({
+      manualRates: state.manualRates.filter(
+        (r) => !(r.fromCurrency === fromCurrency && r.toCurrency === toCurrency),
+      ),
+    }))
+  },
+
+  addExpenseCheckIn: async (input, rateBook) => {
+    const state = get()
+    const plan = buildExpenseCheckInPlan({
+      date: input.date,
+      accountId: input.accountId,
+      currency: input.currency,
+      amount: input.amount,
+      accountAmount: input.accountAmount,
+      accounts: state.accounts,
+      snapshots: state.snapshots,
+      manualRates: state.manualRates,
+      settings: state.settings,
+      rateBook,
+    })
+    if (!plan) throw new Error('Не удалось рассчитать расход')
+
+    const expense = await createExpenseApi({
+      date: input.date,
+      accountId: input.accountId,
+      currency: input.currency,
+      amount: input.amount,
+      accountAmount: plan.accountAmount,
+      commission: plan.commission,
+      note: input.note,
+    })
+
+    // Preserve the existing snapshot's note/income; add the charge to its external expense.
+    const existing = state.snapshots.find((s) => s.date === input.date)
+    const snapshot = normalizeSnapshot(
+      await upsertSnapshotApi({
+        date: input.date,
+        note: existing?.note,
+        income: existing?.income,
+        expense: (existing?.expense ?? 0) + plan.expenseBase,
+        lines: [plan.line],
+      }),
+    )
+
+    set((prev) => {
+      const others = prev.snapshots.filter(
+        (s) => s.id !== snapshot.id && s.date !== snapshot.date,
+      )
+      return {
+        expenses: [...prev.expenses, expense],
+        snapshots: [...others, snapshot],
+      }
+    })
+    return { expenseId: expense.id, snapshotId: snapshot.id }
+  },
+
+  deleteExpense: async (id) => {
+    await deleteExpenseApi(id)
+    set((state) => ({
+      expenses: state.expenses.filter((e) => e.id !== id),
     }))
   },
 

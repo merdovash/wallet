@@ -11,6 +11,7 @@ export const APP_SECTION_PATHS: Record<AppSection, string> = {
   daily: '/daily',
   float: '/float',
   cashback: '/cashback',
+  commissions: '/commissions',
   'index-comparison': '/indices',
   settings: '/settings',
 }

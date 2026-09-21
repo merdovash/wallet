@@ -9,13 +9,21 @@ export type AppSection =
   | 'daily'
   | 'float'
   | 'cashback'
+  | 'commissions'
   | 'index-comparison'
   | 'settings'
 
 /** Разделы внутри хаба «Аналитика». */
 export type AnalyticsSection = Extract<
   AppSection,
-  'daily' | 'types' | 'currencies' | 'monthly' | 'float' | 'cashback' | 'index-comparison'
+  | 'daily'
+  | 'types'
+  | 'currencies'
+  | 'monthly'
+  | 'float'
+  | 'cashback'
+  | 'commissions'
+  | 'index-comparison'
 >
 
 export type SnapshotOrigin = 'manual' | 'transfer'
@@ -133,6 +141,31 @@ export interface IndexValue {
 
 /** Manual rates: 1 unit of currency → how many units of baseCurrency. */
 export type ExchangeRates = Record<string, number>
+
+/** User-set current exchange rate: 1 fromCurrency = rate × toCurrency. */
+export interface ManualRate {
+  fromCurrency: string
+  toCurrency: string
+  rate: number
+  updatedAt?: string
+}
+
+/** Standalone expense from an account; creates a check-in immediately. */
+export interface Expense {
+  id: string
+  date: string
+  accountId: string
+  /** Currency the expense was made in (may differ from the account currency). */
+  currency: string
+  /** Expense amount in `currency`. */
+  amount: number
+  /** Amount charged from the account, in the account currency. */
+  accountAmount: number
+  /** Conversion commission in the account currency, frozen at creation time. */
+  commission: number
+  note?: string
+  createdAt?: string
+}
 
 export interface WalletSettings {
   baseCurrency: string

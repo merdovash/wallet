@@ -308,6 +308,98 @@ export async function handleWalletApi(
       }
     }
 
+    if (pathname === '/api/wallet/manual-rates' && method === 'GET') {
+      sendJson(res, 200, { manualRates: await store.listManualRates(user.id) })
+      return true
+    }
+
+    if (pathname === '/api/wallet/manual-rates' && method === 'PUT') {
+      const body = await readJsonBody<{
+        fromCurrency?: string
+        toCurrency?: string
+        rate?: number
+      }>(req)
+      if (!body.fromCurrency || !body.toCurrency || body.rate == null) {
+        sendJson(res, 400, { error: 'Нужны fromCurrency, toCurrency, rate' })
+        return true
+      }
+      const manualRate = await store.upsertManualRate(user.id, {
+        fromCurrency: body.fromCurrency,
+        toCurrency: body.toCurrency,
+        rate: Number(body.rate),
+      })
+      sendJson(res, 200, { manualRate })
+      return true
+    }
+
+    {
+      const params = matchPath(pathname, '/api/wallet/manual-rates/:from/:to')
+      if (params && method === 'DELETE') {
+        const ok = await store.deleteManualRate(user.id, params.from!, params.to!)
+        if (!ok) {
+          sendJson(res, 404, { error: 'Курс не найден' })
+          return true
+        }
+        sendJson(res, 200, { ok: true })
+        return true
+      }
+    }
+
+    if (pathname === '/api/wallet/expenses' && method === 'GET') {
+      sendJson(res, 200, { expenses: await store.listExpenses(user.id) })
+      return true
+    }
+
+    if (pathname === '/api/wallet/expenses' && method === 'POST') {
+      const body = await readJsonBody<{
+        date?: string
+        accountId?: string
+        currency?: string
+        amount?: number
+        accountAmount?: number
+        commission?: number
+        note?: string
+      }>(req)
+      if (
+        !body.date ||
+        !body.accountId ||
+        !body.currency ||
+        body.amount == null ||
+        !(Number(body.amount) > 0) ||
+        body.accountAmount == null ||
+        !(Number(body.accountAmount) > 0)
+      ) {
+        sendJson(res, 400, {
+          error: 'Нужны date, accountId, currency, amount > 0, accountAmount > 0',
+        })
+        return true
+      }
+      const expense = await store.createExpense(user.id, {
+        date: body.date,
+        accountId: body.accountId,
+        currency: body.currency,
+        amount: Number(body.amount),
+        accountAmount: Number(body.accountAmount),
+        commission: body.commission != null ? Number(body.commission) : undefined,
+        note: body.note,
+      })
+      sendJson(res, 201, { expense })
+      return true
+    }
+
+    {
+      const params = matchPath(pathname, '/api/wallet/expenses/:id')
+      if (params && method === 'DELETE') {
+        const ok = await store.deleteExpense(user.id, params.id!)
+        if (!ok) {
+          sendJson(res, 404, { error: 'Расход не найден' })
+          return true
+        }
+        sendJson(res, 200, { ok: true })
+        return true
+      }
+    }
+
     if (pathname === '/api/wallet/funds' && method === 'GET') {
       sendJson(res, 200, { funds: await store.listAccountFunds(user.id) })
       return true

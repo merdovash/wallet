@@ -26,6 +26,8 @@
 | `wallet_transfers` | Переводы между счетами |
 | `wallet_account_funds` | Фонды (конверты) внутри счёта; остатки считаются из чек-инов и переводов |
 | `wallet_account_fund_expenses` | Итоговые расходы фонда по календарным месяцам |
+| `wallet_manual_rates` | Ручные актуальные курсы обмена валютных пар (1 запись на пару) |
+| `wallet_expenses` | Расходы со счёта (отдельное действие; чек-ин фиксируется сразу) |
 | `cbr_rate_days` | Кэш дневных курсов ЦБ (общий) |
 
 ```mermaid
@@ -118,7 +120,7 @@ erDiagram
 
 Ограничения: `PRIMARY KEY (user_id)`, FK `user_id`.
 
-Ручные курсы в БД не хранятся: конвертация через `cbr_rate_days` (клиентский fallback — константа в коде).
+Конвертация в базовую валюту идёт через `cbr_rate_days` (клиентский fallback — константа в коде). Кроме того, в `wallet_manual_rates` пользователь может задать актуальный курс обмена произвольной пары валют (`1 from_currency = rate × to_currency`, одна запись на пару): он имеет приоритет над курсом ЦБ **при обмене** — в подсказке суммы зачисления перевода и суммы списания расхода, а также как референс комиссии конвертации расхода.
 
 ---
 
@@ -320,6 +322,9 @@ erDiagram
 | `010_key_rate.sql` | Ключевая ставка в настройках |
 | `011_account_funds.sql` | Фонды-конверты внутри счёта |
 | `012_fund_monthly_expenses.sql` | Расходы фонда по месяцам и `auto_target` |
+| `013_transfer_to_amount.sql` | `to_amount` у переводов (сумма зачисления) |
+| `013_market_indices.sql` … `015_derived_market_indices.sql` | Рыночные индексы и их значения |
+| `016_manual_rates_expenses.sql` | `wallet_manual_rates` (ручные курсы пар) и `wallet_expenses` (расходы со счёта с комиссией конвертации) |
 
 ---
 
@@ -333,6 +338,8 @@ erDiagram
 | `/api/wallet/snapshots` | `wallet_snapshots`, `wallet_snapshot_lines` |
 | `/api/wallet/transfers` | `wallet_transfers` |
 | `/api/wallet/funds` | `wallet_account_funds`, `wallet_account_fund_expenses` |
+| `/api/wallet/manual-rates` | `wallet_manual_rates` |
+| `/api/wallet/expenses` | `wallet_expenses` (+ чек-ин через `/api/wallet/snapshots`) |
 | `/api/wallet/import` | все `wallet_*` (если кошелёк пуст) |
 | `/api/rates` | `cbr_rate_days` |
 

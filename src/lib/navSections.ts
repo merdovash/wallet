@@ -45,6 +45,11 @@ export const ANALYTICS_NAV_ITEMS: {
     description: 'Скидка от расходов через кэшбек-счета',
   },
   {
+    id: 'commissions',
+    label: 'Комиссии',
+    description: 'Потери на конвертации и комиссии при переводах и расходах',
+  },
+  {
     id: 'index-comparison',
     label: 'Сравнение с индексами',
     description: 'Что было бы, если направлять капитал и пополнения в выбранный индекс',
