@@ -14,6 +14,8 @@ export function ManualRatesCard() {
 
   const [fromCurrency, setFromCurrency] = useState('USD')
   const [toCurrency, setToCurrency] = useState('RUB')
+  /** За единицу какой валюты пары указывается курс: исходной или целевой. */
+  const [rateBase, setRateBase] = useState<'from' | 'to'>('from')
   const [rateText, setRateText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,12 +24,21 @@ export function ManualRatesCard() {
   const canSave =
     !busy && fromCurrency !== toCurrency && parsedRate != null && parsedRate > 0
 
+  const rateUnitCurrency = rateBase === 'from' ? fromCurrency : toCurrency
+  const rateQuoteCurrency = rateBase === 'from' ? toCurrency : fromCurrency
+
   async function handleSave() {
     if (!canSave || parsedRate == null) return
     setBusy(true)
     setError(null)
     try {
-      await setManualRate({ fromCurrency, toCurrency, rate: parsedRate })
+      // Храним курс в той ориентации, как её указал пользователь:
+      // «1 USD = 85 RUB» сохраняется как пара USD→RUB с курсом 85.
+      await setManualRate({
+        fromCurrency: rateUnitCurrency,
+        toCurrency: rateQuoteCurrency,
+        rate: parsedRate,
+      })
       setRateText('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить курс')
@@ -57,6 +68,8 @@ export function ManualRatesCard() {
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Актуальный курс обмена произвольной пары валют. Используется при обмене валют —
           подставляется в сумму зачисления перевода и в сумму списания расхода вместо курса ЦБ.
+          Курс можно указать за единицу любой из валют пары: например, покупая доллары за рубли,
+          укажите «1 USD = 85 RUB». Для пары хранится один актуальный курс.
         </p>
       </div>
 
@@ -87,7 +100,20 @@ export function ManualRatesCard() {
             ))}
           </Select>
         </Field>
-        <Field label={`Курс: 1 ${fromCurrency} =`} className="min-w-[8rem] flex-1">
+        <Field label="Курс за" className="min-w-[7rem] flex-1">
+          <Select
+            value={rateBase}
+            onChange={(e) => setRateBase(e.target.value === 'to' ? 'to' : 'from')}
+            dataQa="manual-rate-base"
+          >
+            <option value="from">1 {fromCurrency}</option>
+            <option value="to">1 {toCurrency}</option>
+          </Select>
+        </Field>
+        <Field
+          label={`1 ${rateUnitCurrency} = … ${rateQuoteCurrency}`}
+          className="min-w-[8rem] flex-1"
+        >
           <MoneyInput
             value={rateText}
             onChange={setRateText}
@@ -140,6 +166,7 @@ export function ManualRatesCard() {
                   onClick={() => {
                     setFromCurrency(rate.fromCurrency)
                     setToCurrency(rate.toCurrency)
+                    setRateBase('from')
                     setRateText(
                       String(rate.rate).replace('.', ','),
                     )

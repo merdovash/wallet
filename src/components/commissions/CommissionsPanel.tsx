@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
-import { buildCommissionReport } from '../../lib/commissionReport'
+import { useMemo, useState } from 'react'
+import { buildCommissionReport, type CommissionRow } from '../../lib/commissionReport'
+import { CommissionBreakdownPanel } from './CommissionBreakdownPanel'
 import { dataQa } from '../../lib/dataQa'
 import { formatDateDisplay, signedAmount } from '../../lib/format'
 import { usePeriodRange } from '../../lib/usePeriodRange'
@@ -39,6 +40,7 @@ export function CommissionsPanel() {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const { range } = usePeriodRange()
+  const [breakdownRowId, setBreakdownRowId] = useState<string | null>(null)
 
   const report = useMemo(
     () =>
@@ -122,46 +124,61 @@ export function CommissionsPanel() {
             <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3">
               <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Операции</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Красное — потеря (комиссия / курс хуже ЦБ), зелёное — выгода · новые сверху
+                Красное — потеря (комиссия / курс хуже ЦБ), зелёное — выгода · новые сверху ·
+                клик по операции — расшифровка расчёта
               </p>
             </div>
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
               {report.rows.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm"
-                  {...dataQa(`commissions-row-${row.id}`)}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-slate-900 dark:text-slate-200">
-                        {formatDateDisplay(row.date)}
-                      </span>
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                          row.kind === 'transfer'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-sky-100 text-sky-800'
-                        }`}
-                      >
-                        {row.kind === 'transfer' ? 'перевод' : 'расход'}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
-                      {row.label} · {row.detail}
-                    </span>
-                  </span>
-                  <span
-                    className={`shrink-0 tabular-nums font-medium ${commissionTone(row.commissionBase)}`}
+                <li key={row.id} {...dataQa(`commissions-row-${row.id}`)}>
+                  <button
+                    type="button"
+                    onClick={() => setBreakdownRowId(row.id)}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    {...dataQa(`commissions-row-open-${row.id}`)}
                   >
-                    {commissionLabel(row.commissionBase, settings.baseCurrency)}
-                  </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-slate-900 dark:text-slate-200">
+                          {formatDateDisplay(row.date)}
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                            row.kind === 'transfer'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-sky-100 text-sky-800'
+                          }`}
+                        >
+                          {row.kind === 'transfer' ? 'перевод' : 'расход'}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                        {row.label} · {row.detail}
+                      </span>
+                    </span>
+                    <span
+                      className={`shrink-0 tabular-nums font-medium ${commissionTone(row.commissionBase)}`}
+                    >
+                      {commissionLabel(row.commissionBase, settings.baseCurrency)}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
           </Card>
         </>
       )}
+
+      <CommissionBreakdownPanel
+        open={breakdownRowId != null}
+        onClose={() => setBreakdownRowId(null)}
+        row={findRow(report.rows, breakdownRowId)}
+      />
     </div>
   )
+}
+
+function findRow(rows: CommissionRow[], id: string | null): CommissionRow | null {
+  if (!id) return null
+  return rows.find((row) => row.id === id) ?? null
 }

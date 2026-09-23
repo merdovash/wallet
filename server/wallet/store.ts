@@ -792,6 +792,12 @@ export async function upsertManualRate(
     throw new Error('Курс должен быть больше 0')
   }
   const pool = getPool()
+  // Один актуальный курс на пару: запись противоположного направления заменяется.
+  await pool.query(
+    `DELETE FROM wallet_manual_rates
+     WHERE user_id = $1 AND from_currency = $2 AND to_currency = $3`,
+    [userId, toCurrency, fromCurrency],
+  )
   const result = await pool.query<{
     from_currency: string
     to_currency: string

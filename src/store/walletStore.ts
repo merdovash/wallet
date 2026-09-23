@@ -447,11 +447,14 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   setManualRate: async (input) => {
     const manualRate = await upsertManualRateApi(input)
     set((state) => {
+      // Один актуальный курс на пару: сервер заменяет и обратное направление.
       const others = state.manualRates.filter(
         (r) =>
           !(
-            r.fromCurrency === manualRate.fromCurrency &&
-            r.toCurrency === manualRate.toCurrency
+            (r.fromCurrency === manualRate.fromCurrency &&
+              r.toCurrency === manualRate.toCurrency) ||
+            (r.fromCurrency === manualRate.toCurrency &&
+              r.toCurrency === manualRate.fromCurrency)
           ),
       )
       return {

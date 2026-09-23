@@ -88,6 +88,51 @@ describe('buildCommissionReport', () => {
     expect(report.totalBase).toBeCloseTo(50)
   })
 
+  it('builds a formula breakdown for a transfer: sent, received, difference', () => {
+    const report = buildCommissionReport(accounts, transfers, [], settings)
+    const row = report.rows.find((r) => r.id === 'transfer-t1')!
+    expect(row.breakdown).toHaveLength(3)
+    // Отправлено: 100 USD × 90 RUB/USD = 9 000 ₽.
+    expect(row.breakdown[0]!.expression).toContain('× 90')
+    expect(row.breakdown[0]!.result).toContain('9')
+    // Получено в базовой — без умножения (валюта уже базовая).
+    expect(row.breakdown[1]!.expression).toBeUndefined()
+    // Итог: 9 000 − 8 500 = 500, выделен.
+    expect(row.breakdown[2]!.emphasize).toBe(true)
+    expect(row.breakdown[2]!.expression).toContain('−')
+    expect(row.breakdown[2]!.result).toContain('500')
+  })
+
+  it('builds a formula breakdown for an expense from the frozen reference rate', () => {
+    const report = buildCommissionReport(accounts, [], expenses, settings)
+    const row = report.rows.find((r) => r.id === 'expense-e1')!
+    expect(row.breakdown).toHaveLength(2)
+    // Референс: 950 − 50 = 900 ₽ за 10 USD → курс 90.
+    expect(row.breakdown[0]!.expression).toContain('× 90')
+    expect(row.breakdown[0]!.result).toContain('900')
+    // Комиссия: 950 − 900 = 50 ₽, выделена (валюта счёта — базовая).
+    expect(row.breakdown[1]!.expression).toContain('−')
+    expect(row.breakdown[1]!.result).toContain('50')
+    expect(row.breakdown[1]!.emphasize).toBe(true)
+  })
+
+  it('adds a base-conversion step for an expense on a foreign-currency account', () => {
+    const usdExpenseRow: Expense = {
+      id: 'e4',
+      date: '2026-04-03',
+      accountId: 'usd',
+      currency: 'THB',
+      amount: 320,
+      accountAmount: 11,
+      commission: 1,
+    }
+    const report = buildCommissionReport(accounts, [], [usdExpenseRow], settings)
+    const row = report.rows[0]!
+    expect(row.breakdown).toHaveLength(3)
+    expect(row.breakdown[2]!.expression).toContain('× 90')
+    expect(row.breakdown[2]!.emphasize).toBe(true)
+  })
+
   it('converts expense commission from the account currency to base', () => {
     const usdExpense: Expense = {
       id: 'e3',
