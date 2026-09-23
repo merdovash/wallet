@@ -3,6 +3,9 @@ import type { PeriodRange } from './dashboardPeriod'
 import { formatCurrency } from './format'
 import {
   isMeaningfulTransferSpread,
+  transferReceivedAmount,
+  transferReceivedBase,
+  transferSentBase,
   transferSpreadBase,
 } from './transferAmounts'
 import type {
@@ -11,6 +14,17 @@ import type {
   Transfer,
   WalletSettings,
 } from '../types/wallet'
+
+/** Строка расшифровки: `expression = result` (слева алгоритм со значениями, справа итог). */
+export interface CommissionBreakdownLine {
+  label: string
+  /** Левая часть формулы с конкретными значениями; пустая — показываем только итог. */
+  expression?: string
+  /** Правая часть — итоговая сумма (отформатированная). */
+  result: string
+  /** Итоговая строка формулы (выделяется и красится по знаку комиссии). */
+  emphasize?: boolean
+}
 
 export interface CommissionRow {
   id: string
@@ -22,6 +36,8 @@ export interface CommissionRow {
   detail: string
   /** Комиссия в базовой валюте: положительная — потеря, отрицательная — выгода. */
   commissionBase: number
+  /** Пошаговая расшифровка комиссии в виде формул. */
+  breakdown: CommissionBreakdownLine[]
 }
 
 export interface CommissionMonthRow {
@@ -43,6 +59,101 @@ export interface CommissionReport {
 function inRange(date: string, range?: PeriodRange | null): boolean {
   if (!range) return true
   return date >= range.startDate && date <= range.endDate
+}
+
+function formatRate(rate: number): string {
+  return rate.toLocaleString('ru-RU', { maximumFractionDigits: 4 })
+}
+
+/** Курс 1 единицы валюты в базовой на дату (курс ЦБ / fallback). */
+function baseRateFor(
+  currency: string,
+  settings: WalletSettings,
+  date: string,
+  rateBook?: RateBook,
+): number {
+  if (currency === settings.baseCurrency) return 1
+  return convertAmount(1, currency, settings.baseCurrency, settings, date, rateBook)
+}
+
+function transferBreakdown(
+  transfer: Transfer,
+  from: Account | undefined,
+  to: Account | undefined,
+  commissionBase: number,
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): CommissionBreakdownLine[] {
+  const base = settings.baseCurrency
+  const fromCurrency = from?.currency ?? base
+  const toCurrency = to?.currency ?? base
+  const received = transferReceivedAmount(transfer, from, to, settings, rateBook)
+  const sentBase = transferSentBase(transfer, from, settings, rateBook)
+  const receivedBase = transferReceivedBase(transfer, from, to, settings, rateBook)
+  const fromRate = baseRateFor(fromCurrency, settings, transfer.date, rateBook)
+  const toRate = baseRateFor(toCurrency, settings, transfer.date, rateBook)
+
+  const lines: CommissionBreakdownLine[] = []
+  lines.push({
+    label: `Отправлено в базовой валюте${fromCurrency !== base ? ' (курс ЦБ на дату)' : ''}`,
+    expression:
+      fromCurrency !== base
+        ? `${formatCurrency(transfer.amount, fromCurrency)} × ${formatRate(fromRate)} ${base}/${fromCurrency}`
+        : undefined,
+    result: formatCurrency(sentBase, base),
+  })
+  lines.push({
+    label: `Получено в базовой валюте${toCurrency !== base ? ' (курс ЦБ на дату)' : ''}`,
+    expression:
+      toCurrency !== base
+        ? `${formatCurrency(received, toCurrency)} × ${formatRate(toRate)} ${base}/${toCurrency}`
+        : undefined,
+    result: formatCurrency(receivedBase, base),
+  })
+  lines.push({
+    label: 'Комиссия / курсовая разница (отправлено − получено)',
+    expression: `${formatCurrency(sentBase, base)} − ${formatCurrency(receivedBase, base)}`,
+    result: formatCurrency(commissionBase, base),
+    emphasize: true,
+  })
+  return lines
+}
+
+function expenseBreakdown(
+  expense: Expense,
+  accountCurrency: string,
+  commissionBase: number,
+  settings: WalletSettings,
+  rateBook?: RateBook,
+): CommissionBreakdownLine[] {
+  const base = settings.baseCurrency
+  // Референс зафиксирован при создании расхода: списано − комиссия.
+  const referenceAmount = expense.accountAmount - expense.commission
+  const referenceRate = expense.amount > 0 ? referenceAmount / expense.amount : 0
+
+  const lines: CommissionBreakdownLine[] = [
+    {
+      label: 'Расход по курсу обмена на момент операции',
+      expression: `${formatCurrency(expense.amount, expense.currency)} × ${formatRate(referenceRate)} ${accountCurrency}/${expense.currency}`,
+      result: formatCurrency(referenceAmount, accountCurrency),
+    },
+    {
+      label: 'Комиссия (списано со счёта − расход по курсу)',
+      expression: `${formatCurrency(expense.accountAmount, accountCurrency)} − ${formatCurrency(referenceAmount, accountCurrency)}`,
+      result: formatCurrency(expense.commission, accountCurrency),
+      emphasize: accountCurrency === base,
+    },
+  ]
+  if (accountCurrency !== base) {
+    const accountRate = baseRateFor(accountCurrency, settings, expense.date, rateBook)
+    lines.push({
+      label: 'Комиссия в базовой валюте (курс ЦБ на дату)',
+      expression: `${formatCurrency(expense.commission, accountCurrency)} × ${formatRate(accountRate)} ${base}/${accountCurrency}`,
+      result: formatCurrency(commissionBase, base),
+      emphasize: true,
+    })
+  }
+  return lines
 }
 
 /**
@@ -78,6 +189,7 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase: -spread,
+      breakdown: transferBreakdown(transfer, from, to, -spread, settings, rateBook),
     })
   }
 
@@ -106,6 +218,7 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase,
+      breakdown: expenseBreakdown(expense, accountCurrency, commissionBase, settings, rateBook),
     })
   }
 
