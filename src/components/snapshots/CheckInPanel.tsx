@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { balanceOnDate } from '../../engine/growthEngine'
-import { todayIsoDate } from '../../lib/format'
+import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
 import { collectIndexValueEntries, indexValueToInput, parseIndexValueInput } from '../../lib/indexValueInput'
@@ -12,7 +12,7 @@ import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
 import type { RateBook } from '../../engine/growthEngine'
-import type { Account, SnapshotLine, Transfer, WalletSettings } from '../../types/wallet'
+import type { Account, Expense, SnapshotLine, Transfer, WalletSettings } from '../../types/wallet'
 import { dataQa } from '../../lib/dataQa'
 import { Button, DateInput, Input, MoneyInput } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
@@ -22,6 +22,7 @@ import {
   type CheckInTransferDraft,
 } from './CheckInTransferPanel'
 import { TransferSpreadLine } from './TransferSpreadLine'
+import { ExpenseEditPanel } from './ExpenseEditPanel'
 
 interface CheckInPanelProps {
   open: boolean
@@ -125,6 +126,8 @@ export function CheckInPanel({
   const deleteSnapshot = useWalletStore((s) => s.deleteSnapshot)
   const addTransfer = useWalletStore((s) => s.addTransfer)
   const deleteTransfer = useWalletStore((s) => s.deleteTransfer)
+  const expenses = useWalletStore((s) => s.expenses)
+  const deleteExpense = useWalletStore((s) => s.deleteExpense)
   const indices = useWalletStore((s) => s.indices)
   const indexValues = useWalletStore((s) => s.indexValues)
   const upsertIndexValues = useWalletStore((s) => s.upsertIndexValues)
@@ -177,6 +180,7 @@ export function CheckInPanel({
   const [indexAmounts, setIndexAmounts] = useState<Record<string, string>>({})
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([])
   const [transferEditor, setTransferEditor] = useState<TransferEditor | null>(null)
+  const [expenseEditing, setExpenseEditing] = useState<Expense | null>(null)
   const [scrollToTransferId, setScrollToTransferId] = useState<string | null>(null)
   const [incomeManual, setIncomeManual] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -217,6 +221,7 @@ export function CheckInPanel({
       )
     }
     setTransferEditor(null)
+    setExpenseEditing(null)
     setScrollToTransferId(null)
     setShowHelp(false)
   }, [open, editing, prefill]) // eslint-disable-line react-hooks/exhaustive-deps -- reset only on open
@@ -232,6 +237,14 @@ export function CheckInPanel({
         .filter((t) => t.date === date)
         .sort((a, b) => a.id.localeCompare(b.id)),
     [transfers, date],
+  )
+
+  const dateExpenses = useMemo(
+    () =>
+      expenses
+        .filter((e) => e.date === date)
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    [expenses, date],
   )
 
   const hints = useMemo(() => {
@@ -893,6 +906,18 @@ export function CheckInPanel({
           />
         )}
 
+        {!locked && (
+          <ExpensesSection
+            accounts={accounts}
+            expenses={dateExpenses}
+            onEdit={setExpenseEditing}
+            onDelete={(id) => {
+              if (!confirm('Удалить расход? Остаток счёта в чек-ине будет восстановлен.')) return
+              void deleteExpense(id, rateBook)
+            }}
+          />
+        )}
+
         {editing && (
           <Button type="button" variant="danger" dataQa="check-in-delete" onClick={() => void handleDelete()}>
             {locked ? 'Удалить перевод' : 'Удалить чек-ин'}
@@ -916,6 +941,12 @@ export function CheckInPanel({
       initial={transferEditor?.initial ?? null}
       onClose={() => setTransferEditor(null)}
       onSave={handleTransferEditorSave}
+    />
+
+    <ExpenseEditPanel
+      open={expenseEditing != null}
+      expense={expenseEditing}
+      onClose={() => setExpenseEditing(null)}
     />
     </>
   )
@@ -1060,6 +1091,73 @@ function TransfersSection({
                 onClick={() => onRemovePending(t.key)}
               >
                 Убрать
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function ExpensesSection({
+  accounts,
+  expenses,
+  onEdit,
+  onDelete,
+}: {
+  accounts: Account[]
+  expenses: Expense[]
+  onEdit: (e: Expense) => void
+  onDelete: (id: string) => void
+}) {
+  const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+
+  if (expenses.length === 0) {
+    return (
+      <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Расходы за день</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Расходов нет</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Расходы за день</h3>
+      <ul className="space-y-2">
+        {expenses.map((e) => {
+          const account = accountMap.get(e.accountId)
+          const crossCurrency = Boolean(account && account.currency !== e.currency)
+          return (
+            <li
+              key={e.id}
+              className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60"
+            >
+              <button
+                type="button"
+                className="min-w-0 flex-1 text-left"
+                {...dataQa(`check-in-expense-${e.id}`)}
+                onClick={() => onEdit(e)}
+              >
+                <p className="font-medium text-slate-900 dark:text-slate-200">
+                  {account?.name ?? 'Счёт удалён'}: −{formatCurrency(e.amount, e.currency)}
+                  {crossCurrency && account
+                    ? ` (списано ${formatCurrency(e.accountAmount, account.currency)})`
+                    : ''}
+                </p>
+                {e.note ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{e.note}</p>
+                ) : null}
+                <p className="mt-0.5 text-[11px] text-blue-600 dark:text-blue-400">Изменить</p>
+              </button>
+              <button
+                type="button"
+                className="shrink-0 text-xs text-red-600 hover:underline"
+                {...dataQa(`check-in-expense-delete-${e.id}`)}
+                onClick={() => onDelete(e.id)}
+              >
+                Удалить
               </button>
             </li>
           )
