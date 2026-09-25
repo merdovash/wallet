@@ -36,6 +36,8 @@ export interface CommissionRow {
   label: string
   /** Детали суммы операции в исходной валюте. */
   detail: string
+  /** Счета, участвующие в операции (для фильтра по кошелькам). */
+  accountIds: string[]
   /** Комиссия в базовой валюте: положительная — потеря, отрицательная — выгода. */
   commissionBase: number
   /** Пошаговая расшифровка комиссии в виде формул. */
@@ -282,6 +284,7 @@ export function buildCommissionReport(
       id: `transfer-${transfer.id}`,
       date: transfer.date,
       kind: 'transfer',
+      accountIds: [transfer.fromAccountId, transfer.toAccountId].filter(Boolean),
       label: `${from?.name ?? '—'} → ${to?.name ?? '—'}`,
       detail: `${formatCurrency(transfer.amount, from?.currency ?? settings.baseCurrency)}${
         transfer.toAmount != null
@@ -311,6 +314,7 @@ export function buildCommissionReport(
       id: `expense-${expense.id}`,
       date: expense.date,
       kind: 'expense',
+      accountIds: [expense.accountId],
       label: `Расход · ${account?.name ?? '—'}${expense.note ? ` · ${expense.note}` : ''}`,
       detail: `${formatCurrency(expense.amount, expense.currency)}${
         expense.currency !== accountCurrency
@@ -331,6 +335,11 @@ export function buildCommissionReport(
 
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
 
+  return summarizeCommissionRows(rows)
+}
+
+/** Итоги и помесячная сводка по набору строк (для пересчёта после фильтра по кошелькам). */
+export function summarizeCommissionRows(rows: CommissionRow[]): CommissionReport {
   const totalBase = rows.reduce((sum, row) => sum + row.commissionBase, 0)
   const transfersBase = rows
     .filter((row) => row.kind === 'transfer')
@@ -350,4 +359,15 @@ export function buildCommissionReport(
   const months = [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month))
 
   return { rows, totalBase, transfersBase, expensesBase, months }
+}
+
+/** Сумма комиссии по каждому счёту (перевод учитывается в обоих его счетах). */
+export function commissionByAccount(rows: CommissionRow[]): Map<string, number> {
+  const totals = new Map<string, number>()
+  for (const row of rows) {
+    for (const accountId of new Set(row.accountIds)) {
+      totals.set(accountId, (totals.get(accountId) ?? 0) + row.commissionBase)
+    }
+  }
+  return totals
 }

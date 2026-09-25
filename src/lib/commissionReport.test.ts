@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { Account, Expense, ManualRate, Transfer, WalletSettings } from '../types/wallet'
-import { buildCommissionReport } from './commissionReport'
+import {
+  buildCommissionReport,
+  commissionByAccount,
+  summarizeCommissionRows,
+} from './commissionReport'
 
 const settings: WalletSettings = {
   baseCurrency: 'RUB',
@@ -159,6 +163,14 @@ describe('buildCommissionReport', () => {
     expect(last.emphasize).toBe(true)
   })
 
+  it('tags rows with the accounts involved', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const transferRow = report.rows.find((r) => r.id === 'transfer-t1')!
+    const expenseRow = report.rows.find((r) => r.id === 'expense-e1')!
+    expect(transferRow.accountIds).toEqual(['usd', 'rub'])
+    expect(expenseRow.accountIds).toEqual(['rub'])
+  })
+
   it('converts expense commission from the account currency to base', () => {
     const usdExpense: Expense = {
       id: 'e3',
@@ -171,5 +183,30 @@ describe('buildCommissionReport', () => {
     }
     const report = buildCommissionReport(accounts, [], [usdExpense], [], settings)
     expect(report.totalBase).toBeCloseTo(90)
+  })
+})
+
+describe('commissionByAccount', () => {
+  it('sums the commission per account, counting a transfer in both its accounts', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const totals = commissionByAccount(report.rows)
+    // usd: только перевод (500); rub: перевод (500) + расход (50).
+    expect(totals.get('usd')).toBeCloseTo(500)
+    expect(totals.get('rub')).toBeCloseTo(550)
+    expect(totals.size).toBe(2)
+  })
+})
+
+describe('summarizeCommissionRows', () => {
+  it('recomputes totals and months for a filtered subset', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const onlyUsd = summarizeCommissionRows(
+      report.rows.filter((row) => row.accountIds.includes('usd')),
+    )
+    expect(onlyUsd.rows).toHaveLength(1)
+    expect(onlyUsd.totalBase).toBeCloseTo(500)
+    expect(onlyUsd.transfersBase).toBeCloseTo(500)
+    expect(onlyUsd.expensesBase).toBe(0)
+    expect(onlyUsd.months).toEqual([{ month: '2026-03', commissionBase: 500, rowCount: 1 }])
   })
 })
