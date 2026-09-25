@@ -8,12 +8,19 @@ import {
 import { CommissionBreakdownPanel } from './CommissionBreakdownPanel'
 import { dataQa } from '../../lib/dataQa'
 import { formatDateDisplay, signedAmount } from '../../lib/format'
+import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
 import { useWalletStore } from '../../store/walletStore'
+import type { Expense, Transfer } from '../../types/wallet'
 import { Card, EmptyState } from '../ui/FormControls'
 import { PageHeader } from '../ui/PageHeader'
 import { PeriodFilter } from '../ui/PeriodFilter'
+import {
+  CheckInTransferPanel,
+  type CheckInTransferDraft,
+} from '../snapshots/CheckInTransferPanel'
+import { ExpenseEditPanel } from '../snapshots/ExpenseEditPanel'
 
 const MONTH_LABEL = new Intl.DateTimeFormat('ru-RU', {
   month: 'long',
@@ -38,6 +45,10 @@ function commissionLabel(value: number, currency: string): string {
   return signedAmount(-value, currency)
 }
 
+function amountToInput(amount: number): string {
+  return formatMoneyInput(String(amount).replace('.', ','))
+}
+
 export function CommissionsPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const transfers = useWalletStore((s) => s.transfers)
@@ -46,8 +57,12 @@ export function CommissionsPanel() {
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const { range } = usePeriodRange()
+  const deleteTransfer = useWalletStore((s) => s.deleteTransfer)
+  const addTransfer = useWalletStore((s) => s.addTransfer)
   const [breakdownRowId, setBreakdownRowId] = useState<string | null>(null)
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
+  const [editExpense, setEditExpense] = useState<Expense | null>(null)
+  const [editTransfer, setEditTransfer] = useState<Transfer | null>(null)
 
   const fullReport = useMemo(
     () =>
@@ -91,6 +106,69 @@ export function CommissionsPanel() {
     setSelectedAccountIds((prev) =>
       prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
     )
+  }
+
+  const editorAccounts = useMemo(
+    () =>
+      [...accounts].sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+      ),
+    [accounts],
+  )
+
+  /** Из расшифровки — к карточке редактирования перевода или расхода. */
+  function openRowEditor(row: CommissionRow) {
+    setBreakdownRowId(null)
+    if (row.kind === 'expense') {
+      const expense = expenses.find((e) => `expense-${e.id}` === row.id)
+      if (expense) setEditExpense(expense)
+      return
+    }
+    const transfer = transfers.find((t) => `transfer-${t.id}` === row.id)
+    if (transfer) setEditTransfer(transfer)
+  }
+
+  const transferDraft: CheckInTransferDraft | null = useMemo(() => {
+    if (!editTransfer) return null
+    return {
+      fromAccountId: editTransfer.fromAccountId,
+      toAccountId: editTransfer.toAccountId,
+      amount: amountToInput(editTransfer.amount),
+      toAmount: editTransfer.toAmount != null ? amountToInput(editTransfer.toAmount) : '',
+      commissionAccountId: editTransfer.commissionAccountId ?? '',
+      note: editTransfer.note ?? '',
+    }
+  }, [editTransfer])
+
+  /** Пересохранение перевода: как в чек-ине — удалить и создать заново той же датой. */
+  async function handleTransferEditSave(draft: CheckInTransferDraft) {
+    const current = editTransfer
+    if (!current) return
+    const amount = parseMoneyInput(draft.amount)
+    if (
+      !draft.fromAccountId ||
+      !draft.toAccountId ||
+      draft.fromAccountId === draft.toAccountId ||
+      amount == null ||
+      amount <= 0
+    ) {
+      return
+    }
+    const toAmount = parseMoneyInput(draft.toAmount)
+    await deleteTransfer(current.id)
+    await addTransfer({
+      date: current.date,
+      fromAccountId: draft.fromAccountId,
+      toAccountId: draft.toAccountId,
+      amount,
+      toAmount: toAmount != null && toAmount > 0 ? toAmount : undefined,
+      commissionAccountId:
+        draft.commissionAccountId === draft.fromAccountId ||
+        draft.commissionAccountId === draft.toAccountId
+          ? draft.commissionAccountId
+          : undefined,
+      note: draft.note.trim() || undefined,
+    })
   }
 
   return (
@@ -273,6 +351,25 @@ export function CommissionsPanel() {
         open={breakdownRowId != null}
         onClose={() => setBreakdownRowId(null)}
         row={findRow(report.rows, breakdownRowId)}
+        onEdit={openRowEditor}
+      />
+
+      <ExpenseEditPanel
+        open={editExpense != null}
+        expense={editExpense}
+        onClose={() => setEditExpense(null)}
+      />
+
+      <CheckInTransferPanel
+        open={editTransfer != null}
+        title="Редактировать перевод"
+        date={editTransfer?.date ?? ''}
+        accounts={editorAccounts}
+        settings={settings}
+        rateBook={rateBook}
+        initial={transferDraft}
+        onClose={() => setEditTransfer(null)}
+        onSave={handleTransferEditSave}
       />
     </div>
   )

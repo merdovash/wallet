@@ -14,6 +14,8 @@ export type CheckInTransferDraft = {
   toAccountId: string
   amount: string
   toAmount: string
+  /** '' = не указано, к какому кошельку относится комиссия. */
+  commissionAccountId: string
   note: string
 }
 
@@ -35,6 +37,7 @@ export function emptyTransferDraft(accounts: Account[]): CheckInTransferDraft {
     toAccountId: accounts[1]?.id ?? accounts[0]?.id ?? '',
     amount: '',
     toAmount: '',
+    commissionAccountId: '',
     note: '',
   }
 }
@@ -54,6 +57,7 @@ export function CheckInTransferPanel({
   const [toAccountId, setToAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [toAmount, setToAmount] = useState('')
+  const [commissionAccountId, setCommissionAccountId] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const manualRates = useWalletStore((s) => s.manualRates)
@@ -64,6 +68,7 @@ export function CheckInTransferPanel({
     setToAccountId(initial.toAccountId)
     setAmount(initial.amount)
     setToAmount(initial.toAmount)
+    setCommissionAccountId(initial.commissionAccountId)
     setNote(initial.note)
     setSaving(false)
   }, [open, initial])
@@ -138,6 +143,10 @@ export function CheckInTransferPanel({
         toAccountId,
         amount,
         toAmount,
+        commissionAccountId:
+          commissionAccountId === fromAccountId || commissionAccountId === toAccountId
+            ? commissionAccountId
+            : '',
         note,
       })
       onClose()
@@ -210,6 +219,25 @@ export function CheckInTransferPanel({
           className="text-sm font-medium"
           dataQa="check-in-transfer-spread"
         />
+        <Field label="Комиссия относится к кошельку">
+          <Select
+            value={
+              commissionAccountId === fromAccountId || commissionAccountId === toAccountId
+                ? commissionAccountId
+                : ''
+            }
+            onChange={(e) => setCommissionAccountId(e.target.value)}
+            dataQa="check-in-transfer-commission-account"
+          >
+            <option value="">Не указано (оба счёта)</option>
+            {fromAccount ? (
+              <option value={fromAccount.id}>{fromAccount.name} ({fromAccount.currency})</option>
+            ) : null}
+            {toAccount && toAccount.id !== fromAccount?.id ? (
+              <option value={toAccount.id}>{toAccount.name} ({toAccount.currency})</option>
+            ) : null}
+          </Select>
+        </Field>
         <Field label="Комментарий">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" dataQa="check-in-transfer-note" />
         </Field>

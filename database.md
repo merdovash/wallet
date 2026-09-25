@@ -325,6 +325,7 @@ erDiagram
 | `013_transfer_to_amount.sql` | `to_amount` у переводов (сумма зачисления) |
 | `013_market_indices.sql` … `015_derived_market_indices.sql` | Рыночные индексы и их значения |
 | `016_manual_rates_expenses.sql` | `wallet_manual_rates` (ручные курсы пар) и `wallet_expenses` (расходы со счёта с комиссией конвертации) |
+| `017_transfer_commission_account.sql` | `commission_account_id` у переводов — кошелёк, к которому относится комиссия |
 
 ---
 

@@ -5,6 +5,8 @@ export interface CheckInPrefillTransfer {
   toAccountId: string
   amount: string
   toAmount: string
+  /** '' = не указано, к какому кошельку относится комиссия. */
+  commissionAccountId: string
   note: string
 }
 

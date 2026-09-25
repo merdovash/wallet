@@ -263,6 +263,7 @@ export async function handleWalletApi(
         toAccountId?: string
         amount?: number
         toAmount?: number
+        commissionAccountId?: string
         note?: string
       }>(req)
       if (
@@ -289,6 +290,7 @@ export async function handleWalletApi(
         toAccountId: body.toAccountId,
         amount: Number(body.amount),
         toAmount,
+        commissionAccountId: body.commissionAccountId || undefined,
         note: body.note,
       })
       sendJson(res, 201, { transfer })
