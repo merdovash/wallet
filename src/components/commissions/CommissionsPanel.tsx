@@ -37,6 +37,7 @@ export function CommissionsPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const transfers = useWalletStore((s) => s.transfers)
   const expenses = useWalletStore((s) => s.expenses)
+  const manualRates = useWalletStore((s) => s.manualRates)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const { range } = usePeriodRange()
@@ -44,8 +45,16 @@ export function CommissionsPanel() {
 
   const report = useMemo(
     () =>
-      buildCommissionReport(accounts, transfers, expenses, settings, rateBook, range ?? undefined),
-    [accounts, transfers, expenses, settings, rateBook, range],
+      buildCommissionReport(
+        accounts,
+        transfers,
+        expenses,
+        manualRates,
+        settings,
+        rateBook,
+        range ?? undefined,
+      ),
+    [accounts, transfers, expenses, manualRates, settings, rateBook, range],
   )
 
   return (
