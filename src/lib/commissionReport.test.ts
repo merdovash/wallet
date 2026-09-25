@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { Account, Expense, Transfer, WalletSettings } from '../types/wallet'
-import { buildCommissionReport } from './commissionReport'
+import type { Account, Expense, ManualRate, Transfer, WalletSettings } from '../types/wallet'
+import {
+  buildCommissionReport,
+  commissionByAccount,
+  summarizeCommissionRows,
+} from './commissionReport'
 
 const settings: WalletSettings = {
   baseCurrency: 'RUB',
@@ -61,7 +65,7 @@ const expenses: Expense[] = [
 
 describe('buildCommissionReport', () => {
   it('collects transfer spreads and expense commissions in base currency', () => {
-    const report = buildCommissionReport(accounts, transfers, expenses, settings)
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
     expect(report.rows).toHaveLength(2)
     expect(report.transfersBase).toBeCloseTo(500)
     expect(report.expensesBase).toBeCloseTo(50)
@@ -72,7 +76,7 @@ describe('buildCommissionReport', () => {
   })
 
   it('groups by month', () => {
-    const report = buildCommissionReport(accounts, transfers, expenses, settings)
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
     expect(report.months).toEqual([
       { month: '2026-04', commissionBase: 50, rowCount: 1 },
       { month: '2026-03', commissionBase: 500, rowCount: 1 },
@@ -80,7 +84,7 @@ describe('buildCommissionReport', () => {
   })
 
   it('filters by period range', () => {
-    const report = buildCommissionReport(accounts, transfers, expenses, settings, undefined, {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings, undefined, {
       startDate: '2026-04-01',
       endDate: '2026-04-30',
     })
@@ -88,32 +92,58 @@ describe('buildCommissionReport', () => {
     expect(report.totalBase).toBeCloseTo(50)
   })
 
-  it('builds a formula breakdown for a transfer: sent, received, difference', () => {
-    const report = buildCommissionReport(accounts, transfers, [], settings)
+  it('builds a transfer breakdown: CBR, custom and actual amounts plus the actual rate', () => {
+    const manualRates: ManualRate[] = [{ fromCurrency: 'USD', toCurrency: 'RUB', rate: 87 }]
+    const report = buildCommissionReport(accounts, transfers, [], manualRates, settings)
     const row = report.rows.find((r) => r.id === 'transfer-t1')!
-    expect(row.breakdown).toHaveLength(3)
-    // Отправлено: 100 USD × 90 RUB/USD = 9 000 ₽.
+    expect(row.breakdown).toHaveLength(7)
+    // По курсу ЦБ: 100 USD × 90 = 9 000 ₽.
     expect(row.breakdown[0]!.expression).toContain('× 90')
     expect(row.breakdown[0]!.result).toContain('9')
-    // Получено в базовой — без умножения (валюта уже базовая).
-    expect(row.breakdown[1]!.expression).toBeUndefined()
-    // Итог: 9 000 − 8 500 = 500, выделен.
-    expect(row.breakdown[2]!.emphasize).toBe(true)
-    expect(row.breakdown[2]!.expression).toContain('−')
+    // По кастомному курсу: 100 USD × 87 = 8 700 ₽.
+    expect(row.breakdown[1]!.expression).toContain('× 87')
+    expect(row.breakdown[1]!.result).toContain('700')
+    // Фактически зачислено 8 500 ₽; фактический курс 8 500 ÷ 100 = 85 RUB/USD.
+    expect(row.breakdown[2]!.expression).toBeUndefined()
     expect(row.breakdown[2]!.result).toContain('500')
+    expect(row.breakdown[3]!.expression).toContain('÷')
+    expect(row.breakdown[3]!.result).toContain('85')
+    // Итог: 9 000 − 8 500 = 500, выделен.
+    expect(row.breakdown[6]!.emphasize).toBe(true)
+    expect(row.breakdown[6]!.expression).toContain('−')
+    expect(row.breakdown[6]!.result).toContain('500')
   })
 
-  it('builds a formula breakdown for an expense from the frozen reference rate', () => {
-    const report = buildCommissionReport(accounts, [], expenses, settings)
+  it('omits the custom-rate line when the pair has no manual rate', () => {
+    const report = buildCommissionReport(accounts, transfers, [], [], settings)
+    const row = report.rows.find((r) => r.id === 'transfer-t1')!
+    expect(row.breakdown).toHaveLength(6)
+    expect(
+      row.breakdown.some((line) => line.label.includes('кастомному')),
+    ).toBe(false)
+  })
+
+  it('builds an expense breakdown: CBR, custom, actual, actual rate and frozen reference', () => {
+    const manualRates: ManualRate[] = [{ fromCurrency: 'USD', toCurrency: 'RUB', rate: 100 }]
+    const report = buildCommissionReport(accounts, [], expenses, manualRates, settings)
     const row = report.rows.find((r) => r.id === 'expense-e1')!
-    expect(row.breakdown).toHaveLength(2)
-    // Референс: 950 − 50 = 900 ₽ за 10 USD → курс 90.
+    expect(row.breakdown).toHaveLength(6)
+    // По курсу ЦБ: 10 USD × 90 = 900 ₽.
     expect(row.breakdown[0]!.expression).toContain('× 90')
     expect(row.breakdown[0]!.result).toContain('900')
+    // По кастомному курсу: 10 USD × 100 = 1 000 ₽.
+    expect(row.breakdown[1]!.expression).toContain('× 100')
+    // Фактически списано 950 ₽; фактический курс 950 ÷ 10 = 95 RUB/USD.
+    expect(row.breakdown[2]!.result).toContain('950')
+    expect(row.breakdown[3]!.expression).toContain('÷')
+    expect(row.breakdown[3]!.result).toContain('95')
+    // Референс на момент операции: 950 − 50 = 900 ₽ за 10 USD → курс 90.
+    expect(row.breakdown[4]!.expression).toContain('× 90')
+    expect(row.breakdown[4]!.result).toContain('900')
     // Комиссия: 950 − 900 = 50 ₽, выделена (валюта счёта — базовая).
-    expect(row.breakdown[1]!.expression).toContain('−')
-    expect(row.breakdown[1]!.result).toContain('50')
-    expect(row.breakdown[1]!.emphasize).toBe(true)
+    expect(row.breakdown[5]!.expression).toContain('−')
+    expect(row.breakdown[5]!.result).toContain('50')
+    expect(row.breakdown[5]!.emphasize).toBe(true)
   })
 
   it('adds a base-conversion step for an expense on a foreign-currency account', () => {
@@ -126,11 +156,19 @@ describe('buildCommissionReport', () => {
       accountAmount: 11,
       commission: 1,
     }
-    const report = buildCommissionReport(accounts, [], [usdExpenseRow], settings)
+    const report = buildCommissionReport(accounts, [], [usdExpenseRow], [], settings)
     const row = report.rows[0]!
-    expect(row.breakdown).toHaveLength(3)
-    expect(row.breakdown[2]!.expression).toContain('× 90')
-    expect(row.breakdown[2]!.emphasize).toBe(true)
+    const last = row.breakdown[row.breakdown.length - 1]!
+    expect(last.expression).toContain('× 90')
+    expect(last.emphasize).toBe(true)
+  })
+
+  it('tags rows with the accounts involved', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const transferRow = report.rows.find((r) => r.id === 'transfer-t1')!
+    const expenseRow = report.rows.find((r) => r.id === 'expense-e1')!
+    expect(transferRow.accountIds).toEqual(['usd', 'rub'])
+    expect(expenseRow.accountIds).toEqual(['rub'])
   })
 
   it('converts expense commission from the account currency to base', () => {
@@ -143,7 +181,32 @@ describe('buildCommissionReport', () => {
       accountAmount: 11,
       commission: 1,
     }
-    const report = buildCommissionReport(accounts, [], [usdExpense], settings)
+    const report = buildCommissionReport(accounts, [], [usdExpense], [], settings)
     expect(report.totalBase).toBeCloseTo(90)
+  })
+})
+
+describe('commissionByAccount', () => {
+  it('sums the commission per account, counting a transfer in both its accounts', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const totals = commissionByAccount(report.rows)
+    // usd: только перевод (500); rub: перевод (500) + расход (50).
+    expect(totals.get('usd')).toBeCloseTo(500)
+    expect(totals.get('rub')).toBeCloseTo(550)
+    expect(totals.size).toBe(2)
+  })
+})
+
+describe('summarizeCommissionRows', () => {
+  it('recomputes totals and months for a filtered subset', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const onlyUsd = summarizeCommissionRows(
+      report.rows.filter((row) => row.accountIds.includes('usd')),
+    )
+    expect(onlyUsd.rows).toHaveLength(1)
+    expect(onlyUsd.totalBase).toBeCloseTo(500)
+    expect(onlyUsd.transfersBase).toBeCloseTo(500)
+    expect(onlyUsd.expensesBase).toBe(0)
+    expect(onlyUsd.months).toEqual([{ month: '2026-03', commissionBase: 500, rowCount: 1 }])
   })
 })

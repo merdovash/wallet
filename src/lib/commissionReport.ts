@@ -1,6 +1,7 @@
 import { convertAmount, type RateBook } from '../engine/growthEngine'
 import type { PeriodRange } from './dashboardPeriod'
 import { formatCurrency } from './format'
+import { manualRateFor } from './manualRates'
 import {
   isMeaningfulTransferSpread,
   transferReceivedAmount,
@@ -11,6 +12,7 @@ import {
 import type {
   Account,
   Expense,
+  ManualRate,
   Transfer,
   WalletSettings,
 } from '../types/wallet'
@@ -34,6 +36,8 @@ export interface CommissionRow {
   label: string
   /** Детали суммы операции в исходной валюте. */
   detail: string
+  /** Счета, участвующие в операции (для фильтра по кошелькам). */
+  accountIds: string[]
   /** Комиссия в базовой валюте: положительная — потеря, отрицательная — выгода. */
   commissionBase: number
   /** Пошаговая расшифровка комиссии в виде формул. */
@@ -76,11 +80,73 @@ function baseRateFor(
   return convertAmount(1, currency, settings.baseCurrency, settings, date, rateBook)
 }
 
+/**
+ * Сравнение конвертации: сумма по курсу ЦБ, по кастомному (ручному) курсу,
+ * фактическая сумма и фактический курс оплаты/обмена.
+ */
+function conversionComparisonLines(input: {
+  date: string
+  amount: number
+  fromCurrency: string
+  toCurrency: string
+  /** Фактическая сумма в toCurrency (зачислено / списано). */
+  actualAmount: number
+  actualLabel: string
+  actualRateLabel: string
+  cbrLabel: string
+  customLabel: string
+  manualRates: ManualRate[]
+  settings: WalletSettings
+  rateBook?: RateBook
+}): CommissionBreakdownLine[] {
+  const lines: CommissionBreakdownLine[] = []
+  const { amount, fromCurrency, toCurrency } = input
+
+  const cbrRate = convertAmount(
+    1,
+    fromCurrency,
+    toCurrency,
+    input.settings,
+    input.date,
+    input.rateBook,
+  )
+  if (Number.isFinite(cbrRate) && cbrRate > 0) {
+    lines.push({
+      label: input.cbrLabel,
+      expression: `${formatCurrency(amount, fromCurrency)} × ${formatRate(cbrRate)} ${toCurrency}/${fromCurrency}`,
+      result: formatCurrency(amount * cbrRate, toCurrency),
+    })
+  }
+
+  const customRate = manualRateFor(fromCurrency, toCurrency, input.manualRates)
+  if (customRate != null && Number.isFinite(customRate) && customRate > 0) {
+    lines.push({
+      label: input.customLabel,
+      expression: `${formatCurrency(amount, fromCurrency)} × ${formatRate(customRate)} ${toCurrency}/${fromCurrency}`,
+      result: formatCurrency(amount * customRate, toCurrency),
+    })
+  }
+
+  lines.push({
+    label: input.actualLabel,
+    result: formatCurrency(input.actualAmount, toCurrency),
+  })
+  if (amount > 0) {
+    lines.push({
+      label: input.actualRateLabel,
+      expression: `${formatCurrency(input.actualAmount, toCurrency)} ÷ ${formatCurrency(amount, fromCurrency)}`,
+      result: `${formatRate(input.actualAmount / amount)} ${toCurrency}/${fromCurrency}`,
+    })
+  }
+  return lines
+}
+
 function transferBreakdown(
   transfer: Transfer,
   from: Account | undefined,
   to: Account | undefined,
   commissionBase: number,
+  manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
 ): CommissionBreakdownLine[] {
@@ -94,6 +160,24 @@ function transferBreakdown(
   const toRate = baseRateFor(toCurrency, settings, transfer.date, rateBook)
 
   const lines: CommissionBreakdownLine[] = []
+  if (fromCurrency !== toCurrency) {
+    lines.push(
+      ...conversionComparisonLines({
+        date: transfer.date,
+        amount: transfer.amount,
+        fromCurrency,
+        toCurrency,
+        actualAmount: received,
+        cbrLabel: 'Зачисление по курсу ЦБ на дату',
+        customLabel: 'Зачисление по кастомному курсу (текущему)',
+        actualLabel: 'Фактически зачислено',
+        actualRateLabel: 'Фактический курс обмена',
+        manualRates,
+        settings,
+        rateBook,
+      }),
+    )
+  }
   lines.push({
     label: `Отправлено в базовой валюте${fromCurrency !== base ? ' (курс ЦБ на дату)' : ''}`,
     expression:
@@ -123,6 +207,7 @@ function expenseBreakdown(
   expense: Expense,
   accountCurrency: string,
   commissionBase: number,
+  manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
 ): CommissionBreakdownLine[] {
@@ -132,8 +217,24 @@ function expenseBreakdown(
   const referenceRate = expense.amount > 0 ? referenceAmount / expense.amount : 0
 
   const lines: CommissionBreakdownLine[] = [
+    ...(expense.currency !== accountCurrency
+      ? conversionComparisonLines({
+          date: expense.date,
+          amount: expense.amount,
+          fromCurrency: expense.currency,
+          toCurrency: accountCurrency,
+          actualAmount: expense.accountAmount,
+          cbrLabel: 'Расход по курсу ЦБ на дату',
+          customLabel: 'Расход по кастомному курсу (текущему)',
+          actualLabel: 'Фактически списано со счёта',
+          actualRateLabel: 'Фактический курс оплаты',
+          manualRates,
+          settings,
+          rateBook,
+        })
+      : []),
     {
-      label: 'Расход по курсу обмена на момент операции',
+      label: 'Расход по курсу обмена на момент операции (зафиксирован)',
       expression: `${formatCurrency(expense.amount, expense.currency)} × ${formatRate(referenceRate)} ${accountCurrency}/${expense.currency}`,
       result: formatCurrency(referenceAmount, accountCurrency),
     },
@@ -165,6 +266,7 @@ export function buildCommissionReport(
   accounts: Account[],
   transfers: Transfer[],
   expenses: Expense[],
+  manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
   range?: PeriodRange | null,
@@ -182,6 +284,7 @@ export function buildCommissionReport(
       id: `transfer-${transfer.id}`,
       date: transfer.date,
       kind: 'transfer',
+      accountIds: [transfer.fromAccountId, transfer.toAccountId].filter(Boolean),
       label: `${from?.name ?? '—'} → ${to?.name ?? '—'}`,
       detail: `${formatCurrency(transfer.amount, from?.currency ?? settings.baseCurrency)}${
         transfer.toAmount != null
@@ -189,7 +292,7 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase: -spread,
-      breakdown: transferBreakdown(transfer, from, to, -spread, settings, rateBook),
+      breakdown: transferBreakdown(transfer, from, to, -spread, manualRates, settings, rateBook),
     })
   }
 
@@ -211,6 +314,7 @@ export function buildCommissionReport(
       id: `expense-${expense.id}`,
       date: expense.date,
       kind: 'expense',
+      accountIds: [expense.accountId],
       label: `Расход · ${account?.name ?? '—'}${expense.note ? ` · ${expense.note}` : ''}`,
       detail: `${formatCurrency(expense.amount, expense.currency)}${
         expense.currency !== accountCurrency
@@ -218,12 +322,24 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase,
-      breakdown: expenseBreakdown(expense, accountCurrency, commissionBase, settings, rateBook),
+      breakdown: expenseBreakdown(
+        expense,
+        accountCurrency,
+        commissionBase,
+        manualRates,
+        settings,
+        rateBook,
+      ),
     })
   }
 
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
 
+  return summarizeCommissionRows(rows)
+}
+
+/** Итоги и помесячная сводка по набору строк (для пересчёта после фильтра по кошелькам). */
+export function summarizeCommissionRows(rows: CommissionRow[]): CommissionReport {
   const totalBase = rows.reduce((sum, row) => sum + row.commissionBase, 0)
   const transfersBase = rows
     .filter((row) => row.kind === 'transfer')
@@ -243,4 +359,15 @@ export function buildCommissionReport(
   const months = [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month))
 
   return { rows, totalBase, transfersBase, expensesBase, months }
+}
+
+/** Сумма комиссии по каждому счёту (перевод учитывается в обоих его счетах). */
+export function commissionByAccount(rows: CommissionRow[]): Map<string, number> {
+  const totals = new Map<string, number>()
+  for (const row of rows) {
+    for (const accountId of new Set(row.accountIds)) {
+      totals.set(accountId, (totals.get(accountId) ?? 0) + row.commissionBase)
+    }
+  }
+  return totals
 }

@@ -14,7 +14,11 @@ import type {
   WalletSettings,
 } from '../types/wallet'
 import { normalizeAccountKind } from '../lib/accountKinds'
-import { buildExpenseCheckInPlan } from '../lib/expenseCheckIn'
+import {
+  buildExpenseCheckInPlan,
+  expenseChargeBase,
+  expenseCommission,
+} from '../lib/expenseCheckIn'
 import { buildTransferSnapshotLines } from '../lib/transferCheckIn'
 import type { RateBook } from '../engine/growthEngine'
 import {
@@ -36,6 +40,7 @@ import {
   reorderAccountsApi,
   updateAccountApi,
   updateAccountFundApi,
+  updateExpenseApi,
   updateMarketIndexApi,
   updateSnapshotApi,
   upsertManualRateApi,
@@ -120,7 +125,19 @@ interface WalletState {
     },
     rateBook?: RateBook,
   ) => Promise<{ expenseId: string; snapshotId: string }>
-  deleteExpense: (id: string) => Promise<void>
+  /** Update expense and adjust the same-date check-in (balance line and external expense). */
+  updateExpenseCheckIn: (
+    id: string,
+    patch: {
+      currency?: string
+      amount?: number
+      accountAmount?: number
+      note?: string
+    },
+    rateBook?: RateBook,
+  ) => Promise<void>
+  /** Delete expense and revert its effect on the same-date check-in. */
+  deleteExpense: (id: string, rateBook?: RateBook) => Promise<void>
   addAccountFund: (input: {
     accountId: string
     name: string
@@ -526,10 +543,109 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     return { expenseId: expense.id, snapshotId: snapshot.id }
   },
 
-  deleteExpense: async (id) => {
+  updateExpenseCheckIn: async (id, patch, rateBook) => {
+    const state = get()
+    const old = state.expenses.find((e) => e.id === id)
+    if (!old) throw new Error('Расход не найден')
+    const account = state.accounts.find((a) => a.id === old.accountId)
+    if (!account) throw new Error('Счёт не найден')
+
+    const currency = (patch.currency ?? old.currency).toUpperCase()
+    const amount = patch.amount ?? old.amount
+    if (!(amount > 0)) throw new Error('Сумма расхода должна быть больше 0')
+    const sameCurrency = currency === account.currency
+    const accountAmount = sameCurrency ? amount : (patch.accountAmount ?? old.accountAmount)
+    if (!(accountAmount > 0)) throw new Error('Сумма списания со счёта должна быть больше 0')
+
+    const commission = expenseCommission(
+      { amount, currency, accountAmount, accountCurrency: account.currency, date: old.date },
+      state.manualRates,
+      state.settings,
+      rateBook,
+    )
+
+    const expense = await updateExpenseApi(id, {
+      currency,
+      amount,
+      accountAmount,
+      commission,
+      note: patch.note === undefined ? undefined : patch.note.trim() || null,
+    })
+
+    // Rebalance the same-date check-in by the change in the charged amount.
+    const snapshot = state.snapshots.find((s) => s.date === old.date)
+    if (snapshot) {
+      const line = snapshot.lines.find((l) => l.accountId === old.accountId)
+      const oldCharge = expenseChargeBase(
+        old.accountAmount,
+        account.currency,
+        old.date,
+        state.manualRates,
+        state.settings,
+        rateBook,
+      )
+      const newCharge = expenseChargeBase(
+        accountAmount,
+        account.currency,
+        old.date,
+        state.manualRates,
+        state.settings,
+        rateBook,
+      )
+      await get().updateSnapshot(snapshot.id, {
+        expense: Math.max(0, (snapshot.expense ?? 0) - oldCharge + newCharge),
+        ...(line
+          ? {
+              lines: [
+                {
+                  accountId: old.accountId,
+                  amount: line.amount + old.accountAmount - accountAmount,
+                },
+              ],
+            }
+          : {}),
+      })
+    }
+
+    set((prev) => ({
+      expenses: prev.expenses.map((e) => (e.id === id ? expense : e)),
+    }))
+  },
+
+  deleteExpense: async (id, rateBook) => {
+    const state = get()
+    const old = state.expenses.find((e) => e.id === id)
     await deleteExpenseApi(id)
-    set((state) => ({
-      expenses: state.expenses.filter((e) => e.id !== id),
+
+    // Revert the expense's effect on the same-date check-in.
+    if (old) {
+      const account = state.accounts.find((a) => a.id === old.accountId)
+      const snapshot = state.snapshots.find((s) => s.date === old.date)
+      if (account && snapshot) {
+        const line = snapshot.lines.find((l) => l.accountId === old.accountId)
+        const oldCharge = expenseChargeBase(
+          old.accountAmount,
+          account.currency,
+          old.date,
+          state.manualRates,
+          state.settings,
+          rateBook,
+        )
+        await get().updateSnapshot(snapshot.id, {
+          expense: Math.max(0, (snapshot.expense ?? 0) - oldCharge),
+          ...(line
+            ? {
+                lines: [
+                  { accountId: old.accountId, amount: line.amount + old.accountAmount },
+                ],
+              }
+            : {}),
+        })
+      }
+    }
+
+    set((prev) => ({
+      expenses: prev.expenses.filter((e) => e.id !== id),
     }))
   },
 

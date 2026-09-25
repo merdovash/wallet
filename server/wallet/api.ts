@@ -389,6 +389,28 @@ export async function handleWalletApi(
 
     {
       const params = matchPath(pathname, '/api/wallet/expenses/:id')
+      if (params && method === 'PATCH') {
+        const body = await readJsonBody<{
+          currency?: string
+          amount?: number
+          accountAmount?: number
+          commission?: number
+          note?: string | null
+        }>(req)
+        const expense = await store.updateExpense(user.id, params.id!, {
+          currency: body.currency,
+          amount: body.amount != null ? Number(body.amount) : undefined,
+          accountAmount: body.accountAmount != null ? Number(body.accountAmount) : undefined,
+          commission: body.commission != null ? Number(body.commission) : undefined,
+          note: body.note,
+        })
+        if (!expense) {
+          sendJson(res, 404, { error: 'Расход не найден' })
+          return true
+        }
+        sendJson(res, 200, { expense })
+        return true
+      }
       if (params && method === 'DELETE') {
         const ok = await store.deleteExpense(user.id, params.id!)
         if (!ok) {

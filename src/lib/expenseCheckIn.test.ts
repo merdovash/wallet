@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { Account, BalanceSnapshot, ManualRate, WalletSettings } from '../types/wallet'
-import { buildExpenseCheckInPlan, suggestedAccountAmount } from './expenseCheckIn'
+import {
+  buildExpenseCheckInPlan,
+  expenseChargeBase,
+  expenseCommission,
+  suggestedAccountAmount,
+} from './expenseCheckIn'
 
 const settings: WalletSettings = {
   baseCurrency: 'RUB',
@@ -45,6 +50,52 @@ describe('suggestedAccountAmount', () => {
 
   it('falls back to the official rate without a manual pair', () => {
     expect(suggestedAccountAmount(10, 'USD', rub, [], settings, '2026-03-02')).toBe(900)
+  })
+})
+
+describe('expenseCommission', () => {
+  it('is zero for a same-currency expense', () => {
+    expect(
+      expenseCommission(
+        { amount: 300, currency: 'RUB', accountAmount: 300, accountCurrency: 'RUB', date: '2026-03-02' },
+        manualRates,
+        settings,
+      ),
+    ).toBe(0)
+  })
+
+  it('is the charge minus the manual-rate reference', () => {
+    expect(
+      expenseCommission(
+        { amount: 10, currency: 'USD', accountAmount: 1050, accountCurrency: 'RUB', date: '2026-03-02' },
+        manualRates,
+        settings,
+      ),
+    ).toBeCloseTo(50)
+  })
+
+  it('falls back to the official rate without a manual pair', () => {
+    expect(
+      expenseCommission(
+        { amount: 10, currency: 'USD', accountAmount: 950, accountCurrency: 'RUB', date: '2026-03-02' },
+        [],
+        settings,
+      ),
+    ).toBeCloseTo(50)
+  })
+})
+
+describe('expenseChargeBase', () => {
+  it('returns the charge itself for a base-currency account', () => {
+    expect(expenseChargeBase(1050, 'RUB', '2026-03-02', manualRates, settings)).toBe(1050)
+  })
+
+  it('converts via the manual rate for a foreign account', () => {
+    expect(expenseChargeBase(40, 'USD', '2026-03-02', manualRates, settings)).toBeCloseTo(4000)
+  })
+
+  it('converts via the official rate without a manual pair', () => {
+    expect(expenseChargeBase(40, 'USD', '2026-03-02', [], settings)).toBeCloseTo(3600)
   })
 })
 

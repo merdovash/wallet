@@ -920,6 +920,52 @@ export async function createExpense(
   return mapExpense(result.rows[0]!)
 }
 
+export async function updateExpense(
+  userId: string,
+  id: string,
+  patch: {
+    currency?: string
+    amount?: number
+    accountAmount?: number
+    commission?: number
+    note?: string | null
+  },
+): Promise<DbExpense | null> {
+  const pool = getPool()
+  const existing = await pool.query<ExpenseRow>(
+    `SELECT ${EXPENSE_SELECT} FROM wallet_expenses WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  )
+  const row = existing.rows[0]
+  if (!row) return null
+  const current = mapExpense(row)
+
+  const currency = patch.currency != null ? patch.currency.toUpperCase() : current.currency
+  if (!CURRENCY_RE.test(currency)) throw new Error('Некорректная валюта расхода')
+  const amount = patch.amount != null ? patch.amount : current.amount
+  if (!Number.isFinite(amount) || !(amount > 0)) {
+    throw new Error('Сумма расхода должна быть больше 0')
+  }
+  const accountAmount = patch.accountAmount != null ? patch.accountAmount : current.accountAmount
+  if (!Number.isFinite(accountAmount) || !(accountAmount > 0)) {
+    throw new Error('Сумма списания со счёта должна быть больше 0')
+  }
+  const commission =
+    patch.commission != null && Number.isFinite(patch.commission)
+      ? patch.commission
+      : current.commission
+  const note = patch.note === undefined ? (current.note ?? null) : patch.note
+
+  const result = await pool.query<ExpenseRow>(
+    `UPDATE wallet_expenses
+     SET currency = $3, amount = $4, account_amount = $5, commission = $6, note = $7
+     WHERE id = $1 AND user_id = $2
+     RETURNING ${EXPENSE_SELECT}`,
+    [id, userId, currency, amount, accountAmount, commission, note],
+  )
+  return mapExpense(result.rows[0]!)
+}
+
 export async function deleteExpense(userId: string, id: string): Promise<boolean> {
   const pool = getPool()
   const result = await pool.query(

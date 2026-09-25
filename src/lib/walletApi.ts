@@ -204,6 +204,23 @@ export async function createExpenseApi(input: {
   return body.expense
 }
 
+export async function updateExpenseApi(
+  id: string,
+  patch: Partial<{
+    currency: string
+    amount: number
+    accountAmount: number
+    commission: number
+    note: string | null
+  }>,
+): Promise<Expense> {
+  const body = await api<{ expense: Expense }>(`/api/wallet/expenses/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return body.expense
+}
+
 export async function deleteExpenseApi(id: string): Promise<void> {
   await api(`/api/wallet/expenses/${id}`, { method: 'DELETE' })
 }

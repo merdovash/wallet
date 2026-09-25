@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react'
-import { buildCommissionReport, type CommissionRow } from '../../lib/commissionReport'
+import {
+  buildCommissionReport,
+  commissionByAccount,
+  summarizeCommissionRows,
+  type CommissionRow,
+} from '../../lib/commissionReport'
 import { CommissionBreakdownPanel } from './CommissionBreakdownPanel'
 import { dataQa } from '../../lib/dataQa'
 import { formatDateDisplay, signedAmount } from '../../lib/format'
@@ -37,16 +42,56 @@ export function CommissionsPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const transfers = useWalletStore((s) => s.transfers)
   const expenses = useWalletStore((s) => s.expenses)
+  const manualRates = useWalletStore((s) => s.manualRates)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRatesStore((s) => s.byDate)
   const { range } = usePeriodRange()
   const [breakdownRowId, setBreakdownRowId] = useState<string | null>(null)
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
 
-  const report = useMemo(
+  const fullReport = useMemo(
     () =>
-      buildCommissionReport(accounts, transfers, expenses, settings, rateBook, range ?? undefined),
-    [accounts, transfers, expenses, settings, rateBook, range],
+      buildCommissionReport(
+        accounts,
+        transfers,
+        expenses,
+        manualRates,
+        settings,
+        rateBook,
+        range ?? undefined,
+      ),
+    [accounts, transfers, expenses, manualRates, settings, rateBook, range],
   )
+
+  // Кошельки, по которым за период есть комиссия или курсовая разница.
+  const accountTotals = useMemo(() => commissionByAccount(fullReport.rows), [fullReport])
+  const chipAccounts = useMemo(
+    () =>
+      accounts
+        .filter((a) => accountTotals.has(a.id))
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+    [accounts, accountTotals],
+  )
+
+  // Пустой выбор = без фильтра; выбор чистится от счетов, выпавших из периода.
+  const activeAccountIds = useMemo(
+    () => selectedAccountIds.filter((id) => accountTotals.has(id)),
+    [selectedAccountIds, accountTotals],
+  )
+
+  const report = useMemo(() => {
+    if (activeAccountIds.length === 0) return fullReport
+    const selected = new Set(activeAccountIds)
+    return summarizeCommissionRows(
+      fullReport.rows.filter((row) => row.accountIds.some((id) => selected.has(id))),
+    )
+  }, [fullReport, activeAccountIds])
+
+  function toggleAccount(id: string) {
+    setSelectedAccountIds((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
+    )
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-4" {...dataQa('commissions-page')}>
@@ -55,6 +100,61 @@ export function CommissionsPanel() {
         description="Потери на конвертации и комиссии: переводы (разница с курсом ЦБ) и расходы с обменом валюты"
         actions={<PeriodFilter showRange />}
       />
+
+      {chipAccounts.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Кошельки
+            </span>
+            {activeAccountIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedAccountIds([])}
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                {...dataQa('commissions-wallets-reset')}
+              >
+                Все
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2" {...dataQa('commissions-wallets')}>
+            {chipAccounts.map((account) => {
+              const active = activeAccountIds.includes(account.id)
+              const accent = account.color || '#2563eb'
+              const total = accountTotals.get(account.id) ?? 0
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleAccount(account.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-left text-xs transition ${
+                    active ? 'text-white' : 'hover:opacity-85'
+                  }`}
+                  style={{
+                    borderColor: accent,
+                    backgroundColor: active ? accent : 'transparent',
+                    color: active ? '#ffffff' : accent,
+                  }}
+                  {...dataQa(`commissions-wallet-${account.id}`)}
+                >
+                  <div className="font-medium">
+                    {account.name}
+                    {account.archived ? ' · архив' : ''}
+                  </div>
+                  <div
+                    className="tabular-nums"
+                    style={{ color: active ? 'rgba(255,255,255,0.85)' : accent }}
+                  >
+                    {commissionLabel(total, settings.baseCurrency)}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Card className="!p-4" dataQa="widget-commissions-total">
