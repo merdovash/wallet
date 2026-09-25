@@ -75,6 +75,29 @@ describe('buildCommissionReport', () => {
     expect(report.rows[1]!.id).toBe('transfer-t1')
   })
 
+  it('computes the commission percent of the operations volume', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    // Перевод: отправлено 100 USD × 90 = 9 000 ₽; расход: списано 950 ₽.
+    const transferRow = report.rows.find((r) => r.id === 'transfer-t1')!
+    const expenseRow = report.rows.find((r) => r.id === 'expense-e1')!
+    expect(transferRow.amountBase).toBeCloseTo(9000)
+    expect(expenseRow.amountBase).toBeCloseTo(950)
+    expect(report.amountBase).toBeCloseTo(9950)
+    // 550 / 9 950 × 100 ≈ 5,53 %.
+    expect(report.commissionPercent).toBeCloseTo((550 / 9950) * 100)
+  })
+
+  it('recomputes the percent for a filtered subset and returns null for empty rows', () => {
+    const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
+    const onlyUsd = summarizeCommissionRows(
+      report.rows.filter((row) => row.accountIds.includes('usd')),
+    )
+    expect(onlyUsd.commissionPercent).toBeCloseTo((500 / 9000) * 100)
+    const empty = summarizeCommissionRows([])
+    expect(empty.amountBase).toBe(0)
+    expect(empty.commissionPercent).toBeNull()
+  })
+
   it('groups by month', () => {
     const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
     expect(report.months).toEqual([
