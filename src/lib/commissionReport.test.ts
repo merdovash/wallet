@@ -163,6 +163,19 @@ describe('buildCommissionReport', () => {
     expect(last.emphasize).toBe(true)
   })
 
+  it('attributes the commission to the specified wallet only', () => {
+    const attributed: Transfer[] = [{ ...transfers[0]!, commissionAccountId: 'rub' }]
+    const report = buildCommissionReport(accounts, attributed, [], [], settings)
+    const row = report.rows[0]!
+    expect(row.accountIds).toEqual(['rub'])
+    const last = row.breakdown[row.breakdown.length - 1]!
+    expect(last.label).toContain('относится к кошельку')
+    expect(last.result).toBe('Карта')
+    const totals = commissionByAccount(report.rows)
+    expect(totals.get('rub')).toBeCloseTo(500)
+    expect(totals.has('usd')).toBe(false)
+  })
+
   it('tags rows with the accounts involved', () => {
     const report = buildCommissionReport(accounts, transfers, expenses, [], settings)
     const transferRow = report.rows.find((r) => r.id === 'transfer-t1')!

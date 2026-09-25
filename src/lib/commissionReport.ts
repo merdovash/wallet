@@ -280,11 +280,32 @@ export function buildCommissionReport(
     const to = byId.get(transfer.toAccountId)
     const spread = transferSpreadBase(transfer, from, to, settings, rateBook)
     if (!isMeaningfulTransferSpread(spread)) continue
+    const commissionAccount = transfer.commissionAccountId
+      ? byId.get(transfer.commissionAccountId)
+      : undefined
+    const breakdown = transferBreakdown(
+      transfer,
+      from,
+      to,
+      -spread,
+      manualRates,
+      settings,
+      rateBook,
+    )
+    if (commissionAccount) {
+      breakdown.push({
+        label: 'Комиссия относится к кошельку',
+        result: commissionAccount.name,
+      })
+    }
     rows.push({
       id: `transfer-${transfer.id}`,
       date: transfer.date,
       kind: 'transfer',
-      accountIds: [transfer.fromAccountId, transfer.toAccountId].filter(Boolean),
+      // Указанный кошелёк комиссии перекрывает оба счёта перевода.
+      accountIds: transfer.commissionAccountId
+        ? [transfer.commissionAccountId]
+        : [transfer.fromAccountId, transfer.toAccountId].filter(Boolean),
       label: `${from?.name ?? '—'} → ${to?.name ?? '—'}`,
       detail: `${formatCurrency(transfer.amount, from?.currency ?? settings.baseCurrency)}${
         transfer.toAmount != null
@@ -292,7 +313,7 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase: -spread,
-      breakdown: transferBreakdown(transfer, from, to, -spread, manualRates, settings, rateBook),
+      breakdown,
     })
   }
 

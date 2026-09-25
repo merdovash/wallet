@@ -40,6 +40,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   const [toAccountId, setToAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [toAmount, setToAmount] = useState('')
+  const [commissionAccountId, setCommissionAccountId] = useState('')
   const [note, setNote] = useState('')
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
     setToAccountId(activeAccounts[1]?.id ?? activeAccounts[0]?.id ?? '')
     setAmount('')
     setToAmount('')
+    setCommissionAccountId('')
     setNote('')
   }, [open, activeAccounts])
 
@@ -142,6 +144,10 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           amount: amountToInput(value),
           toAmount:
             parsedToAmount != null && parsedToAmount > 0 ? amountToInput(parsedToAmount) : '',
+          commissionAccountId:
+            commissionAccountId === fromAccountId || commissionAccountId === toAccountId
+              ? commissionAccountId
+              : '',
           note: note.trim(),
         },
       ],
@@ -260,6 +266,25 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           className="text-sm font-medium"
           dataQa="transfer-create-spread"
         />
+        <Field label="Комиссия относится к кошельку">
+          <Select
+            value={
+              commissionAccountId === fromAccountId || commissionAccountId === toAccountId
+                ? commissionAccountId
+                : ''
+            }
+            onChange={(e) => setCommissionAccountId(e.target.value)}
+            dataQa="transfer-create-commission-account"
+          >
+            <option value="">Не указано (оба счёта)</option>
+            {fromAccount ? (
+              <option value={fromAccount.id}>{fromAccount.name} ({fromAccount.currency})</option>
+            ) : null}
+            {toAccount && toAccount.id !== fromAccount?.id ? (
+              <option value={toAccount.id}>{toAccount.name} ({toAccount.currency})</option>
+            ) : null}
+          </Select>
+        </Field>
         <Field label="Комментарий">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Необязательно" dataQa="transfer-create-note" />
         </Field>

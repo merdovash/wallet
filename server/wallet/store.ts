@@ -58,6 +58,8 @@ export interface DbTransfer {
   toAccountId: string
   amount: number
   toAmount?: number
+  /** Wallet the commission / FX spread belongs to (one of the two accounts). */
+  commissionAccountId?: string
   note?: string
   createdAt?: string
 }
@@ -652,10 +654,11 @@ export async function listTransfers(userId: string): Promise<DbTransfer[]> {
     to_account_id: string
     amount: number
     to_amount: number | string | null
+    commission_account_id: string | null
     note: string | null
     created_at: Date | string | null
   }>(
-    `SELECT id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, to_amount, note, created_at
+    `SELECT id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, to_amount, commission_account_id, note, created_at
      FROM wallet_transfers
      WHERE user_id = $1
      ORDER BY transfer_date ASC, id ASC`,
@@ -668,6 +671,8 @@ export async function listTransfers(userId: string): Promise<DbTransfer[]> {
     toAccountId: String(row.to_account_id),
     amount: num(row.amount),
     toAmount: row.to_amount == null ? undefined : num(row.to_amount),
+    commissionAccountId:
+      row.commission_account_id == null ? undefined : String(row.commission_account_id),
     note: row.note ? String(row.note) : undefined,
     createdAt: isoTs(row.created_at),
   }))
@@ -690,6 +695,7 @@ export async function createTransfer(
     toAccountId: string
     amount: number
     toAmount?: number
+    commissionAccountId?: string
     note?: string
   },
 ): Promise<DbTransfer> {
@@ -706,6 +712,14 @@ export async function createTransfer(
     input.toAmount != null && Number.isFinite(input.toAmount) && input.toAmount > 0
       ? input.toAmount
       : null
+  const commissionAccountId = input.commissionAccountId || null
+  if (
+    commissionAccountId != null &&
+    commissionAccountId !== input.fromAccountId &&
+    commissionAccountId !== input.toAccountId
+  ) {
+    throw new Error('Кошелёк комиссии должен быть одним из счетов перевода')
+  }
 
   const pool = getPool()
   const result = await pool.query<{
@@ -715,13 +729,14 @@ export async function createTransfer(
     to_account_id: string
     amount: number
     to_amount: number | string | null
+    commission_account_id: string | null
     note: string | null
     created_at: Date | string | null
   }>(
     `INSERT INTO wallet_transfers
-       (user_id, transfer_date, from_account_id, to_account_id, amount, to_amount, note)
-     VALUES ($1, $2::date, $3, $4, $5, $6, $7)
-     RETURNING id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, to_amount, note, created_at`,
+       (user_id, transfer_date, from_account_id, to_account_id, amount, to_amount, commission_account_id, note)
+     VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8)
+     RETURNING id, transfer_date::text AS transfer_date, from_account_id, to_account_id, amount, to_amount, commission_account_id, note, created_at`,
     [
       userId,
       input.date,
@@ -729,6 +744,7 @@ export async function createTransfer(
       input.toAccountId,
       input.amount,
       toAmount,
+      commissionAccountId,
       input.note ?? null,
     ],
   )
@@ -740,6 +756,8 @@ export async function createTransfer(
     toAccountId: String(row.to_account_id),
     amount: num(row.amount),
     toAmount: row.to_amount == null ? undefined : num(row.to_amount),
+    commissionAccountId:
+      row.commission_account_id == null ? undefined : String(row.commission_account_id),
     note: row.note ? String(row.note) : undefined,
     createdAt: isoTs(row.created_at),
   }
@@ -1607,6 +1625,7 @@ export async function importWalletData(
       toAccountId: string
       amount: number
       toAmount?: number
+      commissionAccountId?: string
       note?: string
     }>
   },
@@ -1686,10 +1705,13 @@ export async function importWalletData(
       const fromId = idMap.get(transfer.fromAccountId) ?? transfer.fromAccountId
       const toId = idMap.get(transfer.toAccountId) ?? transfer.toAccountId
       if (fromId === toId) continue
+      const commissionId = transfer.commissionAccountId
+        ? idMap.get(transfer.commissionAccountId) ?? transfer.commissionAccountId
+        : null
       await query(
         `INSERT INTO wallet_transfers
-           (user_id, transfer_date, from_account_id, to_account_id, amount, to_amount, note)
-         VALUES ($1, $2::date, $3, $4, $5, $6, $7)`,
+           (user_id, transfer_date, from_account_id, to_account_id, amount, to_amount, commission_account_id, note)
+         VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8)`,
         [
           userId,
           transfer.date,
@@ -1697,6 +1719,7 @@ export async function importWalletData(
           toId,
           transfer.amount,
           transfer.toAmount != null && transfer.toAmount > 0 ? transfer.toAmount : null,
+          commissionId === fromId || commissionId === toId ? commissionId : null,
           transfer.note ?? null,
         ],
       )

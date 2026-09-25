@@ -64,6 +64,8 @@ type PendingTransfer = {
   toAccountId: string
   amount: string
   toAmount: string
+  /** '' = не указано, к какому кошельку относится комиссия. */
+  commissionAccountId: string
   note: string
 }
 
@@ -78,13 +80,17 @@ function amountToInput(amount: number): string {
 
 /** Возвращает данные перевода, если черновик корректно заполнен, иначе null. */
 function parsePendingTransfer(
-  t: Pick<PendingTransfer, 'fromAccountId' | 'toAccountId' | 'amount' | 'toAmount' | 'note'>,
+  t: Pick<
+    PendingTransfer,
+    'fromAccountId' | 'toAccountId' | 'amount' | 'toAmount' | 'commissionAccountId' | 'note'
+  >,
   accounts?: Account[],
 ): {
   fromAccountId: string
   toAccountId: string
   amount: number
   toAmount?: number
+  commissionAccountId?: string
   note?: string
 } | null {
   const value = parseMoneyInput(t.amount)
@@ -108,6 +114,10 @@ function parsePendingTransfer(
     toAccountId: t.toAccountId,
     amount: value,
     toAmount: received != null && received > 0 ? received : undefined,
+    commissionAccountId:
+      t.commissionAccountId === t.fromAccountId || t.commissionAccountId === t.toAccountId
+        ? t.commissionAccountId
+        : undefined,
     note: t.note.trim() || undefined,
   }
 }
@@ -388,6 +398,7 @@ export function CheckInPanel({
         toAccountId: t.toAccountId,
         amount: t.amount,
         toAmount: t.toAmount,
+        commissionAccountId: t.commissionAccountId,
         note: t.note,
       },
     })
@@ -417,6 +428,7 @@ export function CheckInPanel({
         toAccountId: t.toAccountId,
         amount: amountToInput(t.amount),
         toAmount: toAmountInput,
+        commissionAccountId: t.commissionAccountId ?? '',
         note: t.note ?? '',
       },
     })

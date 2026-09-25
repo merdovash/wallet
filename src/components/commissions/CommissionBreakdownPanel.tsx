@@ -1,16 +1,24 @@
 import type { CommissionRow } from '../../lib/commissionReport'
 import { dataQa } from '../../lib/dataQa'
 import { formatDateDisplay } from '../../lib/format'
+import { Button } from '../ui/FormControls'
 import { StackPanel } from '../ui/StackPanel'
 
 interface CommissionBreakdownPanelProps {
   open: boolean
   onClose: () => void
   row: CommissionRow | null
+  /** Открыть карточку редактирования перевода/расхода этой операции. */
+  onEdit?: (row: CommissionRow) => void
 }
 
 /** Расшифровка комиссии формулами: слева алгоритм с конкретными значениями, справа итог. */
-export function CommissionBreakdownPanel({ open, onClose, row }: CommissionBreakdownPanelProps) {
+export function CommissionBreakdownPanel({
+  open,
+  onClose,
+  row,
+  onEdit,
+}: CommissionBreakdownPanelProps) {
   const tone =
     row != null && row.commissionBase > 0
       ? 'text-red-600 dark:text-red-400'
@@ -82,6 +90,18 @@ export function CommissionBreakdownPanel({ open, onClose, row }: CommissionBreak
               </li>
             ))}
           </ul>
+
+          {onEdit ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              dataQa="commission-breakdown-edit"
+              onClick={() => onEdit(row)}
+            >
+              {row.kind === 'transfer' ? 'Редактировать перевод' : 'Редактировать расход'}
+            </Button>
+          ) : null}
         </div>
       )}
     </StackPanel>

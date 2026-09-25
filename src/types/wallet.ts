@@ -93,6 +93,8 @@ export interface Transfer {
    * use `amount`; legacy FX transfers use the official conversion of `amount`.
    */
   toAmount?: number
+  /** Wallet the commission / FX spread belongs to (one of the two accounts). */
+  commissionAccountId?: string
   note?: string
   /** Server timestamp; used so a fund created later does not rewrite older transfers. */
   createdAt?: string
