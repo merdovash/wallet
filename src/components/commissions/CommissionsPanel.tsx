@@ -49,6 +49,12 @@ function amountToInput(amount: number): string {
   return formatMoneyInput(String(amount).replace('.', ','))
 }
 
+/** Комиссия в процентах от объёма операций (перевод — отправлено, расход — списано). */
+function percentLabel(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return `${value.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} %`
+}
+
 export function CommissionsPanel() {
   const accounts = useWalletStore((s) => s.accounts)
   const transfers = useWalletStore((s) => s.transfers)
@@ -234,7 +240,7 @@ export function CommissionsPanel() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card className="!p-4" dataQa="widget-commissions-total">
           <p className="text-xs text-slate-500 dark:text-slate-400">Комиссии за период</p>
           <p
@@ -257,6 +263,21 @@ export function CommissionsPanel() {
             className={`mt-1 text-lg font-semibold tabular-nums ${commissionTone(report.expensesBase)}`}
           >
             {commissionLabel(report.expensesBase, settings.baseCurrency)}
+          </p>
+        </Card>
+        <Card className="!p-4" dataQa="widget-commissions-percent">
+          <p className="text-xs text-slate-500 dark:text-slate-400">Процент комиссии</p>
+          <p
+            className={`mt-1 text-lg font-semibold tabular-nums ${
+              report.commissionPercent != null
+                ? commissionTone(report.commissionPercent)
+                : 'text-slate-400 dark:text-slate-500'
+            }`}
+          >
+            {percentLabel(report.commissionPercent)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+            от объёма операций с комиссией
           </p>
         </Card>
       </div>

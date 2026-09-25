@@ -40,6 +40,8 @@ export interface CommissionRow {
   accountIds: string[]
   /** Комиссия в базовой валюте: положительная — потеря, отрицательная — выгода. */
   commissionBase: number
+  /** Объём операции в базовой валюте (отправлено переводом / списано расходом). */
+  amountBase: number
   /** Пошаговая расшифровка комиссии в виде формул. */
   breakdown: CommissionBreakdownLine[]
 }
@@ -57,6 +59,10 @@ export interface CommissionReport {
   totalBase: number
   transfersBase: number
   expensesBase: number
+  /** Суммарный объём операций с комиссией в базовой валюте. */
+  amountBase: number
+  /** Комиссия в процентах от объёма операций; null, если объём нулевой. */
+  commissionPercent: number | null
   months: CommissionMonthRow[]
 }
 
@@ -313,6 +319,7 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase: -spread,
+      amountBase: transferSentBase(transfer, from, settings, rateBook),
       breakdown,
     })
   }
@@ -343,6 +350,14 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase,
+      amountBase: convertAmount(
+        expense.accountAmount,
+        accountCurrency,
+        settings.baseCurrency,
+        settings,
+        expense.date,
+        rateBook,
+      ),
       breakdown: expenseBreakdown(
         expense,
         accountCurrency,
@@ -368,6 +383,11 @@ export function summarizeCommissionRows(rows: CommissionRow[]): CommissionReport
   const expensesBase = rows
     .filter((row) => row.kind === 'expense')
     .reduce((sum, row) => sum + row.commissionBase, 0)
+  const amountBase = rows.reduce(
+    (sum, row) => sum + (Number.isFinite(row.amountBase) ? row.amountBase : 0),
+    0,
+  )
+  const commissionPercent = amountBase > 0 ? (totalBase / amountBase) * 100 : null
 
   const byMonth = new Map<string, CommissionMonthRow>()
   for (const row of rows) {
@@ -379,7 +399,7 @@ export function summarizeCommissionRows(rows: CommissionRow[]): CommissionReport
   }
   const months = [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month))
 
-  return { rows, totalBase, transfersBase, expensesBase, months }
+  return { rows, totalBase, transfersBase, expensesBase, amountBase, commissionPercent, months }
 }
 
 /** Сумма комиссии по каждому счёту (перевод учитывается в обоих его счетах). */
