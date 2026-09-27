@@ -26,3 +26,12 @@ export function collectIndexValueEntries(
     return [{ indexId: index.id, value }]
   })
 }
+
+/** True when two money-field strings encode different index values. */
+export function indexValueInputsDiffer(a: string, b: string, kind: IndexKind): boolean {
+  const left = parseIndexValueInput(a, kind)
+  const right = parseIndexValueInput(b, kind)
+  if (left == null && right == null) return a.trim() !== b.trim()
+  if (left == null || right == null) return true
+  return Math.abs(left - right) > 1e-10
+}

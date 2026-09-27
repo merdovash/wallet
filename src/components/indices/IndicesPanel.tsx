@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -31,7 +31,7 @@ import {
   resolveIndexCurrency,
 } from '../../lib/marketIndex'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
-import { indexValueToInput } from '../../lib/indexValueInput'
+import { indexValueInputsDiffer, indexValueToInput } from '../../lib/indexValueInput'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useSortableList } from '../../lib/useSortableList'
@@ -333,9 +333,10 @@ function IndexDetailPanel({
   const [todayValue, setTodayValue] = useState('')
   const [color, setColor] = useState<string>(ACCOUNT_COLORS[0])
   const [saving, setSaving] = useState(false)
+  const todayTouchedRef = useRef(false)
   const { mode: themeMode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(themeMode === 'dark'), [themeMode])
-  const { rootRef, focusKeyProps } = useRestoreFocusOnResume(editingMode)
+  const { rootRef, focusKeyProps } = useRestoreFocusOnResume(Boolean(index))
 
   const series = useMemo(
     () => (index ? resolveIndexValues(index.id, allIndices, indexValues) : []),
@@ -361,11 +362,23 @@ function IndexDetailPanel({
     [allIndices, indexId],
   )
   const parsedTodayValue = editManualIndex ? parseMoneyInput(todayValue) : null
+  const todayPrefill =
+    index && index.kind !== 'derived_rate' && directLatestForToday
+      ? indexValueToInput(directLatestForToday.value, index.kind)
+      : ''
+  const todayDirty =
+    Boolean(index && isManualIndex(index.kind)) &&
+    indexValueInputsDiffer(todayValue, todayPrefill, index?.kind ?? 'amount')
   const saveDisabled =
     !name.trim() ||
     saving ||
     (kind === 'derived_rate' && !baseIndexId) ||
     (editManualIndex && parsedTodayValue == null)
+  const todaySaveDisabled = saving || parsedTodayValue == null
+
+  useEffect(() => {
+    todayTouchedRef.current = false
+  }, [indexId])
 
   useEffect(() => {
     if (!index) return
@@ -378,27 +391,31 @@ function IndexDetailPanel({
         ? formatMoneyInput(String(ratePctToPoints(index.rateSpreadPct)).replace('.', ','))
         : '',
     )
-    setTodayValue(
-      index.kind !== 'derived_rate' && directLatestForToday
-        ? indexValueToInput(directLatestForToday.value, index.kind)
-        : '',
-    )
     setColor(index.color)
-  }, [index, directLatestForToday])
+  }, [index])
+
+  useEffect(() => {
+    if (todayTouchedRef.current) return
+    setTodayValue(todayPrefill)
+  }, [todayPrefill])
 
   useRegisterPrimaryAction(Boolean(index), {
-    id: editingMode ? 'index-detail-save' : 'index-detail-edit',
-    label: editingMode ? 'Сохранить' : 'Изменить',
+    id: editingMode || todayDirty ? 'index-detail-save' : 'index-detail-edit',
+    label: editingMode || todayDirty ? 'Сохранить' : 'Изменить',
     scope: 'panel',
-    disabled: editingMode ? saveDisabled : false,
-    title: editingMode
+    disabled: editingMode ? saveDisabled : todayDirty ? todaySaveDisabled : false,
+    title: editingMode || todayDirty
       ? editManualIndex && parsedTodayValue == null
         ? 'Введите значение на сегодня'
-        : 'Сохранить индекс'
+        : todayDirty && !editingMode
+          ? 'Сохранить значение на сегодня'
+          : 'Сохранить индекс'
       : 'Перейти к редактированию',
     onClick: () => {
       if (editingMode) {
         void handleSave()
+      } else if (todayDirty) {
+        void handleSaveToday()
       } else {
         setEditingMode(true)
       }
@@ -435,9 +452,33 @@ function IndexDetailPanel({
           { indexId: index.id, value: kind === 'annual_rate' ? pointsToRatePct(todayParsed) : todayParsed },
         ])
       }
+      todayTouchedRef.current = false
       setEditingMode(false)
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось сохранить индекс')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveToday() {
+    if (!index || index.kind === 'derived_rate') return
+    const todayParsed = parseMoneyInput(todayValue)
+    if (todayParsed == null) {
+      alert('Введите значение на сегодня')
+      return
+    }
+    setSaving(true)
+    try {
+      await upsertIndexValues(today, [
+        {
+          indexId: index.id,
+          value: index.kind === 'annual_rate' ? pointsToRatePct(todayParsed) : todayParsed,
+        },
+      ])
+      todayTouchedRef.current = false
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Не удалось сохранить значение')
     } finally {
       setSaving(false)
     }
@@ -458,14 +499,23 @@ function IndexDetailPanel({
       onClose={onClose}
       dataQa="index-detail"
       headerActions={
-        editingMode ? (
+        editingMode || todayDirty ? (
           <Button
             type="button"
             className="!hidden !px-3 !py-1.5 md:!inline-flex"
-            disabled={saveDisabled}
-            title={editManualIndex && parsedTodayValue == null ? 'Введите значение на сегодня' : 'Сохранить индекс'}
+            disabled={editingMode ? saveDisabled : todaySaveDisabled}
+            title={
+              editManualIndex && parsedTodayValue == null
+                ? 'Введите значение на сегодня'
+                : todayDirty && !editingMode
+                  ? 'Сохранить значение на сегодня'
+                  : 'Сохранить индекс'
+            }
             dataQa="index-detail-save"
-            onClick={() => void handleSave()}
+            onClick={() => {
+              if (editingMode) void handleSave()
+              else void handleSaveToday()
+            }}
           >
             Сохранить
           </Button>
@@ -482,8 +532,9 @@ function IndexDetailPanel({
         )
       }
     >
+      <div ref={rootRef}>
       {editingMode ? (
-        <div ref={rootRef}>
+        <div>
           <form
             className="space-y-4"
             onSubmit={(event) => {
@@ -548,7 +599,10 @@ function IndexDetailPanel({
                   <Field label="Значение на сегодня">
                     <MoneyInput
                       value={todayValue}
-                      onChange={setTodayValue}
+                      onChange={(value) => {
+                        todayTouchedRef.current = true
+                        setTodayValue(value)
+                      }}
                       allowNegative={kind === 'annual_rate'}
                       placeholder={directLatestForToday ? indexValueToInput(directLatestForToday.value, kind) : '0'}
                       dataQa="index-detail-today-value"
@@ -601,13 +655,43 @@ function IndexDetailPanel({
           <ReadOnlyField label="Валюта" value={resolvedCurrency} />
           {baseIndexName ? <ReadOnlyField label="Базовый индекс" value={baseIndexName} /> : null}
           {index.kind === 'derived_rate' ? (
-            <ReadOnlyField label="Дельта" value={formatRateSpreadPoints(index.rateSpreadPct)} />
-          ) : null}
-          <ReadOnlyField label="Последнее значение" value={latest ? formatValue(latest.value, index.kind) : 'нет данных'} />
-          <ReadOnlyField label="Дата" value={latest ? formatIsoToRu(latest.date) : '—'} />
+            <>
+              <ReadOnlyField label="Дельта" value={formatRateSpreadPoints(index.rateSpreadPct)} />
+              <ReadOnlyField label="Последнее значение" value={latest ? formatValue(latest.value, index.kind) : 'нет данных'} />
+              <ReadOnlyField label="Дата" value={latest ? formatIsoToRu(latest.date) : '—'} />
+            </>
+          ) : (
+            <div className="space-y-1">
+              <Field label="Значение на сегодня">
+                <MoneyInput
+                  value={todayValue}
+                  onChange={(value) => {
+                    todayTouchedRef.current = true
+                    setTodayValue(value)
+                  }}
+                  allowNegative={index.kind === 'annual_rate'}
+                  placeholder={
+                    directLatestForToday ? indexValueToInput(directLatestForToday.value, index.kind) : '0'
+                  }
+                  dataQa="index-detail-today-value"
+                  {...focusKeyProps('today-value')}
+                />
+              </Field>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {`Запись на сегодня (${formatIsoToRu(today)}).`}
+                {' '}
+                {directToday
+                  ? 'Значение на эту дату уже есть и будет перезаписано.'
+                  : directLatestForToday
+                    ? `Последнее значение: ${formatIsoToRu(directLatestForToday.date)}.`
+                    : 'По этому индексу ещё не было значений.'}
+              </p>
+            </div>
+          )}
           <IndexValueChart index={index} values={series} chartTheme={chartTheme} dataQa="index-detail-chart" />
         </div>
       )}
+      </div>
     </StackPanel>
   )
 }
