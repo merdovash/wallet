@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { suggestedAccountAmount } from '../../lib/expenseCheckIn'
-import { todayIsoDate } from '../../lib/format'
+import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
@@ -35,6 +35,7 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
   const [currency, setCurrency] = useState('')
   const [amount, setAmount] = useState('')
   const [accountAmount, setAccountAmount] = useState('')
+  const [commission, setCommission] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +48,7 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
     setCurrency(first?.currency ?? settings.baseCurrency)
     setAmount('')
     setAccountAmount('')
+    setCommission('')
     setNote('')
     setSaving(false)
     setError(null)
@@ -63,6 +65,9 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
   const crossCurrency = Boolean(account && currency && account.currency !== currency)
   const parsedAmount = parseMoneyInput(amount)
   const parsedAccountAmount = parseMoneyInput(accountAmount)
+  const parsedCommission = parseMoneyInput(commission)
+  const sameCurrencyCommission =
+    !crossCurrency && parsedCommission != null && parsedCommission > 0 ? parsedCommission : 0
 
   const chargeHint =
     crossCurrency && account && parsedAmount != null && parsedAmount > 0
@@ -101,6 +106,7 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
             crossCurrency && parsedAccountAmount != null && parsedAccountAmount > 0
               ? parsedAccountAmount
               : undefined,
+          commission: sameCurrencyCommission > 0 ? sameCurrencyCommission : undefined,
           note: note.trim() || undefined,
         },
         rateBook,
@@ -188,6 +194,21 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
               }
               dataQa="expense-create-account-amount"
             />
+          </Field>
+        ) : account ? (
+          <Field label={`Комиссия (${account.currency})`}>
+            <MoneyInput
+              value={commission}
+              onChange={setCommission}
+              allowNegative={false}
+              placeholder="0"
+              dataQa="expense-create-commission"
+            />
+            <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">
+              {parsedAmount != null && parsedAmount > 0 && sameCurrencyCommission > 0
+                ? `Со счёта спишется ${formatCurrency(parsedAmount + sameCurrencyCommission, account.currency)}`
+                : 'Необязательно. Со счёта списывается сумма расхода плюс комиссия.'}
+            </span>
           </Field>
         ) : null}
         <Field label="Комментарий">

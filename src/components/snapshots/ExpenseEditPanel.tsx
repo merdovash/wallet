@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { suggestedAccountAmount } from '../../lib/expenseCheckIn'
-import { formatIsoToRu } from '../../lib/format'
+import { formatCurrency, formatIsoToRu } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
@@ -36,6 +36,7 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
   const [currency, setCurrency] = useState('')
   const [amount, setAmount] = useState('')
   const [accountAmount, setAccountAmount] = useState('')
+  const [commission, setCommission] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +48,11 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
     setAccountAmount(
       expense.currency !== (account?.currency ?? expense.currency)
         ? amountToInput(expense.accountAmount)
+        : '',
+    )
+    setCommission(
+      expense.currency === (account?.currency ?? expense.currency) && expense.commission > 0
+        ? amountToInput(expense.commission)
         : '',
     )
     setNote(expense.note ?? '')
@@ -64,6 +70,9 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
   const crossCurrency = Boolean(account && currency && account.currency !== currency)
   const parsedAmount = parseMoneyInput(amount)
   const parsedAccountAmount = parseMoneyInput(accountAmount)
+  const parsedCommission = parseMoneyInput(commission)
+  const sameCurrencyCommission =
+    !crossCurrency && parsedCommission != null && parsedCommission > 0 ? parsedCommission : 0
 
   const chargeHint =
     crossCurrency && account && expense && parsedAmount != null && parsedAmount > 0
@@ -101,6 +110,7 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
             crossCurrency && parsedAccountAmount != null && parsedAccountAmount > 0
               ? parsedAccountAmount
               : undefined,
+          commission: crossCurrency ? 0 : sameCurrencyCommission,
           note,
         },
         rateBook,
@@ -172,6 +182,21 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
               }
               dataQa="expense-edit-account-amount"
             />
+          </Field>
+        ) : account ? (
+          <Field label={`Комиссия (${account.currency})`}>
+            <MoneyInput
+              value={commission}
+              onChange={setCommission}
+              allowNegative={false}
+              placeholder="0"
+              dataQa="expense-edit-commission"
+            />
+            <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">
+              {parsedAmount != null && parsedAmount > 0 && sameCurrencyCommission > 0
+                ? `Со счёта спишется ${formatCurrency(parsedAmount + sameCurrencyCommission, account.currency)}`
+                : 'Необязательно. Со счёта списывается сумма расхода плюс комиссия.'}
+            </span>
           </Field>
         ) : null}
         <Field label="Комментарий">

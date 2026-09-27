@@ -18,6 +18,8 @@ export interface ExpenseCheckInInput {
   amount: number
   /** Charged from the account (account currency); required for cross-currency. */
   accountAmount?: number
+  /** Explicit fee in the account currency; used when expense currency matches the account. */
+  commission?: number
   accounts: Account[]
   snapshots: BalanceSnapshot[]
   manualRates: ManualRate[]
@@ -30,7 +32,8 @@ export interface ExpenseCheckInPlan {
   account: Account
   /** Charged from the account, in the account currency. */
   accountAmount: number
-  /** Charged minus the expense converted at the current exchange rate (account currency). */
+  /** Charged minus the expense converted at the current exchange rate (account currency),
+   *  or the explicit same-currency fee. */
   commission: number
   /** Snapshot line with the reduced balance. */
   line: SnapshotLine
@@ -126,22 +129,28 @@ export function buildExpenseCheckInPlan(input: ExpenseCheckInInput): ExpenseChec
   if (!account || !(input.amount > 0)) return null
 
   const sameCurrency = input.currency === account.currency
-  const accountAmount = sameCurrency ? input.amount : input.accountAmount
+  const explicitCommission =
+    input.commission != null && Number.isFinite(input.commission) && input.commission > 0
+      ? input.commission
+      : 0
+  const accountAmount = sameCurrency ? input.amount + explicitCommission : input.accountAmount
   if (accountAmount == null || !(accountAmount > 0)) return null
 
-  const commission = expenseCommission(
-    {
-      amount: input.amount,
-      currency: input.currency,
-      accountAmount,
-      accountCurrency: account.currency,
-      date: input.date,
-    },
-    input.manualRates,
-    input.settings,
-    input.rateBook,
-    input.fxOverrides,
-  )
+  const commission = sameCurrency
+    ? explicitCommission
+    : expenseCommission(
+        {
+          amount: input.amount,
+          currency: input.currency,
+          accountAmount,
+          accountCurrency: account.currency,
+          date: input.date,
+        },
+        input.manualRates,
+        input.settings,
+        input.rateBook,
+        input.fxOverrides,
+      )
 
   const balance = balanceOnDate(account.id, input.date, input.snapshots) ?? 0
   const expenseBase = expenseChargeBase(

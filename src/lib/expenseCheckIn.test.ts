@@ -194,4 +194,39 @@ describe('buildExpenseCheckInPlan', () => {
     })
     expect(plan).toBeNull()
   })
+
+  it('adds an explicit same-currency commission to the charge', () => {
+    const plan = buildExpenseCheckInPlan({
+      date: '2026-03-02',
+      accountId: 'rub',
+      currency: 'RUB',
+      amount: 1500,
+      commission: 40,
+      accounts: [rub, usd],
+      snapshots,
+      manualRates,
+      settings,
+    })
+    expect(plan!.accountAmount).toBe(1540)
+    expect(plan!.commission).toBe(40)
+    expect(plan!.line).toEqual({ accountId: 'rub', amount: 8460 })
+    expect(plan!.expenseBase).toBe(1540)
+  })
+
+  it('ignores an explicit commission on a cross-currency expense', () => {
+    const plan = buildExpenseCheckInPlan({
+      date: '2026-03-02',
+      accountId: 'rub',
+      currency: 'USD',
+      amount: 10,
+      accountAmount: 1050,
+      commission: 999,
+      accounts: [rub, usd],
+      snapshots,
+      manualRates,
+      settings,
+    })
+    expect(plan!.commission).toBeCloseTo(50)
+    expect(plan!.accountAmount).toBe(1050)
+  })
 })

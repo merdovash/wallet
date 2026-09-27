@@ -177,7 +177,7 @@ export interface Expense {
   amount: number
   /** Amount charged from the account, in the account currency. */
   accountAmount: number
-  /** Conversion commission in the account currency, frozen at creation time. */
+  /** Conversion or explicit fee in the account currency, frozen at creation time. */
   commission: number
   note?: string
   createdAt?: string

@@ -292,35 +292,55 @@ function expenseBreakdown(
   const referenceAmount = expense.accountAmount - expense.commission
   const referenceRate = expense.amount > 0 ? referenceAmount / expense.amount : 0
 
+  const sameCurrency = expense.currency === accountCurrency
   const lines: CommissionBreakdownLine[] = [
-    ...(expense.currency !== accountCurrency
-      ? conversionComparisonLines({
-          date: expense.date,
-          amount: expense.amount,
-          fromCurrency: expense.currency,
-          toCurrency: accountCurrency,
-          actualAmount: expense.accountAmount,
-          cbrLabel: 'Расход по курсу ЦБ на дату',
-          customLabel: 'Расход по ручному курсу',
-          actualLabel: 'Фактически списано со счёта',
-          actualRateLabel: 'Фактический курс оплаты',
-          manualRates,
-          fxOverrides,
-          settings,
-          rateBook,
-        })
-      : []),
-    {
-      label: 'Расход по курсу обмена на момент операции (зафиксирован)',
-      expression: `${formatCurrency(expense.amount, expense.currency)} × ${formatRate(referenceRate)} ${accountCurrency}/${expense.currency}`,
-      result: formatCurrency(referenceAmount, accountCurrency),
-    },
-    {
-      label: 'Комиссия (списано со счёта − расход по курсу)',
-      expression: `${formatCurrency(expense.accountAmount, accountCurrency)} − ${formatCurrency(referenceAmount, accountCurrency)}`,
-      result: formatCurrency(expense.commission, accountCurrency),
-      emphasize: accountCurrency === base,
-    },
+    ...(sameCurrency
+      ? [
+          {
+            label: 'Расход',
+            expression: formatCurrency(expense.amount, expense.currency),
+            result: formatCurrency(expense.amount, expense.currency),
+          },
+          {
+            label: 'Комиссия',
+            expression: formatCurrency(expense.commission, accountCurrency),
+            result: formatCurrency(expense.commission, accountCurrency),
+            emphasize: accountCurrency === base,
+          },
+          {
+            label: 'Списано со счёта',
+            expression: `${formatCurrency(expense.amount, expense.currency)} + ${formatCurrency(expense.commission, accountCurrency)}`,
+            result: formatCurrency(expense.accountAmount, accountCurrency),
+          },
+        ]
+      : [
+          ...conversionComparisonLines({
+            date: expense.date,
+            amount: expense.amount,
+            fromCurrency: expense.currency,
+            toCurrency: accountCurrency,
+            actualAmount: expense.accountAmount,
+            cbrLabel: 'Расход по курсу ЦБ на дату',
+            customLabel: 'Расход по ручному курсу',
+            actualLabel: 'Фактически списано со счёта',
+            actualRateLabel: 'Фактический курс оплаты',
+            manualRates,
+            fxOverrides,
+            settings,
+            rateBook,
+          }),
+          {
+            label: 'Расход по курсу обмена на момент операции (зафиксирован)',
+            expression: `${formatCurrency(expense.amount, expense.currency)} × ${formatRate(referenceRate)} ${accountCurrency}/${expense.currency}`,
+            result: formatCurrency(referenceAmount, accountCurrency),
+          },
+          {
+            label: 'Комиссия (списано со счёта − расход по курсу)',
+            expression: `${formatCurrency(expense.accountAmount, accountCurrency)} − ${formatCurrency(referenceAmount, accountCurrency)}`,
+            result: formatCurrency(expense.commission, accountCurrency),
+            emphasize: accountCurrency === base,
+          },
+        ]),
   ]
   if (accountCurrency !== base) {
     const accountRate = baseRateFor(

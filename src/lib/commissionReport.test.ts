@@ -235,6 +235,21 @@ describe('buildCommissionReport', () => {
     const report = buildCommissionReport(accounts, [], [usdExpense], [], settings)
     expect(report.totalBase).toBeCloseTo(90)
   })
+
+  it('includes an explicit same-currency expense commission', () => {
+    const fee: Expense = {
+      id: 'e4',
+      date: '2026-04-04',
+      accountId: 'rub',
+      currency: 'RUB',
+      amount: 1000,
+      accountAmount: 1030,
+      commission: 30,
+    }
+    const report = buildCommissionReport(accounts, [], [fee], [], settings)
+    expect(report.expensesBase).toBeCloseTo(30)
+    expect(report.rows[0]?.breakdown.some((line) => line.label === 'Комиссия')).toBe(true)
+  })
 })
 
 describe('commissionByAccount', () => {

@@ -133,6 +133,7 @@ interface WalletState {
       currency: string
       amount: number
       accountAmount?: number
+      commission?: number
       note?: string
     },
     rateBook?: RateBook,
@@ -144,6 +145,7 @@ interface WalletState {
       currency?: string
       amount?: number
       accountAmount?: number
+      commission?: number
       note?: string
     },
     rateBook?: RateBook,
@@ -539,6 +541,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       currency: input.currency,
       amount: input.amount,
       accountAmount: input.accountAmount,
+      commission: input.commission,
       accounts: state.accounts,
       snapshots: state.snapshots,
       manualRates: state.manualRates,
@@ -593,16 +596,28 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     const amount = patch.amount ?? old.amount
     if (!(amount > 0)) throw new Error('Сумма расхода должна быть больше 0')
     const sameCurrency = currency === account.currency
-    const accountAmount = sameCurrency ? amount : (patch.accountAmount ?? old.accountAmount)
+    const explicitCommission =
+      patch.commission !== undefined
+        ? patch.commission
+        : sameCurrency && old.currency === account.currency
+          ? old.commission
+          : 0
+    const accountAmount = sameCurrency
+      ? amount + (Number.isFinite(explicitCommission) && explicitCommission > 0 ? explicitCommission : 0)
+      : (patch.accountAmount ?? old.accountAmount)
     if (!(accountAmount > 0)) throw new Error('Сумма списания со счёта должна быть больше 0')
 
-    const commission = expenseCommission(
-      { amount, currency, accountAmount, accountCurrency: account.currency, date: old.date },
-      state.manualRates,
-      state.settings,
-      rateBook,
-      state.fxOverrides,
-    )
+    const commission = sameCurrency
+      ? Number.isFinite(explicitCommission) && explicitCommission > 0
+        ? explicitCommission
+        : 0
+      : expenseCommission(
+          { amount, currency, accountAmount, accountCurrency: account.currency, date: old.date },
+          state.manualRates,
+          state.settings,
+          rateBook,
+          state.fxOverrides,
+        )
 
     const expense = await updateExpenseApi(id, {
       currency,
