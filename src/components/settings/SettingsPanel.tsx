@@ -1,282 +1,49 @@
-﻿import { useEffect, useMemo, useState } from 'react'
-import { resolvePivotForDate } from '../../lib/cbrRates'
-import {
-  CHECK_IN_INTERVAL_OPTIONS,
-  normalizeCheckInIntervalDays,
-  readCheckInIntervalDays,
-  writeCheckInIntervalDays,
-} from '../../lib/checkInReminder'
-import { CURRENCY_OPTIONS, currencyLabel } from '../../lib/currency'
-import { currenciesWithWalletsByBalance } from '../../lib/currenciesWithWallets'
-import { formatCurrency, formatDateDisplay, formatDateTimeDisplay, todayIsoDate } from '../../lib/format'
-import {
-  formatInflationPercentInput,
-  parseInflationPercentInput,
-} from '../../lib/realReturn'
-import { useTheme } from '../../lib/useTheme'
-import type { ThemeMode } from '../../lib/theme'
-import { useRatesStore } from '../../store/ratesStore'
-import { useWalletStore } from '../../store/walletStore'
+﻿import { SETTINGS_NAV_ITEMS } from '../../lib/navSections'
+import { sectionToPath } from '../../lib/appRoutes'
 import { dataQa } from '../../lib/dataQa'
-import { Button, Card, Field, Input, Select } from '../ui/FormControls'
+import type { SettingsSection } from '../../types/wallet'
 import { PageHeader } from '../ui/PageHeader'
-import { ManualRatesCard } from './ManualRatesCard'
-import { RatesRegistryPanel } from './RatesRegistryPanel'
 
-export function SettingsPanel() {
-  const settings = useWalletStore((s) => s.settings)
-  const accounts = useWalletStore((s) => s.accounts)
-  const snapshots = useWalletStore((s) => s.snapshots)
-  const setSettings = useWalletStore((s) => s.setSettings)
-  const { mode: themeMode, setMode: setThemeMode } = useTheme()
-  const byDate = useRatesStore((s) => s.byDate)
-  const status = useRatesStore((s) => s.status)
-  const error = useRatesStore((s) => s.error)
-  const lastFetchedAt = useRatesStore((s) => s.lastFetchedAt)
-  const latestRateDate = useRatesStore((s) => s.latestRateDate)
-  const ensureRates = useRatesStore((s) => s.ensureRates)
-  const refreshDate = useRatesStore((s) => s.refreshDate)
-  const [registryOpen, setRegistryOpen] = useState(false)
-  const [checkInIntervalDays, setCheckInIntervalDays] = useState(readCheckInIntervalDays)
-  const [inflationText, setInflationText] = useState(() =>
-    formatInflationPercentInput(settings.annualInflationPct),
-  )
-  const [keyRateText, setKeyRateText] = useState(() =>
-    formatInflationPercentInput(settings.keyRatePct),
-  )
+interface SettingsPanelProps {
+  onOpenSection: (section: SettingsSection) => void
+}
 
-  useEffect(() => {
-    setInflationText(formatInflationPercentInput(settings.annualInflationPct))
-  }, [settings.annualInflationPct])
-
-  useEffect(() => {
-    setKeyRateText(formatInflationPercentInput(settings.keyRatePct))
-  }, [settings.keyRatePct])
-
-  const today = todayIsoDate()
-  const pivot = useMemo(() => resolvePivotForDate(today, byDate), [byDate, today])
-  const rateDates = useMemo(() => Object.keys(byDate).sort().reverse(), [byDate])
-  const effectiveRateDate = latestRateDate ?? rateDates[0] ?? null
-
-  const currenciesInUse = useMemo(
-    () => currenciesWithWalletsByBalance(accounts, snapshots, settings, byDate),
-    [accounts, snapshots, settings, byDate],
-  )
-
-  useEffect(() => {
-    void ensureRates([today])
-  }, [ensureRates, today])
-
-  const statusLabel =
-    status === 'loading'
-      ? 'Загрузка…'
-      : status === 'error'
-        ? `Ошибка: ${error ?? 'не удалось загрузить'}`
-        : status === 'ready'
-          ? 'Курсы ЦБ загружены'
-          : 'Курсы ещё не загружены'
-
+export function SettingsPanel({ onOpenSection }: SettingsPanelProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-4" {...dataQa('settings-page')}>
       <PageHeader
         title="Настройки"
-        description="Базовая валюта и курсы ЦБ РФ на дату чек-ина (cbr-xml-daily.ru)"
+        description="Оформление, чек-ины, бенчмарки и курсы валют"
         showPrimary={false}
       />
 
-      <Card className="space-y-4">
-        <Field label="Тема оформления">
-          <Select
-            value={themeMode}
-            onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
-            dataQa="settings-theme"
-          >
-            <option value="system">Как в системе</option>
-            <option value="light">Светлая</option>
-            <option value="dark">Тёмная</option>
-          </Select>
-        </Field>
-      </Card>
-
-      <Card className="space-y-4">
-        <Field label="Интервал чек-инов">
-          <Select
-            value={String(checkInIntervalDays)}
-            dataQa="settings-interval"
-            onChange={(e) => {
-              const next = Number(e.target.value)
-              writeCheckInIntervalDays(next)
-              setCheckInIntervalDays(normalizeCheckInIntervalDays(next))
-            }}
-          >
-            {CHECK_IN_INTERVAL_OPTIONS.map((days) => (
-              <option key={days} value={days}>
-                раз в {days === 1 ? 'день' : `${days} ${days < 5 ? 'дня' : 'дней'}`}
-              </option>
-            ))}
-          </Select>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            На дашборде появится напоминание, если с последнего чек-ина прошло больше интервала
-          </p>
-        </Field>
-      </Card>
-
-      <Card className="space-y-4">
-        <Field label="Базовая валюта">
-          <Select
-            value={settings.baseCurrency}
-            dataQa="settings-base-currency"
-            onChange={(e) => {
-              void setSettings({ baseCurrency: e.target.value })
-            }}
-          >
-            {CURRENCY_OPTIONS.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code} — {c.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Годовая инфляция, %">
-          <Input
-            type="text"
-            inputMode="decimal"
-            placeholder="например 8"
-            dataQa="settings-inflation"
-            value={inflationText}
-            onChange={(e) => setInflationText(e.target.value)}
-            onBlur={() => {
-              const parsed = parseInflationPercentInput(inflationText)
-              void setSettings({ annualInflationPct: parsed })
-            }}
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Для виджета «Реальных годовых» на дашборде: (1 + номинал) / (1 + инфляция) − 1
-          </p>
-        </Field>
-        <Field label="Ключевая ставка, %">
-          <Input
-            type="text"
-            inputMode="decimal"
-            placeholder="например 16"
-            dataQa="settings-key-rate"
-            value={keyRateText}
-            onChange={(e) => setKeyRateText(e.target.value)}
-            onBlur={() => {
-              const parsed = parseInflationPercentInput(keyRateText)
-              void setSettings({ keyRatePct: parsed })
-            }}
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Бенчмарк в расшифровке доходности — сравнение «в годовых» портфеля с ключевой ставкой
-          </p>
-        </Field>
-      </Card>
-
-      <ManualRatesCard />
-
-      <Card className="space-y-4" dataQa="settings-rates">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Курсы ЦБ</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{statusLabel}</p>
-            {lastFetchedAt && (
-              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                Обновлено: {formatDateTimeDisplay(lastFetchedAt)}
-              </p>
-            )}
-            {effectiveRateDate && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                День котировки ЦБ: {formatDateDisplay(effectiveRateDate)}
-                {effectiveRateDate !== today
-                  ? ` (для ${formatDateDisplay(today)})`
-                  : ''}
-                {rateDates.length > 1 ? ` · в кэше дней: ${rateDates.length}` : ''}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={rateDates.length === 0}
-              onClick={() => setRegistryOpen(true)}
-              dataQa="settings-rates-registry"
+      <ul className="space-y-2">
+        {SETTINGS_NAV_ITEMS.map((item) => (
+          <li key={item.id}>
+            <a
+              href={sectionToPath(item.id)}
+              onClick={(e) => {
+                e.preventDefault()
+                onOpenSection(item.id)
+              }}
+              {...dataQa(`settings-nav-${item.id}`)}
+              className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-blue-300 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700 dark:hover:bg-blue-950/30"
             >
-              Реестр
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={status === 'loading'}
-              onClick={() => void refreshDate(today)}
-              dataQa="settings-rates-refresh"
-            >
-              Обновить
-            </Button>
-          </div>
-        </div>
-
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Для каждого чек-ина берётся курс ЦБ на эту дату (в выходные — последний рабочий день).
-          USDT считается как USD.
-        </p>
-
-        {pivot && (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              1 единица → {settings.baseCurrency} (сегодня)
-            </h3>
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" {...dataQa('settings-rates-list')}>
-              {currenciesInUse.map((code) => {
-                if (code === settings.baseCurrency) {
-                  return (
-                    <li key={code} className="flex justify-between px-3 py-2 text-sm" {...dataQa(`settings-rate-${code}`)}>
-                      <span>
-                        {code} — {currencyLabel(code)}
-                      </span>
-                      <span className="font-medium">1</span>
-                    </li>
-                  )
-                }
-                const rub = pivot[code]
-                if (rub == null) {
-                  return (
-                    <li key={code} className="flex justify-between px-3 py-2 text-sm text-slate-400 dark:text-slate-500" {...dataQa(`settings-rate-${code}`)}>
-                      <span>
-                        {code} — {currencyLabel(code)}
-                      </span>
-                      <span>нет в ЦБ</span>
-                    </li>
-                  )
-                }
-                const inBase =
-                  settings.baseCurrency === 'RUB'
-                    ? rub
-                    : rub / (pivot[settings.baseCurrency] ?? 1)
-                return (
-                  <li key={code} className="flex justify-between px-3 py-2 text-sm" {...dataQa(`settings-rate-${code}`)}>
-                    <span>
-                      {code} — {currencyLabel(code)}
-                    </span>
-                    <span className="font-medium">
-                      {formatCurrency(inBase, settings.baseCurrency)}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
-      </Card>
-
-      <RatesRegistryPanel
-        open={registryOpen}
-        onClose={() => setRegistryOpen(false)}
-        byDate={byDate}
-        baseCurrency={settings.baseCurrency}
-        currenciesInUse={currenciesInUse}
-      />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {item.label}
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                  {item.description}
+                </span>
+              </span>
+              <span className="mt-0.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden>
+                →
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

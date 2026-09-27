@@ -1,7 +1,7 @@
 ﻿import { useMemo } from 'react'
 import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, signedAmount, todayIsoDate } from '../../lib/format'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { Card } from '../ui/FormControls'
 
@@ -11,7 +11,7 @@ export function CreditFloatSummary() {
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
 
   const hasCredit = useMemo(
     () => accounts.some((a) => !a.archived && a.kind === 'credit'),

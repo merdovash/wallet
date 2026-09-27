@@ -23,7 +23,7 @@ import { buildAccountFundsState } from '../../lib/fundBalances'
 import { formatCurrency, formatIsoToRu, todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { FundsOnboarding } from './FundsOnboarding'
 import { FundAutoTargetToggle, FundMonthlyExpenseList } from './FundExpenseMonthsEditor'
@@ -37,7 +37,7 @@ export function FundsPanel({ active }: { active: boolean }) {
   const transfers = useWalletStore((s) => s.transfers)
   const funds = useWalletStore((s) => s.funds)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const addAccountFund = useWalletStore((s) => s.addAccountFund)
   const updateAccountFund = useWalletStore((s) => s.updateAccountFund)
   const deleteAccountFund = useWalletStore((s) => s.deleteAccountFund)

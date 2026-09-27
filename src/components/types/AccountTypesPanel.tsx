@@ -3,7 +3,7 @@ import { buildAccountTypeReport } from '../../lib/accountTypeReport'
 import { formatCurrency, formatPercent, signedAmount } from '../../lib/format'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useFxModeStore } from '../../store/fxModeStore'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import type { AccountKind } from '../../types/wallet'
 import { dataQa } from '../../lib/dataQa'
@@ -38,7 +38,7 @@ export function AccountTypesPanel({ onOpenAccount }: AccountTypesPanelProps) {
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const fxMode = useFxModeStore((s) => s.fxMode)
   const { range } = usePeriodRange()
   const [expanded, setExpanded] = useState<Partial<Record<AccountKind, boolean>>>({})

@@ -19,6 +19,7 @@ import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { FxModeToggle } from '../ui/FxModeToggle'
@@ -43,7 +44,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const fxMode = useFxModeStore((s) => s.fxMode)
   const { range: selectedRange } = usePeriodRange()

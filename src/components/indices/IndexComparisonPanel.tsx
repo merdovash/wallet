@@ -38,7 +38,7 @@ import { latestIndexValue, resolveIndexCurrency } from '../../lib/marketIndex'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
 import { useAuthStore } from '../../store/authStore'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import type { Account, MarketIndex } from '../../types/wallet'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -146,7 +146,7 @@ export function IndexComparisonPanel() {
   const settings = useWalletStore((s) => s.settings)
   const indices = useWalletStore((s) => s.indices)
   const indexValues = useWalletStore((s) => s.indexValues)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const { range } = usePeriodRange()
   const { mode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(), [mode])

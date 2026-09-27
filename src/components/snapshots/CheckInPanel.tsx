@@ -9,7 +9,7 @@ import { formatTransferLabel, suggestedReceiveAmount } from '../../lib/transferC
 import { transferSpreadBase } from '../../lib/transferAmounts'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import type { RateBook } from '../../engine/growthEngine'
 import type { Account, Expense, SnapshotLine, Transfer, WalletSettings } from '../../types/wallet'
@@ -141,9 +141,10 @@ export function CheckInPanel({
   const indices = useWalletStore((s) => s.indices)
   const indexValues = useWalletStore((s) => s.indexValues)
   const upsertIndexValues = useWalletStore((s) => s.upsertIndexValues)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const settings = useWalletStore((s) => s.settings)
   const manualRates = useWalletStore((s) => s.manualRates)
+  const fxOverrides = useWalletStore((s) => s.fxOverrides)
 
   const editing = useMemo(
     () => (snapshotId ? snapshots.find((s) => s.id === snapshotId) ?? null : null),
@@ -417,6 +418,7 @@ export function CheckInPanel({
         t.date,
         rateBook,
         manualRates,
+        fxOverrides,
       )
       if (suggested != null) toAmountInput = amountToInput(suggested)
     }

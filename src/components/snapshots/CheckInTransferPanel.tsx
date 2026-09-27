@@ -61,6 +61,7 @@ export function CheckInTransferPanel({
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const manualRates = useWalletStore((s) => s.manualRates)
+  const fxOverrides = useWalletStore((s) => s.fxOverrides)
 
   useEffect(() => {
     if (!open || !initial) return
@@ -131,6 +132,7 @@ export function CheckInTransferPanel({
           date,
           rateBook,
           manualRates,
+          fxOverrides,
         )
       : null
 

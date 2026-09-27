@@ -2,7 +2,7 @@
 import { buildCurrencyReport } from '../../lib/currencyReport'
 import { formatCurrency, signedAmount } from '../../lib/format'
 import { useFxModeStore } from '../../store/fxModeStore'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
 
@@ -44,7 +44,7 @@ export function CurrencyReportTable({
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const fxMode = useFxModeStore((s) => s.fxMode)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 

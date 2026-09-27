@@ -12,6 +12,8 @@ export type AppSection =
   | 'commissions'
   | 'index-comparison'
   | 'settings'
+  | 'settings-general'
+  | 'settings-currency'
 
 /** Разделы внутри хаба «Аналитика». */
 export type AnalyticsSection = Extract<
@@ -25,6 +27,9 @@ export type AnalyticsSection = Extract<
   | 'commissions'
   | 'index-comparison'
 >
+
+/** Разделы внутри хаба «Настройки». */
+export type SettingsSection = Extract<AppSection, 'settings-general' | 'settings-currency'>
 
 export type SnapshotOrigin = 'manual' | 'transfer'
 
@@ -150,6 +155,15 @@ export interface ManualRate {
   toCurrency: string
   rate: number
   updatedAt?: string
+}
+
+/** Dated buy/sell quote vs RUB (1 unit of `currency` → buy/sell RUB). */
+export interface FxOverride {
+  date: string
+  currency: string
+  buyRate: number
+  sellRate: number
+  comment?: string
 }
 
 /** Standalone expense from an account; creates a check-in immediately. */

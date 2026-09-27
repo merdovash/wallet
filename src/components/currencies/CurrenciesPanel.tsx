@@ -8,6 +8,7 @@ import {
 import { formatCurrency, formatPercent, formatShortDate, signedAmount, todayIsoDate } from '../../lib/format'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { CurrencyReportTable } from '../dashboard/CurrencyReportTable'
@@ -25,7 +26,7 @@ export function CurrenciesPanel({ onOpenAccount }: CurrenciesPanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const [breakdownOpen, setBreakdownOpen] = useState(false)
   const { range } = usePeriodRange()

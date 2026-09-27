@@ -4,7 +4,7 @@ import { buildAllCreditFloatSummaries } from '../../engine/creditFloatEngine'
 import { formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
 import { daysInPeriod } from '../../lib/floatPeriod'
 import { usePeriodRange } from '../../lib/usePeriodRange'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -309,7 +309,7 @@ export function FloatPanel() {
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const { range } = usePeriodRange()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 

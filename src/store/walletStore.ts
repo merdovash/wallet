@@ -5,6 +5,7 @@ import type {
   AccountFund,
   BalanceSnapshot,
   Expense,
+  FxOverride,
   IndexValue,
   ManualRate,
   MarketIndex,
@@ -31,6 +32,7 @@ import {
   deleteAccountFundApi,
   deleteExpenseApi,
   deleteManualRateApi,
+  deleteFxOverrideApi,
   deleteMarketIndexApi,
   deleteSnapshotApi,
   deleteTransferApi,
@@ -44,6 +46,7 @@ import {
   updateMarketIndexApi,
   updateSnapshotApi,
   upsertManualRateApi,
+  upsertFxOverrideApi,
   upsertSnapshotApi,
   upsertIndexValuesApi,
   withFallbackRates,
@@ -60,6 +63,7 @@ interface WalletState {
   indices: MarketIndex[]
   indexValues: IndexValue[]
   manualRates: ManualRate[]
+  fxOverrides: FxOverride[]
   expenses: Expense[]
   loaded: boolean
   loading: boolean
@@ -113,6 +117,14 @@ interface WalletState {
     rate: number
   }) => Promise<void>
   removeManualRate: (fromCurrency: string, toCurrency: string) => Promise<void>
+  upsertFxOverride: (input: {
+    date: string
+    currency: string
+    buyRate: number
+    sellRate: number
+    comment?: string
+  }) => Promise<void>
+  deleteFxOverride: (date: string, currency: string) => Promise<void>
   /** Create expense and immediately upsert a check-in with the reduced balance. */
   addExpenseCheckIn: (
     input: {
@@ -242,6 +254,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   indices: [],
   indexValues: [],
   manualRates: [],
+  fxOverrides: [],
   expenses: [],
   loaded: false,
   loading: false,
@@ -257,6 +270,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       indices: [],
       indexValues: [],
       manualRates: [],
+      fxOverrides: [],
       expenses: [],
       loaded: false,
       loading: false,
@@ -291,6 +305,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         indices: bundle.indices ?? [],
         indexValues: bundle.indexValues ?? [],
         manualRates: bundle.manualRates ?? [],
+        fxOverrides: bundle.fxOverrides ?? [],
         expenses: bundle.expenses ?? [],
         loaded: true,
         loading: false,
@@ -493,6 +508,29 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }))
   },
 
+  upsertFxOverride: async (input) => {
+    const override = await upsertFxOverrideApi(input)
+    set((state) => {
+      const others = state.fxOverrides.filter(
+        (item) => !(item.date === override.date && item.currency === override.currency),
+      )
+      return {
+        fxOverrides: [...others, override].sort(
+          (a, b) => b.date.localeCompare(a.date) || a.currency.localeCompare(b.currency),
+        ),
+      }
+    })
+  },
+
+  deleteFxOverride: async (date, currency) => {
+    await deleteFxOverrideApi(date, currency)
+    set((state) => ({
+      fxOverrides: state.fxOverrides.filter(
+        (item) => !(item.date === date && item.currency === currency),
+      ),
+    }))
+  },
+
   addExpenseCheckIn: async (input, rateBook) => {
     const state = get()
     const plan = buildExpenseCheckInPlan({
@@ -504,6 +542,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       accounts: state.accounts,
       snapshots: state.snapshots,
       manualRates: state.manualRates,
+      fxOverrides: state.fxOverrides,
       settings: state.settings,
       rateBook,
     })

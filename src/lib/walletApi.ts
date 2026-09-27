@@ -5,6 +5,7 @@ import type {
   Expense,
   IndexValue,
   ManualRate,
+  FxOverride,
   MarketIndex,
   SnapshotLine,
   SnapshotOrigin,
@@ -22,6 +23,7 @@ export interface WalletBundle {
   indices?: MarketIndex[]
   indexValues?: IndexValue[]
   manualRates?: ManualRate[]
+  fxOverrides?: FxOverride[]
   expenses?: Expense[]
 }
 
@@ -184,6 +186,27 @@ export async function deleteManualRateApi(
 ): Promise<void> {
   await api(
     `/api/wallet/manual-rates/${encodeURIComponent(fromCurrency)}/${encodeURIComponent(toCurrency)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export async function upsertFxOverrideApi(input: {
+  date: string
+  currency: string
+  buyRate: number
+  sellRate: number
+  comment?: string
+}): Promise<FxOverride> {
+  const body = await api<{ override: FxOverride }>('/api/wallet/fx-overrides', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+  return body.override
+}
+
+export async function deleteFxOverrideApi(date: string, currency: string): Promise<void> {
+  await api(
+    `/api/wallet/fx-overrides/${encodeURIComponent(date)}/${encodeURIComponent(currency)}`,
     { method: 'DELETE' },
   )
 }

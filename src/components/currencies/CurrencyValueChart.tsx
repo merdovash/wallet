@@ -14,7 +14,7 @@ import { chartActiveDot, chartDot, chartTooltipStyles, getChartTheme } from '../
 import { formatCompactAxisValue, formatCurrency, formatShortDate } from '../../lib/format'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { Card, EmptyState } from '../ui/FormControls'
 
@@ -24,7 +24,7 @@ export function CurrencyValueChart() {
   const accounts = useWalletStore((s) => s.accounts)
   const snapshots = useWalletStore((s) => s.snapshots)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const { range } = usePeriodRange()
   const { mode: themeMode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(), [themeMode])

@@ -2,11 +2,14 @@ import { balanceOnDate, convertAmount, type RateBook } from '../engine/growthEng
 import type {
   Account,
   BalanceSnapshot,
+  FxOverride,
   ManualRate,
   SnapshotLine,
   Transfer,
   WalletSettings,
 } from '../types/wallet'
+import { resolvePivotForDate } from './cbrRates'
+import { convertViaDatedFx } from './fxRates'
 import { formatCurrency } from './format'
 import { convertViaManualRate } from './manualRates'
 import { transferReceivedAmount } from './transferAmounts'
@@ -104,9 +107,16 @@ export function suggestedReceiveAmount(
   date: string,
   rateBook?: RateBook,
   manualRates?: ManualRate[],
+  fxOverrides?: FxOverride[],
 ): number | null {
   if (!from || !to || !(amount > 0)) return null
   if (from.currency === to.currency) return amount
+  if (fxOverrides && fxOverrides.length > 0) {
+    const pivot = (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
+      (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+    const dated = convertViaDatedFx(amount, from.currency, to.currency, date, fxOverrides, pivot)
+    if (dated != null && Number.isFinite(dated)) return dated
+  }
   if (manualRates && manualRates.length > 0) {
     const manual = convertViaManualRate(amount, from.currency, to.currency, manualRates)
     if (manual != null && Number.isFinite(manual)) return manual

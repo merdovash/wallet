@@ -5,7 +5,7 @@ import { previewInboundAllocation } from '../../lib/fundBalances'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { buildTransferSnapshotLines, suggestedReceiveAmount } from '../../lib/transferCheckIn'
 import { transferReceivedAmount, transferSpreadBase } from '../../lib/transferAmounts'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import type { CheckInPrefill } from '../../store/checkInUiStore'
 import { useWalletStore } from '../../store/walletStore'
 import { DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -25,7 +25,8 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
   const funds = useWalletStore((s) => s.funds)
   const settings = useWalletStore((s) => s.settings)
   const manualRates = useWalletStore((s) => s.manualRates)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const fxOverrides = useWalletStore((s) => s.fxOverrides)
+  const rateBook = useRateBook()
 
   const activeAccounts = useMemo(
     () =>
@@ -196,6 +197,7 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           date,
           rateBook,
           manualRates,
+          fxOverrides,
         )
       : null
 

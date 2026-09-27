@@ -1,4 +1,4 @@
-import type { AnalyticsSection, AppSection } from '../types/wallet'
+import type { AnalyticsSection, AppSection, SettingsSection } from '../types/wallet'
 
 /** Основные пункты меню (нижняя панель и верх сайдбара). */
 export const PRIMARY_NAV_SECTIONS: AppSection[] = [
@@ -64,8 +64,34 @@ export function isAnalyticsSection(section: AppSection): section is AnalyticsSec
   return ANALYTICS_SECTION_IDS.has(section)
 }
 
+export const SETTINGS_NAV_ITEMS: {
+  id: SettingsSection
+  label: string
+  description: string
+}[] = [
+  {
+    id: 'settings-general',
+    label: 'Общие',
+    description: 'Тема, интервал чек-инов, инфляция и ключевая ставка',
+  },
+  {
+    id: 'settings-currency',
+    label: 'Валюта',
+    description: 'Базовая валюта, загрузка курса ЦБ и реестр котировок',
+  },
+]
+
+export const SETTINGS_SECTION_IDS = new Set<AppSection>(
+  SETTINGS_NAV_ITEMS.map((item) => item.id),
+)
+
+export function isSettingsSection(section: AppSection): section is SettingsSection {
+  return SETTINGS_SECTION_IDS.has(section)
+}
+
 /** В основном меню активен хаб, если открыт он или любой отчёт внутри. */
 export function primaryNavActiveId(section: AppSection): AppSection {
   if (isAnalyticsSection(section)) return 'analytics'
+  if (isSettingsSection(section)) return 'settings'
   return section
 }

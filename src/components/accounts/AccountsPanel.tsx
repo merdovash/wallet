@@ -32,7 +32,7 @@ import { formatIsoToRu, formatCurrency, formatPercent, todayIsoDate } from '../.
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -52,7 +52,7 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const addAccount = useWalletStore((s) => s.addAccount)
   const updateAccount = useWalletStore((s) => s.updateAccount)
   const reorderAccounts = useWalletStore((s) => s.reorderAccounts)
@@ -568,7 +568,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const addSnapshot = useWalletStore((s) => s.addSnapshot)
   const updateSnapshot = useWalletStore((s) => s.updateSnapshot)
   const account = accounts.find((a) => a.id === accountId) ?? null

@@ -3,8 +3,10 @@ import { sectionToPath } from '../../lib/appRoutes'
 import { dataQa } from '../../lib/dataQa'
 import {
   ANALYTICS_NAV_ITEMS,
+  SETTINGS_NAV_ITEMS,
   PRIMARY_NAV_SECTIONS,
   isAnalyticsSection,
+  isSettingsSection,
   primaryNavActiveId,
 } from '../../lib/navSections'
 import { portalHomeUrl } from '../../lib/portalUrl'
@@ -27,6 +29,8 @@ const NAV_META: Record<AppSection, { label: string; Icon: NavIcon }> = {
   commissions: { label: 'Комиссии', Icon: CurrenciesIcon },
   'index-comparison': { label: 'Сравнение с индексами', Icon: AnalyticsIcon },
   settings: { label: 'Настройки', Icon: SettingsIcon },
+  'settings-general': { label: 'Общие', Icon: SettingsIcon },
+  'settings-currency': { label: 'Валюта', Icon: CurrenciesIcon },
 }
 
 interface SidebarProps {
@@ -39,11 +43,20 @@ interface SidebarProps {
 export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: SidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(() => isAnalyticsSection(active))
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => isSettingsSection(active) || active === 'settings',
+  )
   const primaryActive = primaryNavActiveId(active)
 
   useEffect(() => {
     if (isAnalyticsSection(active) || active === 'analytics') {
       setAnalyticsOpen(true)
+    }
+  }, [active])
+
+  useEffect(() => {
+    if (isSettingsSection(active) || active === 'settings') {
+      setSettingsOpen(true)
     }
   }, [active])
 
@@ -135,6 +148,8 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
                 primaryActive={primaryActive}
                 analyticsOpen={analyticsOpen}
                 onAnalyticsOpenChange={setAnalyticsOpen}
+                settingsOpen={settingsOpen}
+                onSettingsOpenChange={setSettingsOpen}
                 onChange={selectSection}
                 collapsed={false}
                 qaSurface="drawer"
@@ -169,6 +184,8 @@ export function Sidebar({ active, onChange, collapsed, onCollapsedChange }: Side
             primaryActive={primaryActive}
             analyticsOpen={analyticsOpen}
             onAnalyticsOpenChange={setAnalyticsOpen}
+            settingsOpen={settingsOpen}
+            onSettingsOpenChange={setSettingsOpen}
             onChange={onChange}
             collapsed={collapsed}
             qaSurface="desktop"
@@ -199,6 +216,8 @@ function PrimaryNavList({
   primaryActive,
   analyticsOpen,
   onAnalyticsOpenChange,
+  settingsOpen,
+  onSettingsOpenChange,
   onChange,
   collapsed,
   qaSurface,
@@ -207,6 +226,8 @@ function PrimaryNavList({
   primaryActive: AppSection
   analyticsOpen: boolean
   onAnalyticsOpenChange: (open: boolean) => void
+  settingsOpen: boolean
+  onSettingsOpenChange: (open: boolean) => void
   onChange: (id: AppSection) => void
   collapsed: boolean
   qaSurface: 'desktop' | 'drawer'
@@ -253,6 +274,65 @@ function PrimaryNavList({
               {analyticsOpen && (
                 <div className="ml-3 space-y-0.5 border-l border-slate-200 pl-2 dark:border-slate-700">
                   {ANALYTICS_NAV_ITEMS.map((item) => {
+                    const meta = NAV_META[item.id]
+                    return (
+                      <NavButton
+                        key={item.id}
+                        id={item.id}
+                        label={item.label}
+                        Icon={meta.Icon}
+                        isActive={active === item.id}
+                        mode="full"
+                        onChange={onChange}
+                        compact
+                        qaSurface={qaSurface}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        if (id === 'settings' && !collapsed) {
+          return (
+            <div key={id} className="space-y-1">
+              <div className="flex items-stretch gap-0.5">
+                <div className="min-w-0 flex-1">
+                  <NavButton
+                    id={id}
+                    label={label}
+                    Icon={Icon}
+                    isActive={primaryActive === id}
+                    mode="full"
+                    qaSurface={qaSurface}
+                    onChange={(next) => {
+                      onSettingsOpenChange(true)
+                      onChange(next)
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-label={settingsOpen ? 'Свернуть настройки' : 'Развернуть настройки'}
+                  aria-expanded={settingsOpen}
+                  onClick={() => onSettingsOpenChange(!settingsOpen)}
+                  className={`shrink-0 rounded-lg px-1.5 ${
+                    primaryActive === id
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+                  }`}
+                  {...dataQa(`nav-settings-toggle-${qaSurface}`)}
+                >
+                  <ChevronIcon
+                    className={`h-4 w-4 transition ${settingsOpen ? 'rotate-90' : ''}`}
+                  />
+                </button>
+              </div>
+              {settingsOpen && (
+                <div className="ml-3 space-y-0.5 border-l border-slate-200 pl-2 dark:border-slate-700">
+                  {SETTINGS_NAV_ITEMS.map((item) => {
                     const meta = NAV_META[item.id]
                     return (
                       <NavButton

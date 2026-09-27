@@ -4,6 +4,7 @@ import type {
   Account,
   BalanceSnapshot,
   ManualRate,
+  FxOverride,
   SnapshotLine,
   WalletSettings,
 } from '../types/wallet'
@@ -20,6 +21,7 @@ export interface ExpenseCheckInInput {
   accounts: Account[]
   snapshots: BalanceSnapshot[]
   manualRates: ManualRate[]
+  fxOverrides?: FxOverride[]
   settings: WalletSettings
   rateBook?: RateBook
 }
@@ -45,6 +47,7 @@ export function suggestedAccountAmount(
   settings: WalletSettings,
   date: string,
   rateBook?: RateBook,
+  fxOverrides?: FxOverride[],
 ): number | null {
   if (!account || !(amount > 0)) return null
   if (currency === account.currency) return amount
@@ -56,6 +59,7 @@ export function suggestedAccountAmount(
     settings,
     date,
     rateBook,
+    fxOverrides,
   )
 }
 
@@ -75,6 +79,7 @@ export function expenseCommission(
   manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  fxOverrides?: FxOverride[],
 ): number {
   if (input.currency === input.accountCurrency) return 0
   const reference = convertForExchange(
@@ -85,6 +90,7 @@ export function expenseCommission(
     settings,
     input.date,
     rateBook,
+    fxOverrides,
   )
   if (reference == null || !Number.isFinite(reference)) return 0
   return input.accountAmount - reference
@@ -98,6 +104,7 @@ export function expenseChargeBase(
   manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  fxOverrides?: FxOverride[],
 ): number {
   const base =
     convertForExchange(
@@ -108,6 +115,7 @@ export function expenseChargeBase(
       settings,
       date,
       rateBook,
+      fxOverrides,
     ) ?? 0
   return Math.max(0, base)
 }
@@ -132,6 +140,7 @@ export function buildExpenseCheckInPlan(input: ExpenseCheckInInput): ExpenseChec
     input.manualRates,
     input.settings,
     input.rateBook,
+    input.fxOverrides,
   )
 
   const balance = balanceOnDate(account.id, input.date, input.snapshots) ?? 0
@@ -142,6 +151,7 @@ export function buildExpenseCheckInPlan(input: ExpenseCheckInInput): ExpenseChec
     input.manualRates,
     input.settings,
     input.rateBook,
+    input.fxOverrides,
   )
 
   return {

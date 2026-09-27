@@ -1,5 +1,7 @@
 import { convertAmount, type RateBook } from '../engine/growthEngine'
-import type { ManualRate, WalletSettings } from '../types/wallet'
+import { convertViaDatedFx } from './fxRates'
+import { resolvePivotForDate } from './cbrRates'
+import type { FxOverride, ManualRate, WalletSettings } from '../types/wallet'
 
 /**
  * Current manual rate for the pair: 1 `fromCurrency` = N × `toCurrency`.
@@ -45,7 +47,14 @@ export function convertForExchange(
   settings: WalletSettings,
   date: string,
   rateBook?: RateBook,
+  fxOverrides?: FxOverride[],
 ): number | null {
+  const pivot = (rateBook ? resolvePivotForDate(date, rateBook) : null) ??
+    (settings.baseCurrency === 'RUB' ? settings.exchangeRates : null)
+  if (fxOverrides && fxOverrides.length > 0) {
+    const dated = convertViaDatedFx(amount, fromCurrency, toCurrency, date, fxOverrides, pivot)
+    if (dated != null && Number.isFinite(dated)) return dated
+  }
   const manual = convertViaManualRate(amount, fromCurrency, toCurrency, manualRates)
   if (manual != null && Number.isFinite(manual)) return manual
   const official = convertAmount(amount, fromCurrency, toCurrency, settings, date, rateBook)

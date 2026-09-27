@@ -24,6 +24,7 @@ import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useFxModeStore } from '../../store/fxModeStore'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
@@ -111,7 +112,7 @@ export function DailyGrowthPanel() {
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const { mode: themeMode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(), [themeMode])

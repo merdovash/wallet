@@ -4,6 +4,8 @@ import { AnalyticsPanel } from './components/analytics/AnalyticsPanel'
 import { Dashboard } from './components/dashboard/Dashboard'
 import { Sidebar } from './components/layout/Sidebar'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import { SettingsGeneralPanel } from './components/settings/SettingsGeneralPanel'
+import { SettingsCurrencyPanel } from './components/settings/SettingsCurrencyPanel'
 import { FloatPanel } from './components/float/FloatPanel'
 import { SnapshotsPanel } from './components/snapshots/SnapshotsPanel'
 import { CheckInPanel } from './components/snapshots/CheckInPanel'
@@ -18,14 +20,14 @@ import { EmptyState } from './components/ui/FormControls'
 import { PrimaryFab } from './components/ui/PrimaryFab'
 import { snapshotDates } from './engine/growthEngine'
 import { todayIsoDate } from './lib/format'
-import { isAnalyticsSection } from './lib/navSections'
+import { isAnalyticsSection, isSettingsSection } from './lib/navSections'
 import { dataQa } from './lib/dataQa'
 import { useAppSection } from './lib/useAppSection'
 import { useAuthStore } from './store/authStore'
 import { useCheckInUiStore } from './store/checkInUiStore'
 import { useRatesStore } from './store/ratesStore'
 import { useWalletStore } from './store/walletStore'
-import type { AnalyticsSection, AppSection } from './types/wallet'
+import type { AnalyticsSection, AppSection, SettingsSection } from './types/wallet'
 
 const SIDEBAR_STORAGE_KEY = 'wallet-sidebar-collapsed'
 
@@ -175,6 +177,18 @@ function SectionContent({
       </button>
     ) : null
 
+  const settingsCrumb =
+    isSettingsSection(section) ? (
+      <button
+        type="button"
+        onClick={() => onOpenSection('settings')}
+        className="mb-3 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+        {...dataQa('nav-settings-back')}
+      >
+        ← Настройки
+      </button>
+    ) : null
+
   switch (section) {
     case 'dashboard':
       return <Dashboard onOpenAccount={onOpenAccount} />
@@ -245,6 +259,22 @@ function SectionContent({
         </>
       )
     case 'settings':
-      return <SettingsPanel />
+      return (
+        <SettingsPanel onOpenSection={(s: SettingsSection) => onOpenSection(s)} />
+      )
+    case 'settings-general':
+      return (
+        <>
+          {settingsCrumb}
+          <SettingsGeneralPanel />
+        </>
+      )
+    case 'settings-currency':
+      return (
+        <>
+          {settingsCrumb}
+          <SettingsCurrencyPanel />
+        </>
+      )
   }
 }

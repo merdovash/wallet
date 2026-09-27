@@ -4,6 +4,7 @@ import { formatCurrency, formatDateDisplay, todayIsoDate } from '../../lib/forma
 import { formatTransferLabel } from '../../lib/transferCheckIn'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState } from '../ui/FormControls'
@@ -16,7 +17,7 @@ export function SnapshotsPanel() {
   const snapshots = useWalletStore((s) => s.snapshots)
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const ensureRates = useRatesStore((s) => s.ensureRates)
   const openCreate = useCheckInUiStore((s) => s.openCreate)
   const openEdit = useCheckInUiStore((s) => s.openEdit)

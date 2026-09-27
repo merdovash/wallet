@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { dataQa } from '../../lib/dataQa'
+import { isSettingsSection } from '../../lib/navSections'
 import { useAppSection } from '../../lib/useAppSection'
 import { useFabKeyboardBottom } from '../../lib/useFabKeyboardBottom'
 import { useCheckInUiStore } from '../../store/checkInUiStore'
@@ -45,7 +46,8 @@ function useSectionPrimary(section: AppSection) {
   const showCheckIcon = !sectionOverride
 
   const hidden =
-    (section === 'settings' && !sectionOverride) || (checkInOpen && !sectionOverride)
+    ((section === 'settings' || isSettingsSection(section)) && !sectionOverride) ||
+    (checkInOpen && !sectionOverride)
 
   return { hidden, label, disabled, title, onClick, showCheckIcon }
 }

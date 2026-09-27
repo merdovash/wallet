@@ -10,7 +10,7 @@ import { dataQa } from '../../lib/dataQa'
 import { formatDateDisplay, signedAmount } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { usePeriodRange } from '../../lib/usePeriodRange'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import type { Expense, Transfer } from '../../types/wallet'
 import { Card, EmptyState } from '../ui/FormControls'
@@ -61,7 +61,7 @@ export function CommissionsPanel() {
   const expenses = useWalletStore((s) => s.expenses)
   const manualRates = useWalletStore((s) => s.manualRates)
   const settings = useWalletStore((s) => s.settings)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
   const { range } = usePeriodRange()
   const deleteTransfer = useWalletStore((s) => s.deleteTransfer)
   const addTransfer = useWalletStore((s) => s.addTransfer)

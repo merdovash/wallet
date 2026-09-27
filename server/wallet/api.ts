@@ -347,6 +347,42 @@ export async function handleWalletApi(
       }
     }
 
+    if (pathname === '/api/wallet/fx-overrides' && method === 'PUT') {
+      const body = await readJsonBody<{
+        date?: string
+        currency?: string
+        buyRate?: number
+        sellRate?: number
+        comment?: string
+      }>(req)
+      if (!body.date || !body.currency || body.buyRate == null || body.sellRate == null) {
+        sendJson(res, 400, { error: 'Нужны date, currency, buyRate, sellRate' })
+        return true
+      }
+      const override = await store.upsertFxOverride(user.id, {
+        date: body.date,
+        currency: body.currency,
+        buyRate: Number(body.buyRate),
+        sellRate: Number(body.sellRate),
+        comment: body.comment,
+      })
+      sendJson(res, 200, { override })
+      return true
+    }
+
+    {
+      const params = matchPath(pathname, '/api/wallet/fx-overrides/:date/:currency')
+      if (params && method === 'DELETE') {
+        const ok = await store.deleteFxOverride(user.id, params.date!, params.currency!)
+        if (!ok) {
+          sendJson(res, 404, { error: 'Курс не найден' })
+          return true
+        }
+        sendJson(res, 200, { ok: true })
+        return true
+      }
+    }
+
     if (pathname === '/api/wallet/expenses' && method === 'GET') {
       sendJson(res, 200, { expenses: await store.listExpenses(user.id) })
       return true

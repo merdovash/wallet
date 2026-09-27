@@ -41,8 +41,11 @@ describe('convertViaManualRate', () => {
 })
 
 describe('convertForExchange', () => {
-  it('prefers the manual rate over the official conversion', () => {
-    expect(convertForExchange(10, 'USD', 'RUB', rates, settings, '2026-03-01')).toBe(1000)
+  it('prefers a dated buy/sell quote over an undated pair rate', () => {
+    const overrides = [{ date: '2026-03-01', currency: 'USD', buyRate: 80, sellRate: 90 }]
+    expect(
+      convertForExchange(10, 'USD', 'RUB', rates, settings, '2026-03-01', undefined, overrides),
+    ).toBe(800)
   })
 
   it('falls back to the official conversion when there is no manual pair', () => {

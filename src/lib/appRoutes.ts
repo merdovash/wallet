@@ -14,6 +14,8 @@ export const APP_SECTION_PATHS: Record<AppSection, string> = {
   commissions: '/commissions',
   'index-comparison': '/indices',
   settings: '/settings',
+  'settings-general': '/settings/general',
+  'settings-currency': '/settings/currency',
 }
 
 const PATH_TO_SECTION = new Map(

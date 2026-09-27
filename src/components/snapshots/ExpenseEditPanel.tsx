@@ -3,7 +3,7 @@ import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { suggestedAccountAmount } from '../../lib/expenseCheckIn'
 import { formatIsoToRu } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import type { Expense } from '../../types/wallet'
 import { Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -24,8 +24,9 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
   const accounts = useWalletStore((s) => s.accounts)
   const settings = useWalletStore((s) => s.settings)
   const manualRates = useWalletStore((s) => s.manualRates)
+  const fxOverrides = useWalletStore((s) => s.fxOverrides)
   const updateExpenseCheckIn = useWalletStore((s) => s.updateExpenseCheckIn)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
 
   const account = useMemo(
     () => (expense ? accounts.find((a) => a.id === expense.accountId) ?? null : null),
@@ -74,6 +75,7 @@ export function ExpenseEditPanel({ open, expense, onClose }: ExpenseEditPanelPro
           settings,
           expense.date,
           rateBook,
+          fxOverrides,
         )
       : null
 

@@ -3,7 +3,7 @@ import { CURRENCY_OPTIONS } from '../../lib/currency'
 import { suggestedAccountAmount } from '../../lib/expenseCheckIn'
 import { todayIsoDate } from '../../lib/format'
 import { parseMoneyInput } from '../../lib/moneyInput'
-import { useRatesStore } from '../../store/ratesStore'
+import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import { DateInput, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
@@ -18,8 +18,9 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
   const accounts = useWalletStore((s) => s.accounts)
   const settings = useWalletStore((s) => s.settings)
   const manualRates = useWalletStore((s) => s.manualRates)
+  const fxOverrides = useWalletStore((s) => s.fxOverrides)
   const addExpenseCheckIn = useWalletStore((s) => s.addExpenseCheckIn)
-  const rateBook = useRatesStore((s) => s.byDate)
+  const rateBook = useRateBook()
 
   const activeAccounts = useMemo(
     () =>
@@ -73,6 +74,7 @@ export function ExpenseCreatePanel({ open, onClose }: ExpenseCreatePanelProps) {
           settings,
           date,
           rateBook,
+          fxOverrides,
         )
       : null
 

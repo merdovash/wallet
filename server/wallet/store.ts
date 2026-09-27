@@ -135,6 +135,14 @@ export interface DbManualRate {
   updatedAt?: string
 }
 
+export interface DbFxOverride {
+  date: string
+  currency: string
+  buyRate: number
+  sellRate: number
+  comment?: string
+}
+
 export interface DbExpense {
   id: string
   date: string
@@ -156,6 +164,7 @@ export interface WalletBundle {
   indices: DbMarketIndex[]
   indexValues: DbIndexValue[]
   manualRates: DbManualRate[]
+  fxOverrides: DbFxOverride[]
   expenses: DbExpense[]
 }
 
@@ -848,6 +857,89 @@ export async function deleteManualRate(
     `DELETE FROM wallet_manual_rates
      WHERE user_id = $1 AND from_currency = $2 AND to_currency = $3`,
     [userId, fromCurrency.toUpperCase(), toCurrency.toUpperCase()],
+  )
+  return result.rowCount > 0
+}
+
+function mapFxOverride(row: {
+  rate_date: string
+  currency: string
+  buy_rate: number | string
+  sell_rate: number | string
+  comment: string | null
+}): DbFxOverride {
+  return {
+    date: String(row.rate_date).slice(0, 10),
+    currency: String(row.currency),
+    buyRate: num(row.buy_rate),
+    sellRate: num(row.sell_rate),
+    comment: row.comment ? String(row.comment) : undefined,
+  }
+}
+
+export async function listFxOverrides(userId: string): Promise<DbFxOverride[]> {
+  const pool = getPool()
+  const result = await pool.query<{
+    rate_date: string
+    currency: string
+    buy_rate: number | string
+    sell_rate: number | string
+    comment: string | null
+  }>(
+    `SELECT rate_date::text AS rate_date, currency, buy_rate, sell_rate, comment
+     FROM wallet_fx_overrides
+     WHERE user_id = $1
+     ORDER BY rate_date DESC, currency ASC`,
+    [userId],
+  )
+  return result.rows.map(mapFxOverride)
+}
+
+export async function upsertFxOverride(
+  userId: string,
+  input: { date: string; currency: string; buyRate: number; sellRate: number; comment?: string },
+): Promise<DbFxOverride> {
+  const currency = input.currency.toUpperCase()
+  if (!CURRENCY_RE.test(currency)) throw new Error('Некорректный код валюты')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error('Некорректная дата')
+  if (!Number.isFinite(input.buyRate) || !(input.buyRate > 0)) {
+    throw new Error('Курс покупки должен быть больше 0')
+  }
+  if (!Number.isFinite(input.sellRate) || !(input.sellRate > 0)) {
+    throw new Error('Курс продажи должен быть больше 0')
+  }
+  const comment = input.comment?.trim() ? input.comment.trim() : null
+  const pool = getPool()
+  const result = await pool.query<{
+    rate_date: string
+    currency: string
+    buy_rate: number | string
+    sell_rate: number | string
+    comment: string | null
+  }>(
+    `INSERT INTO wallet_fx_overrides (user_id, rate_date, currency, buy_rate, sell_rate, comment, updated_at)
+     VALUES ($1, $2::date, $3, $4, $5, $6, now())
+     ON CONFLICT (user_id, rate_date, currency) DO UPDATE
+     SET buy_rate = EXCLUDED.buy_rate,
+         sell_rate = EXCLUDED.sell_rate,
+         comment = EXCLUDED.comment,
+         updated_at = now()
+     RETURNING rate_date::text AS rate_date, currency, buy_rate, sell_rate, comment`,
+    [userId, input.date, currency, input.buyRate, input.sellRate, comment],
+  )
+  return mapFxOverride(result.rows[0]!)
+}
+
+export async function deleteFxOverride(
+  userId: string,
+  date: string,
+  currency: string,
+): Promise<boolean> {
+  const pool = getPool()
+  const result = await pool.query(
+    `DELETE FROM wallet_fx_overrides
+     WHERE user_id = $1 AND rate_date = $2::date AND currency = $3`,
+    [userId, date, currency.toUpperCase()],
   )
   return result.rowCount > 0
 }
@@ -1569,7 +1661,7 @@ export async function upsertIndexValues(
 }
 
 export async function loadWalletBundle(userId: string): Promise<WalletBundle> {
-  const [settings, accounts, snapshots, transfers, funds, indices, indexValues, manualRates, expenses] =
+  const [settings, accounts, snapshots, transfers, funds, indices, indexValues, manualRates, fxOverrides, expenses] =
     await Promise.all([
       ensureUserSettings(userId),
       listAccounts(userId),
@@ -1579,9 +1671,21 @@ export async function loadWalletBundle(userId: string): Promise<WalletBundle> {
       listMarketIndices(userId),
       listIndexValues(userId),
       listManualRates(userId),
+      listFxOverrides(userId),
       listExpenses(userId),
     ])
-  return { settings, accounts, snapshots, transfers, funds, indices, indexValues, manualRates, expenses }
+  return {
+    settings,
+    accounts,
+    snapshots,
+    transfers,
+    funds,
+    indices,
+    indexValues,
+    manualRates,
+    fxOverrides,
+    expenses,
+  }
 }
 
 export async function isWalletEmpty(userId: string): Promise<boolean> {
