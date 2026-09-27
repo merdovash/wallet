@@ -565,6 +565,17 @@ export async function handleWalletApi(
       return true
     }
 
+    if (pathname === '/api/wallet/indices/order' && method === 'PUT') {
+      const body = await readJsonBody<{ orderedIds?: string[] }>(req)
+      if (!Array.isArray(body.orderedIds)) {
+        sendJson(res, 400, { error: 'Нужен orderedIds' })
+        return true
+      }
+      const indices = await store.reorderMarketIndices(user.id, body.orderedIds)
+      sendJson(res, 200, { indices })
+      return true
+    }
+
     {
       const params = matchPath(pathname, '/api/wallet/indices/:id')
       if (params) {

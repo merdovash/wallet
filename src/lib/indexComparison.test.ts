@@ -66,6 +66,7 @@ describe('buildIndexComparison', () => {
       kind: 'amount',
       currency: 'RUB',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const points = buildIndexComparison({
       index,
@@ -107,6 +108,7 @@ describe('buildIndexComparison', () => {
       kind: 'annual_rate',
       currency: 'RUB',
       color: '#059669',
+      sortOrder: 0,
     }
     const points = buildIndexComparison({
       index,
@@ -132,6 +134,7 @@ describe('buildIndexComparison', () => {
       kind: 'amount',
       currency: 'RUB',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const points = buildIndexComparison({
       index,
@@ -186,6 +189,7 @@ describe('buildIndexComparison', () => {
       kind: 'amount',
       currency: 'USD',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const points = buildIndexComparison({
       index,
@@ -218,6 +222,7 @@ describe('buildIndexComparison', () => {
       kind: 'annual_rate',
       currency: 'RUB',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const derivedIndex: MarketIndex = {
       id: 'derived',
@@ -227,6 +232,7 @@ describe('buildIndexComparison', () => {
       baseIndexId: baseIndex.id,
       rateSpreadPct: 0.01,
       color: '#059669',
+      sortOrder: 1,
     }
     const points = buildIndexComparison({
       index: derivedIndex,
@@ -252,6 +258,7 @@ describe('buildIndexComparison', () => {
       kind: 'amount',
       currency: 'RUB',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const points = buildIndexComparison({
       index,
@@ -293,6 +300,7 @@ describe('buildIndexComparison', () => {
       kind: 'amount',
       currency: 'RUB',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const emptyWallet: Account = {
       ...fund,

@@ -137,6 +137,7 @@ export interface MarketIndex {
   /** For derived_rate: added spread as decimal fraction (0.01 = +1 p.p.). */
   rateSpreadPct?: number | null
   color: string
+  sortOrder: number
 }
 
 export interface IndexValue {

@@ -174,7 +174,7 @@ export function IndexComparisonPanel() {
     () =>
       indices
         .filter((index) => latestIndexValue(index.id, indices, indexValues) != null)
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [indices, indexValues],
   )
   const [selectedIndexIds, setSelectedIndexIds] = useState<string[]>(() =>

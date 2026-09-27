@@ -119,6 +119,7 @@ export interface DbMarketIndex {
   baseIndexId?: string | null
   rateSpreadPct?: number | null
   color: string
+  sortOrder: number
 }
 
 export interface DbIndexValue {
@@ -1398,6 +1399,7 @@ type MarketIndexRow = {
   base_index_id: string | null
   rate_spread_pct: number | string | null
   color: string
+  sort_order: number
 }
 
 function normalizeIndexKind(kind: unknown): DbIndexKind {
@@ -1412,6 +1414,7 @@ function mapMarketIndex(row: MarketIndexRow): DbMarketIndex {
     kind: normalizeIndexKind(row.kind),
     currency: String(row.currency),
     color: String(row.color),
+    sortOrder: num(row.sort_order),
   }
   if (row.base_index_id) mapped.baseIndexId = String(row.base_index_id)
   if (row.rate_spread_pct != null) mapped.rateSpreadPct = num(row.rate_spread_pct)
@@ -1421,10 +1424,10 @@ function mapMarketIndex(row: MarketIndexRow): DbMarketIndex {
 export async function listMarketIndices(userId: string): Promise<DbMarketIndex[]> {
   const pool = getPool()
   const result = await pool.query<MarketIndexRow>(
-    `SELECT id, name, kind, currency, base_index_id, rate_spread_pct, color
+    `SELECT id, name, kind, currency, base_index_id, rate_spread_pct, color, sort_order
      FROM wallet_market_indices
      WHERE user_id = $1
-     ORDER BY name ASC`,
+     ORDER BY sort_order ASC, name ASC`,
     [userId],
   )
   return result.rows.map(mapMarketIndex)
@@ -1436,7 +1439,7 @@ async function loadMarketIndexRow(
 ): Promise<MarketIndexRow | null> {
   const pool = getPool()
   const result = await pool.query<MarketIndexRow>(
-    `SELECT id, name, kind, currency, base_index_id, rate_spread_pct, color
+    `SELECT id, name, kind, currency, base_index_id, rate_spread_pct, color, sort_order
      FROM wallet_market_indices
      WHERE id = $1 AND user_id = $2`,
     [indexId, userId],
@@ -1500,11 +1503,16 @@ export async function createMarketIndex(
     if (!Number.isFinite(rateSpreadPct)) throw new Error('Некорректная дельта ставки')
   }
   const pool = getPool()
+  const max = await pool.query<{ m: number | string | null }>(
+    `SELECT MAX(sort_order) AS m FROM wallet_market_indices WHERE user_id = $1`,
+    [userId],
+  )
+  const sortOrder = (max.rows[0]?.m == null ? -1 : num(max.rows[0].m)) + 1
   const result = await pool.query<MarketIndexRow>(
     `INSERT INTO wallet_market_indices
-       (user_id, name, kind, currency, base_index_id, rate_spread_pct, color)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, name, kind, currency, base_index_id, rate_spread_pct, color`,
+       (user_id, name, kind, currency, base_index_id, rate_spread_pct, color, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, name, kind, currency, base_index_id, rate_spread_pct, color, sort_order`,
     [
       userId,
       name,
@@ -1513,6 +1521,7 @@ export async function createMarketIndex(
       baseIndexId,
       rateSpreadPct,
       input.color,
+      sortOrder,
     ],
   )
   return mapMarketIndex(result.rows[0]!)
@@ -1578,7 +1587,7 @@ export async function updateMarketIndex(
          color = $8,
          updated_at = now()
      WHERE id = $1 AND user_id = $2
-     RETURNING id, name, kind, currency, base_index_id, rate_spread_pct, color`,
+     RETURNING id, name, kind, currency, base_index_id, rate_spread_pct, color, sort_order`,
     [
       id,
       userId,
@@ -1591,6 +1600,23 @@ export async function updateMarketIndex(
     ],
   )
   return mapMarketIndex(result.rows[0]!)
+}
+
+export async function reorderMarketIndices(
+  userId: string,
+  orderedIds: string[],
+): Promise<DbMarketIndex[]> {
+  const pool = getPool()
+  await pool.transaction(async (query) => {
+    for (let i = 0; i < orderedIds.length; i += 1) {
+      await query(
+        `UPDATE wallet_market_indices SET sort_order = $3, updated_at = now()
+         WHERE id = $1 AND user_id = $2`,
+        [orderedIds[i], userId, i],
+      )
+    }
+  })
+  return listMarketIndices(userId)
 }
 
 export async function deleteMarketIndex(userId: string, id: string): Promise<boolean> {

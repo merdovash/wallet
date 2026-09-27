@@ -119,6 +119,14 @@ export async function reorderAccountsApi(orderedIds: string[]): Promise<Account[
   return body.accounts
 }
 
+export async function reorderMarketIndicesApi(orderedIds: string[]): Promise<MarketIndex[]> {
+  const body = await api<{ indices: MarketIndex[] }>('/api/wallet/indices/order', {
+    method: 'PUT',
+    body: JSON.stringify({ orderedIds }),
+  })
+  return body.indices
+}
+
 export async function upsertSnapshotApi(input: {
   date: string
   note?: string
@@ -285,7 +293,7 @@ export async function deleteAccountFundApi(id: string): Promise<void> {
 }
 
 export async function createMarketIndexApi(
-  input: Omit<MarketIndex, 'id'>,
+  input: Omit<MarketIndex, 'id' | 'sortOrder'>,
 ): Promise<MarketIndex> {
   const body = await api<{ index: MarketIndex }>('/api/wallet/indices', {
     method: 'POST',

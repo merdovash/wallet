@@ -19,6 +19,7 @@ describe('marketIndex helpers', () => {
       kind: 'annual_rate',
       currency: 'RUB',
       color: '#2563eb',
+      sortOrder: 0,
     }
     const derivedIndex: MarketIndex = {
       id: 'derived',
@@ -28,6 +29,7 @@ describe('marketIndex helpers', () => {
       baseIndexId: 'base',
       rateSpreadPct: 0.01,
       color: '#059669',
+      sortOrder: 1,
     }
 
     expect(

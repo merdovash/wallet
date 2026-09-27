@@ -34,10 +34,12 @@ import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { indexValueToInput } from '../../lib/indexValueInput'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
+import { useSortableList } from '../../lib/useSortableList'
 import { useWalletStore } from '../../store/walletStore'
 import { useTheme } from '../../lib/useTheme'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
+import { SortableHandle, SortableHint, sortableRowClass } from '../ui/SortableHandle'
 import { StackPanel } from '../ui/StackPanel'
 
 const KIND_LABELS: Record<IndexKind, string> = {
@@ -60,6 +62,7 @@ export function IndicesPanel({ active }: { active: boolean }) {
   const addMarketIndex = useWalletStore((s) => s.addMarketIndex)
   const updateMarketIndex = useWalletStore((s) => s.updateMarketIndex)
   const deleteMarketIndex = useWalletStore((s) => s.deleteMarketIndex)
+  const reorderMarketIndices = useWalletStore((s) => s.reorderMarketIndices)
   const upsertIndexValues = useWalletStore((s) => s.upsertIndexValues)
 
   const [formOpen, setFormOpen] = useState(false)
@@ -73,9 +76,16 @@ export function IndicesPanel({ active }: { active: boolean }) {
   const [saving, setSaving] = useState(false)
 
   const ordered = useMemo(
-    () => [...indices].sort((a, b) => a.name.localeCompare(b.name)),
+    () => [...indices].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [indices],
   )
+  const sortableIndices = useSortableList({
+    items: ordered,
+    getId: (index) => index.id,
+    onReorder: (orderedIds) => {
+      void reorderMarketIndices(orderedIds)
+    },
+  })
   const rateBaseOptions = useMemo(
     () => ordered.filter((index) => isRateIndex(index.kind)),
     [ordered],
@@ -153,11 +163,27 @@ export function IndicesPanel({ active }: { active: boolean }) {
         />
       ) : (
         <Card className="!p-0" dataQa="indices-list">
+          {ordered.length > 1 ? (
+            <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+              <SortableHint />
+            </div>
+          ) : null}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {ordered.map((index) => {
+            {sortableIndices.orderedItems.map((index) => {
               const latest = latestById.get(index.id)
               return (
-                <li key={index.id} className="flex items-center gap-3 px-3 py-3 sm:px-4" {...dataQa(`index-row-${index.id}`)}>
+                <li
+                  key={index.id}
+                  ref={(node) => sortableIndices.setNode(index.id, node)}
+                  className={`flex items-center gap-3 px-3 py-3 sm:px-4 ${sortableRowClass(sortableIndices.draggingId === index.id)}`}
+                  {...dataQa(`index-row-${index.id}`)}
+                >
+                  <SortableHandle
+                    label={`Перетащить ${index.name}`}
+                    dataQa={`index-drag-${index.id}`}
+                    dragging={sortableIndices.draggingId === index.id}
+                    {...sortableIndices.handleProps(index.id)}
+                  />
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: index.color }} />
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setDetailId(index.id)} {...dataQa(`index-open-${index.id}`)}>
                     <span className="block truncate font-medium text-slate-900 dark:text-slate-200">{index.name}</span>

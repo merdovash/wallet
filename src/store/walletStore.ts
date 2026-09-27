@@ -40,6 +40,7 @@ import {
   importWalletApi,
   patchSettings,
   reorderAccountsApi,
+  reorderMarketIndicesApi,
   updateAccountApi,
   updateAccountFundApi,
   updateExpenseApi,
@@ -88,6 +89,7 @@ interface WalletState {
     },
   ) => Promise<void>
   reorderAccounts: (orderedIds: string[]) => Promise<void>
+  reorderMarketIndices: (orderedIds: string[]) => Promise<void>
   archiveAccount: (id: string, archived?: boolean) => Promise<void>
   deleteAccount: (id: string) => Promise<void>
   addSnapshot: (input: {
@@ -172,7 +174,7 @@ interface WalletState {
     }>,
   ) => Promise<void>
   deleteAccountFund: (id: string) => Promise<void>
-  addMarketIndex: (input: Omit<MarketIndex, 'id'>) => Promise<string>
+  addMarketIndex: (input: Omit<MarketIndex, 'id' | 'sortOrder'>) => Promise<string>
   updateMarketIndex: (id: string, patch: Partial<Omit<MarketIndex, 'id'>>) => Promise<void>
   deleteMarketIndex: (id: string) => Promise<void>
   upsertIndexValues: (
@@ -360,6 +362,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   reorderAccounts: async (orderedIds) => {
     const accounts = await reorderAccountsApi(orderedIds)
     set({ accounts })
+  },
+
+  reorderMarketIndices: async (orderedIds) => {
+    const indices = await reorderMarketIndicesApi(orderedIds)
+    set({ indices })
   },
 
   archiveAccount: async (id, archived = true) => {

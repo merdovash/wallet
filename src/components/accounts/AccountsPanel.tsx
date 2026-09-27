@@ -4,7 +4,7 @@
   useRef,
   useState,
   type ButtonHTMLAttributes,
-  type DragEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type TouchEvent as ReactTouchEvent,
 } from 'react'
@@ -35,11 +35,13 @@ import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRateBook } from '../../lib/useRateBook'
 import { usePeriodRange } from '../../lib/usePeriodRange'
+import { useSortableList } from '../../lib/useSortableList'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
 import { PageHeader } from '../ui/PageHeader'
+import { SortableHandle, SortableHint, sortableRowClass } from '../ui/SortableHandle'
 import { GrowthChart } from '../dashboard/GrowthChart'
 import { FundsPanel } from './FundsPanel'
 import { IndicesPanel } from '../indices/IndicesPanel'
@@ -73,8 +75,6 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
   const [graceMonths, setGraceMonths] = useState('3')
   const [showArchived, setShowArchived] = useState(false)
   const [pageTab, setPageTab] = useState<'registry' | 'funds' | 'indices'>('registry')
-  const [dragId, setDragId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null)
 
   const linkCandidates = useMemo(
@@ -168,6 +168,14 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     () => buildAccountsPageTotals(accounts, snapshots, settings, rateBook),
     [accounts, snapshots, settings, rateBook],
   )
+
+  const sortableAccounts = useSortableList({
+    items: visible,
+    getId: (account) => account.id,
+    onReorder: (orderedIds) => {
+      void reorderAccounts(orderedIds)
+    },
+  })
 
   function openCreate() {
     setDetailId(null)
@@ -271,43 +279,6 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
     onClick: openCreate,
   })
 
-  function moveAccount(fromId: string, toId: string) {
-    if (fromId === toId) return
-    const ids = visible.map((a) => a.id)
-    const fromIndex = ids.indexOf(fromId)
-    const toIndex = ids.indexOf(toId)
-    if (fromIndex < 0 || toIndex < 0) return
-    const next = [...ids]
-    next.splice(fromIndex, 1)
-    next.splice(toIndex, 0, fromId)
-    void reorderAccounts(next)
-  }
-
-  function handleDragStart(e: DragEvent, id: string) {
-    setDragId(id)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', id)
-  }
-
-  function handleDragOver(e: DragEvent, id: string) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    if (overId !== id) setOverId(id)
-  }
-
-  function handleDrop(e: DragEvent, id: string) {
-    e.preventDefault()
-    const fromId = dragId ?? e.dataTransfer.getData('text/plain')
-    if (fromId) moveAccount(fromId, id)
-    setDragId(null)
-    setOverId(null)
-  }
-
-  function handleDragEnd() {
-    setDragId(null)
-    setOverId(null)
-  }
-
   return (
     <div className="mx-auto max-w-5xl space-y-4" {...dataQa('accounts-page')}>
       <PageHeader
@@ -400,8 +371,13 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
             </Card>
           </div>
           <Card className="!p-0" dataQa="accounts-list">
+          {visible.length > 1 ? (
+            <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+              <SortableHint />
+            </div>
+          ) : null}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {visible.map((account) => (
+            {sortableAccounts.orderedItems.map((account) => (
               <AccountListItem
                 key={account.id}
                 account={account}
@@ -410,14 +386,11 @@ export function AccountsPanel({ focusAccountId, onFocusConsumed }: AccountsPanel
                 baseCurrency={settings.baseCurrency}
                 stale={staleById.get(account.id)}
                 periodReturn={returnById.get(account.id) ?? null}
-                isDragging={dragId === account.id}
-                isOver={overId === account.id && dragId !== account.id}
+                rowRef={(node) => sortableAccounts.setNode(account.id, node)}
+                dragging={sortableAccounts.draggingId === account.id}
+                handleProps={sortableAccounts.handleProps(account.id)}
                 swipeOpen={swipeOpenId === account.id}
                 onSwipeOpenChange={(open) => setSwipeOpenId(open ? account.id : null)}
-                onDragOver={(e) => handleDragOver(e, account.id)}
-                onDrop={(e) => handleDrop(e, account.id)}
-                onDragStart={(e) => handleDragStart(e, account.id)}
-                onDragEnd={handleDragEnd}
                 onOpenDetail={() => {
                   setSwipeOpenId(null)
                   setDetailId(account.id)
@@ -894,14 +867,16 @@ interface AccountListItemProps {
   baseCurrency: string
   stale?: AccountStaleStatus
   periodReturn?: AccountPeriodReturn | null
-  isDragging: boolean
-  isOver: boolean
+  rowRef: (node: HTMLLIElement | null) => void
+  dragging: boolean
+  handleProps: {
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
+    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
+    onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void
+    onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void
+  }
   swipeOpen: boolean
   onSwipeOpenChange: (open: boolean) => void
-  onDragOver: (e: DragEvent) => void
-  onDrop: (e: DragEvent) => void
-  onDragStart: (e: DragEvent) => void
-  onDragEnd: () => void
   onOpenDetail: () => void
   onEdit: () => void
   onArchive: () => void
@@ -914,14 +889,11 @@ function AccountListItem({
   baseCurrency,
   stale,
   periodReturn,
-  isDragging,
-  isOver,
+  rowRef,
+  dragging,
+  handleProps,
   swipeOpen,
   onSwipeOpenChange,
-  onDragOver,
-  onDrop,
-  onDragStart,
-  onDragEnd,
   onOpenDetail,
   onEdit,
   onArchive,
@@ -996,12 +968,11 @@ function AccountListItem({
 
   return (
     <li
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      ref={rowRef}
       {...dataQa(`account-row-${account.id}`)}
-      className={`relative overflow-hidden sm:flex sm:items-center sm:gap-2 sm:overflow-visible sm:px-4 sm:py-3 ${
-        isDragging ? 'opacity-40' : ''
-      } ${isOver ? 'bg-blue-50 dark:bg-blue-950/50' : ''}`}
+      className={`relative sm:flex sm:items-center sm:gap-2 sm:px-4 sm:py-3 ${
+        dragging ? `overflow-visible ${sortableRowClass(true)}` : 'overflow-hidden sm:overflow-visible'
+      }`}
     >
       <div className="absolute inset-y-0 right-0 flex items-center gap-1 px-2 sm:static sm:order-last sm:inset-auto sm:shrink-0 sm:px-0">
         <AccountIconButton
@@ -1034,19 +1005,12 @@ function AccountListItem({
           dragOffset === null ? '' : '!duration-0'
         }`}
       >
-        <div
-          role="button"
-          tabIndex={0}
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          className="flex h-9 w-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:bg-slate-800 hover:text-slate-600 dark:text-slate-400 active:cursor-grabbing"
-          title="Перетащить"
-          aria-label={`Перетащить ${account.name}`}
-          {...dataQa(`account-drag-${account.id}`)}
-        >
-          <DragHandleIcon className="h-4 w-4" />
-        </div>
+        <SortableHandle
+          label={`Перетащить ${account.name}`}
+          dataQa={`account-drag-${account.id}`}
+          dragging={dragging}
+          {...handleProps}
+        />
         <button
           type="button"
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
@@ -1167,19 +1131,6 @@ function AccountIconButton({
     >
       {children}
     </button>
-  )
-}
-
-function DragHandleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
-      <circle cx="5" cy="3.5" r="1.25" />
-      <circle cx="11" cy="3.5" r="1.25" />
-      <circle cx="5" cy="8" r="1.25" />
-      <circle cx="11" cy="8" r="1.25" />
-      <circle cx="5" cy="12.5" r="1.25" />
-      <circle cx="11" cy="12.5" r="1.25" />
-    </svg>
   )
 }
 

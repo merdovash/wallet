@@ -178,7 +178,7 @@ export function CheckInPanel({
     () =>
       [...indices]
         .filter((index) => isManualIndex(index.kind))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [indices],
   )
 
