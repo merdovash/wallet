@@ -35,6 +35,7 @@ import {
   formatShortDate,
 } from '../../lib/format'
 import { latestIndexValue, resolveIndexCurrency } from '../../lib/marketIndex'
+import { hasTransfersInPeriod } from '../../lib/transfersInPeriod'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
 import { useAuthStore } from '../../store/authStore'
@@ -148,6 +149,7 @@ export function IndexComparisonPanel() {
   const indexValues = useWalletStore((s) => s.indexValues)
   const rateBook = useRateBook()
   const { range } = usePeriodRange()
+  const showGrowthChart = hasTransfersInPeriod(transfers, range)
   const { mode } = useTheme()
   const chartTheme = useMemo(() => getChartTheme(), [mode])
   const accountOptions = useMemo(
@@ -630,16 +632,18 @@ export function IndexComparisonPanel() {
             series={capitalLines}
             dataQa="index-capital-chart"
           />
-          <ComparisonChart
-            title="Доход без пополнений"
-            rows={rows}
-            primaryKey="actualGrowth"
-            primaryLabel="Фактический прирост"
-            currency={settings.baseCurrency}
-            chartTheme={chartTheme}
-            series={growthLines}
-            dataQa="index-growth-chart"
-          />
+          {showGrowthChart ? (
+            <ComparisonChart
+              title="Доход без пополнений"
+              rows={rows}
+              primaryKey="actualGrowth"
+              primaryLabel="Фактический прирост"
+              currency={settings.baseCurrency}
+              chartTheme={chartTheme}
+              series={growthLines}
+              dataQa="index-growth-chart"
+            />
+          ) : null}
         </>
       )}
     </div>

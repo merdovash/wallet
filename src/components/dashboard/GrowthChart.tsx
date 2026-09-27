@@ -30,7 +30,7 @@ interface GrowthChartProps {
   onSeriesKindChange?: (kind: GrowthChartSeriesKind) => void
   /** Hide in-chart toggle when rendered in the page header. */
   hideSeriesToggle?: boolean
-  /** Account detail: hide growth/delta line (e.g. operational accounts). */
+  /** Account detail: hide growth/delta line (operational accounts or no transfers in period). */
   showGrowthLine?: boolean
   accounts?: Account[]
   snapshots?: BalanceSnapshot[]

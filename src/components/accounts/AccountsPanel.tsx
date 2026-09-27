@@ -23,6 +23,7 @@ import type { AccountStaleStatus } from '../../lib/accountStaleStatus'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, isGrowthKind, normalizeAccountKind } from '../../lib/accountKinds'
 import { buildAccountPeriodReturn } from '../../lib/accountPeriodReturn'
 import { buildAccountsPageTotals } from '../../lib/accountsPageTotals'
+import { hasTransfersInPeriod } from '../../lib/transfersInPeriod'
 import { buildAccountStaleStatuses, formatStaleDays } from '../../lib/accountStaleStatus'
 import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS, toBase } from '../../lib/currency'
@@ -33,6 +34,7 @@ import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRateBook } from '../../lib/useRateBook'
+import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useWalletStore } from '../../store/walletStore'
 import { dataQa } from '../../lib/dataQa'
 import { Button, Card, EmptyState, Field, Input, MoneyInput, Select } from '../ui/FormControls'
@@ -569,6 +571,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
   const transfers = useWalletStore((s) => s.transfers)
   const settings = useWalletStore((s) => s.settings)
   const rateBook = useRateBook()
+  const { range: selectedRange } = usePeriodRange()
   const addSnapshot = useWalletStore((s) => s.addSnapshot)
   const updateSnapshot = useWalletStore((s) => s.updateSnapshot)
   const account = accounts.find((a) => a.id === accountId) ?? null
@@ -594,6 +597,13 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
     () => buildAccountSeries(accountId, snapshots, transfers, accounts, settings, rateBook),
     [accountId, snapshots, transfers, accounts, settings, rateBook],
   )
+  const showAccountGrowthLine = useMemo(() => {
+    if (!account || !isGrowthKind(normalizeAccountKind(account.kind))) return false
+    const first = detailSeries[0]
+    const last = detailSeries[detailSeries.length - 1]
+    const seriesRange = first && last ? { startDate: first.date, endDate: last.date } : null
+    return hasTransfersInPeriod(transfers, selectedRange ?? seriesRange, account.id)
+  }, [account, detailSeries, transfers, selectedRange])
 
   const lastRecordedDate = lastSnapshotDateForAccount(accountId, snapshots)
   const parsedAmount = parseMoneyInput(todayAmount)
@@ -749,7 +759,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
           data={detailSeries}
           currency={account.currency}
           mode="account"
-          showGrowthLine={isGrowthKind(normalizeAccountKind(account.kind))}
+          showGrowthLine={showAccountGrowthLine}
           accounts={accounts}
           snapshots={snapshots}
           settings={settings}

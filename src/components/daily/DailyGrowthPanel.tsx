@@ -21,6 +21,7 @@ import {
 } from '../../lib/format'
 import { getChartTheme, chartTooltipStyles } from '../../lib/chartTheme'
 import { buildPeriodReturn, dailyGrowthInterval } from '../../lib/monthlyReturns'
+import { hasTransfersInPeriod } from '../../lib/transfersInPeriod'
 import { usePeriodRange } from '../../lib/usePeriodRange'
 import { useTheme } from '../../lib/useTheme'
 import { useRatesStore } from '../../store/ratesStore'
@@ -119,6 +120,7 @@ export function DailyGrowthPanel() {
 
   const checkInDates = useMemo(() => snapshotDates(snapshots), [snapshots])
   const { range } = usePeriodRange()
+  const showGrowthChart = hasTransfersInPeriod(transfers, range)
   const [selectedEndDate, setSelectedEndDate] = useState<string | null>(null)
   const fxMode = useFxModeStore((s) => s.fxMode)
 
@@ -239,6 +241,7 @@ export function DailyGrowthPanel() {
                   : 'Столбец — прирост за интервал до этой даты · слева старые дни · нажмите день для расшифровки'}
               </p>
             </div>
+            {showGrowthChart ? (
             <div className="h-72 w-full touch-manipulation sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -288,6 +291,13 @@ export function DailyGrowthPanel() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            ) : (
+              <EmptyState
+                title="Прирост скрыт"
+                description="За выбранный период нет переводов — линия и столбцы прироста на графиках не показываются."
+                dataQa="chart-daily-hidden"
+              />
+            )}
 
             {/* Reliable tap targets for adaptive / touch layouts */}
             <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 md:hidden">

@@ -12,6 +12,7 @@ import {
   readCheckInIntervalDays,
 } from '../../lib/checkInReminder'
 import { slicePeriodSeries } from '../../lib/dashboardPeriod'
+import { hasTransfersInPeriod } from '../../lib/transfersInPeriod'
 import { formatDateDisplay, todayIsoDate } from '../../lib/format'
 import { buildPeriodReturn } from '../../lib/monthlyReturns'
 import { buildPersonalCoefficients } from '../../lib/personalCoefficients'
@@ -160,6 +161,7 @@ export function Dashboard({ onOpenAccount }: DashboardProps) {
         seriesKind={chartSeries}
         onSeriesKindChange={setChartSeries}
         hideSeriesToggle
+        showGrowthLine={hasTransfersInPeriod(transfers, range)}
         accounts={accounts}
         snapshots={snapshots}
         settings={settings}
