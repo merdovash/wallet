@@ -1,7 +1,7 @@
 import { convertAmount, type RateBook } from '../engine/growthEngine'
 import type { PeriodRange } from './dashboardPeriod'
 import { formatCurrency } from './format'
-import { manualRateFor } from './manualRates'
+import { convertForExchange } from './manualRates'
 import {
   isMeaningfulTransferSpread,
   transferReceivedAmount,
@@ -12,6 +12,7 @@ import {
 import type {
   Account,
   Expense,
+  FxOverride,
   ManualRate,
   Transfer,
   WalletSettings,
@@ -75,15 +76,42 @@ function formatRate(rate: number): string {
   return rate.toLocaleString('ru-RU', { maximumFractionDigits: 4 })
 }
 
-/** Курс 1 единицы валюты в базовой на дату (курс ЦБ / fallback). */
+function exchangeToBase(
+  amount: number,
+  currency: string,
+  settings: WalletSettings,
+  date: string,
+  rateBook: RateBook | undefined,
+  manualRates: ManualRate[],
+  fxOverrides: FxOverride[] | undefined,
+): number {
+  if (currency === settings.baseCurrency) return amount
+  return (
+    convertForExchange(
+      amount,
+      currency,
+      settings.baseCurrency,
+      manualRates,
+      settings,
+      date,
+      rateBook,
+      fxOverrides,
+    ) ??
+    convertAmount(amount, currency, settings.baseCurrency, settings, date, rateBook)
+  )
+}
+
+/** Курс 1 единицы валюты в базовой на дату (ручной курс, иначе ЦБ). */
 function baseRateFor(
   currency: string,
   settings: WalletSettings,
   date: string,
-  rateBook?: RateBook,
+  rateBook: RateBook | undefined,
+  manualRates: ManualRate[],
+  fxOverrides: FxOverride[] | undefined,
 ): number {
   if (currency === settings.baseCurrency) return 1
-  return convertAmount(1, currency, settings.baseCurrency, settings, date, rateBook)
+  return exchangeToBase(1, currency, settings, date, rateBook, manualRates, fxOverrides)
 }
 
 /**
@@ -102,6 +130,7 @@ function conversionComparisonLines(input: {
   cbrLabel: string
   customLabel: string
   manualRates: ManualRate[]
+  fxOverrides?: FxOverride[]
   settings: WalletSettings
   rateBook?: RateBook
 }): CommissionBreakdownLine[] {
@@ -124,12 +153,27 @@ function conversionComparisonLines(input: {
     })
   }
 
-  const customRate = manualRateFor(fromCurrency, toCurrency, input.manualRates)
-  if (customRate != null && Number.isFinite(customRate) && customRate > 0) {
+  const customAmount = convertForExchange(
+    amount,
+    fromCurrency,
+    toCurrency,
+    input.manualRates,
+    input.settings,
+    input.date,
+    input.rateBook,
+    input.fxOverrides,
+  )
+  const cbrAmount = Number.isFinite(cbrRate) && cbrRate > 0 ? amount * cbrRate : null
+  if (
+    customAmount != null &&
+    Number.isFinite(customAmount) &&
+    (cbrAmount == null || Math.abs(customAmount - cbrAmount) >= 0.005)
+  ) {
+    const customRate = amount > 0 ? customAmount / amount : 0
     lines.push({
       label: input.customLabel,
       expression: `${formatCurrency(amount, fromCurrency)} × ${formatRate(customRate)} ${toCurrency}/${fromCurrency}`,
-      result: formatCurrency(amount * customRate, toCurrency),
+      result: formatCurrency(customAmount, toCurrency),
     })
   }
 
@@ -155,15 +199,39 @@ function transferBreakdown(
   manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  fxOverrides?: FxOverride[],
 ): CommissionBreakdownLine[] {
   const base = settings.baseCurrency
   const fromCurrency = from?.currency ?? base
   const toCurrency = to?.currency ?? base
-  const received = transferReceivedAmount(transfer, from, to, settings, rateBook)
-  const sentBase = transferSentBase(transfer, from, settings, rateBook)
-  const receivedBase = transferReceivedBase(transfer, from, to, settings, rateBook)
-  const fromRate = baseRateFor(fromCurrency, settings, transfer.date, rateBook)
-  const toRate = baseRateFor(toCurrency, settings, transfer.date, rateBook)
+  const received = transferReceivedAmount(
+    transfer,
+    from,
+    to,
+    settings,
+    rateBook,
+    manualRates,
+    fxOverrides,
+  )
+  const sentBase = transferSentBase(
+    transfer,
+    from,
+    settings,
+    rateBook,
+    manualRates,
+    fxOverrides,
+  )
+  const receivedBase = transferReceivedBase(
+    transfer,
+    from,
+    to,
+    settings,
+    rateBook,
+    manualRates,
+    fxOverrides,
+  )
+  const fromRate = baseRateFor(fromCurrency, settings, transfer.date, rateBook, manualRates, fxOverrides)
+  const toRate = baseRateFor(toCurrency, settings, transfer.date, rateBook, manualRates, fxOverrides)
 
   const lines: CommissionBreakdownLine[] = []
   if (fromCurrency !== toCurrency) {
@@ -175,17 +243,18 @@ function transferBreakdown(
         toCurrency,
         actualAmount: received,
         cbrLabel: 'Зачисление по курсу ЦБ на дату',
-        customLabel: 'Зачисление по кастомному курсу (текущему)',
+        customLabel: 'Зачисление по ручному курсу',
         actualLabel: 'Фактически зачислено',
         actualRateLabel: 'Фактический курс обмена',
         manualRates,
+        fxOverrides,
         settings,
         rateBook,
       }),
     )
   }
   lines.push({
-    label: `Отправлено в базовой валюте${fromCurrency !== base ? ' (курс ЦБ на дату)' : ''}`,
+    label: `Отправлено в базовой валюте${fromCurrency !== base ? ' (курс на дату)' : ''}`,
     expression:
       fromCurrency !== base
         ? `${formatCurrency(transfer.amount, fromCurrency)} × ${formatRate(fromRate)} ${base}/${fromCurrency}`
@@ -193,7 +262,7 @@ function transferBreakdown(
     result: formatCurrency(sentBase, base),
   })
   lines.push({
-    label: `Получено в базовой валюте${toCurrency !== base ? ' (курс ЦБ на дату)' : ''}`,
+    label: `Получено в базовой валюте${toCurrency !== base ? ' (курс на дату)' : ''}`,
     expression:
       toCurrency !== base
         ? `${formatCurrency(received, toCurrency)} × ${formatRate(toRate)} ${base}/${toCurrency}`
@@ -216,6 +285,7 @@ function expenseBreakdown(
   manualRates: ManualRate[],
   settings: WalletSettings,
   rateBook?: RateBook,
+  fxOverrides?: FxOverride[],
 ): CommissionBreakdownLine[] {
   const base = settings.baseCurrency
   // Референс зафиксирован при создании расхода: списано − комиссия.
@@ -231,10 +301,11 @@ function expenseBreakdown(
           toCurrency: accountCurrency,
           actualAmount: expense.accountAmount,
           cbrLabel: 'Расход по курсу ЦБ на дату',
-          customLabel: 'Расход по кастомному курсу (текущему)',
+          customLabel: 'Расход по ручному курсу',
           actualLabel: 'Фактически списано со счёта',
           actualRateLabel: 'Фактический курс оплаты',
           manualRates,
+          fxOverrides,
           settings,
           rateBook,
         })
@@ -252,9 +323,16 @@ function expenseBreakdown(
     },
   ]
   if (accountCurrency !== base) {
-    const accountRate = baseRateFor(accountCurrency, settings, expense.date, rateBook)
+    const accountRate = baseRateFor(
+      accountCurrency,
+      settings,
+      expense.date,
+      rateBook,
+      manualRates,
+      fxOverrides,
+    )
     lines.push({
-      label: 'Комиссия в базовой валюте (курс ЦБ на дату)',
+      label: 'Комиссия в базовой валюте (курс на дату)',
       expression: `${formatCurrency(expense.commission, accountCurrency)} × ${formatRate(accountRate)} ${base}/${accountCurrency}`,
       result: formatCurrency(commissionBase, base),
       emphasize: true,
@@ -265,7 +343,7 @@ function expenseBreakdown(
 
 /**
  * Отчёт по комиссиям: курсовая разница/комиссия переводов (получено − отправлено
- * по официальному курсу, со знаком минус — потеря) и зафиксированные комиссии
+ * по ручному курсу обмена, иначе по ЦБ) и зафиксированные комиссии
  * конвертации по расходам, всё в базовой валюте.
  */
 export function buildCommissionReport(
@@ -276,6 +354,7 @@ export function buildCommissionReport(
   settings: WalletSettings,
   rateBook?: RateBook,
   range?: PeriodRange | null,
+  fxOverrides?: FxOverride[],
 ): CommissionReport {
   const byId = new Map(accounts.map((a) => [a.id, a]))
   const rows: CommissionRow[] = []
@@ -284,7 +363,15 @@ export function buildCommissionReport(
     if (!inRange(transfer.date, range)) continue
     const from = byId.get(transfer.fromAccountId)
     const to = byId.get(transfer.toAccountId)
-    const spread = transferSpreadBase(transfer, from, to, settings, rateBook)
+    const spread = transferSpreadBase(
+      transfer,
+      from,
+      to,
+      settings,
+      rateBook,
+      manualRates,
+      fxOverrides,
+    )
     if (!isMeaningfulTransferSpread(spread)) continue
     const commissionAccount = transfer.commissionAccountId
       ? byId.get(transfer.commissionAccountId)
@@ -297,6 +384,7 @@ export function buildCommissionReport(
       manualRates,
       settings,
       rateBook,
+      fxOverrides,
     )
     if (commissionAccount) {
       breakdown.push({
@@ -319,7 +407,14 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase: -spread,
-      amountBase: transferSentBase(transfer, from, settings, rateBook),
+      amountBase: transferSentBase(
+        transfer,
+        from,
+        settings,
+        rateBook,
+        manualRates,
+        fxOverrides,
+      ),
       breakdown,
     })
   }
@@ -329,13 +424,14 @@ export function buildCommissionReport(
     if (!Number.isFinite(expense.commission) || Math.abs(expense.commission) < 0.005) continue
     const account = byId.get(expense.accountId)
     const accountCurrency = account?.currency ?? settings.baseCurrency
-    const commissionBase = convertAmount(
+    const commissionBase = exchangeToBase(
       expense.commission,
       accountCurrency,
-      settings.baseCurrency,
       settings,
       expense.date,
       rateBook,
+      manualRates,
+      fxOverrides,
     )
     if (!Number.isFinite(commissionBase) || Math.abs(commissionBase) < 0.005) continue
     rows.push({
@@ -350,13 +446,14 @@ export function buildCommissionReport(
           : ''
       }`,
       commissionBase,
-      amountBase: convertAmount(
+      amountBase: exchangeToBase(
         expense.accountAmount,
         accountCurrency,
-        settings.baseCurrency,
         settings,
         expense.date,
         rateBook,
+        manualRates,
+        fxOverrides,
       ),
       breakdown: expenseBreakdown(
         expense,
@@ -365,6 +462,7 @@ export function buildCommissionReport(
         manualRates,
         settings,
         rateBook,
+        fxOverrides,
       ),
     })
   }

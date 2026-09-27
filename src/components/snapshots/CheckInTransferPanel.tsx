@@ -119,6 +119,8 @@ export function CheckInTransferPanel({
           toAccount,
           settings,
           rateBook,
+          manualRates,
+          fxOverrides,
         )
       : 0
 

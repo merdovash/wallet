@@ -12,7 +12,7 @@ import { useCheckInUiStore } from '../../store/checkInUiStore'
 import { useRateBook } from '../../lib/useRateBook'
 import { useWalletStore } from '../../store/walletStore'
 import type { RateBook } from '../../engine/growthEngine'
-import type { Account, Expense, SnapshotLine, Transfer, WalletSettings } from '../../types/wallet'
+import type { Account, Expense, FxOverride, ManualRate, SnapshotLine, Transfer, WalletSettings } from '../../types/wallet'
 import { dataQa } from '../../lib/dataQa'
 import { Button, DateInput, Input, MoneyInput } from '../ui/FormControls'
 import { EntityEditPanel } from '../ui/EntityEditPanel'
@@ -909,6 +909,8 @@ export function CheckInPanel({
             settings={settings}
             date={date}
             rateBook={rateBook}
+            manualRates={manualRates}
+            fxOverrides={fxOverrides}
             savedTransfers={dateTransfers}
             pendingTransfers={pendingTransfers}
             onEditPending={openEditPending}
@@ -971,6 +973,8 @@ function TransfersSection({
   settings,
   date,
   rateBook,
+  manualRates,
+  fxOverrides,
   savedTransfers,
   pendingTransfers,
   onEditPending,
@@ -982,6 +986,8 @@ function TransfersSection({
   settings: WalletSettings
   date: string
   rateBook?: RateBook
+  manualRates: ManualRate[]
+  fxOverrides: FxOverride[]
   savedTransfers: Transfer[]
   pendingTransfers: PendingTransfer[]
   onEditPending: (t: PendingTransfer) => void
@@ -1026,6 +1032,8 @@ function TransfersSection({
                   accountMap.get(t.toAccountId),
                   settings,
                   rateBook,
+                  manualRates,
+                  fxOverrides,
                 )}
                 currency={settings.baseCurrency}
                 className="mt-0.5 text-xs font-medium"
@@ -1086,6 +1094,8 @@ function TransfersSection({
                           to,
                           settings,
                           rateBook,
+                          manualRates,
+                          fxOverrides,
                         )
                       : 0
                   }

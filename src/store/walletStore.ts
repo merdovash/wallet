@@ -601,6 +601,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       state.manualRates,
       state.settings,
       rateBook,
+      state.fxOverrides,
     )
 
     const expense = await updateExpenseApi(id, {
@@ -622,6 +623,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         state.manualRates,
         state.settings,
         rateBook,
+        state.fxOverrides,
       )
       const newCharge = expenseChargeBase(
         accountAmount,
@@ -630,6 +632,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         state.manualRates,
         state.settings,
         rateBook,
+        state.fxOverrides,
       )
       await get().updateSnapshot(snapshot.id, {
         expense: Math.max(0, (snapshot.expense ?? 0) - oldCharge + newCharge),
@@ -669,6 +672,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           state.manualRates,
           state.settings,
           rateBook,
+          state.fxOverrides,
         )
         await get().updateSnapshot(snapshot.id, {
           expense: Math.max(0, (snapshot.expense ?? 0) - oldCharge),

@@ -2,7 +2,8 @@ import type { RateBook } from '../engine/growthEngine'
 import { isGrowthPortfolioAccount } from './accountKinds'
 import { resolvePivotForDate } from './cbrRates'
 import { toBase } from './currency'
-import type { Account, Transfer, WalletSettings } from '../types/wallet'
+import { convertForExchange } from './manualRates'
+import type { Account, FxOverride, ManualRate, Transfer, WalletSettings } from '../types/wallet'
 
 export type TransferAmountsInput = Pick<
   Transfer,
@@ -35,8 +36,21 @@ function convert(
   settings: WalletSettings,
   date: string,
   rateBook?: RateBook,
+  manualRates?: ManualRate[],
+  fxOverrides?: FxOverride[],
 ): number {
   if (fromCurrency === toCurrency) return amount
+  const exchanged = convertForExchange(
+    amount,
+    fromCurrency,
+    toCurrency,
+    manualRates ?? [],
+    settings,
+    date,
+    rateBook,
+    fxOverrides,
+  )
+  if (exchanged != null && Number.isFinite(exchanged)) return exchanged
   const pivot = pivotFor(date, settings, rateBook)
   const inBase = toBase(amount, fromCurrency, settings.baseCurrency, settings.exchangeRates, pivot)
   if (toCurrency === settings.baseCurrency) return inBase
@@ -52,6 +66,8 @@ export function transferReceivedAmount(
   to: Pick<Account, 'currency'> | undefined,
   settings: WalletSettings,
   rateBook?: RateBook,
+  manualRates?: ManualRate[],
+  fxOverrides?: FxOverride[],
 ): number {
   if (transfer.toAmount != null && Number.isFinite(transfer.toAmount) && transfer.toAmount > 0) {
     return transfer.toAmount
@@ -64,6 +80,8 @@ export function transferReceivedAmount(
     settings,
     transfer.date,
     rateBook,
+    manualRates,
+    fxOverrides,
   )
   return Number.isFinite(converted) ? converted : transfer.amount
 }
@@ -81,6 +99,8 @@ export function transferSentBase(
   from: Pick<Account, 'currency'> | undefined,
   settings: WalletSettings,
   rateBook?: RateBook,
+  manualRates?: ManualRate[],
+  fxOverrides?: FxOverride[],
 ): number {
   if (!from) return transfer.amount
   return convert(
@@ -90,6 +110,8 @@ export function transferSentBase(
     settings,
     transfer.date,
     rateBook,
+    manualRates,
+    fxOverrides,
   )
 }
 
@@ -99,9 +121,19 @@ export function transferReceivedBase(
   to: Pick<Account, 'currency'> | undefined,
   settings: WalletSettings,
   rateBook?: RateBook,
+  manualRates?: ManualRate[],
+  fxOverrides?: FxOverride[],
 ): number {
-  if (!to) return transferSentBase(transfer, from, settings, rateBook)
-  const received = transferReceivedAmount(transfer, from, to, settings, rateBook)
+  if (!to) return transferSentBase(transfer, from, settings, rateBook, manualRates, fxOverrides)
+  const received = transferReceivedAmount(
+    transfer,
+    from,
+    to,
+    settings,
+    rateBook,
+    manualRates,
+    fxOverrides,
+  )
   return convert(
     received,
     to.currency,
@@ -109,6 +141,8 @@ export function transferReceivedBase(
     settings,
     transfer.date,
     rateBook,
+    manualRates,
+    fxOverrides,
   )
 }
 
@@ -119,9 +153,19 @@ export function transferSpreadBase(
   to: Pick<Account, 'currency'> | undefined,
   settings: WalletSettings,
   rateBook?: RateBook,
+  manualRates?: ManualRate[],
+  fxOverrides?: FxOverride[],
 ): number {
-  const sent = transferSentBase(transfer, from, settings, rateBook)
-  const received = transferReceivedBase(transfer, from, to, settings, rateBook)
+  const sent = transferSentBase(transfer, from, settings, rateBook, manualRates, fxOverrides)
+  const received = transferReceivedBase(
+    transfer,
+    from,
+    to,
+    settings,
+    rateBook,
+    manualRates,
+    fxOverrides,
+  )
   if (!Number.isFinite(sent) || !Number.isFinite(received)) return 0
   return received - sent
 }

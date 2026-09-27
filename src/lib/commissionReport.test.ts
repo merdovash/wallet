@@ -123,7 +123,7 @@ describe('buildCommissionReport', () => {
     // По курсу ЦБ: 100 USD × 90 = 9 000 ₽.
     expect(row.breakdown[0]!.expression).toContain('× 90')
     expect(row.breakdown[0]!.result).toContain('9')
-    // По кастомному курсу: 100 USD × 87 = 8 700 ₽.
+    // По ручному курсу: 100 USD × 87 = 8 700 ₽; комиссия 8 700 − 8 500 = 200.
     expect(row.breakdown[1]!.expression).toContain('× 87')
     expect(row.breakdown[1]!.result).toContain('700')
     // Фактически зачислено 8 500 ₽; фактический курс 8 500 ÷ 100 = 85 RUB/USD.
@@ -131,19 +131,18 @@ describe('buildCommissionReport', () => {
     expect(row.breakdown[2]!.result).toContain('500')
     expect(row.breakdown[3]!.expression).toContain('÷')
     expect(row.breakdown[3]!.result).toContain('85')
-    // Итог: 9 000 − 8 500 = 500, выделен.
+    // Итог: 8 700 − 8 500 = 200, выделен.
     expect(row.breakdown[6]!.emphasize).toBe(true)
     expect(row.breakdown[6]!.expression).toContain('−')
-    expect(row.breakdown[6]!.result).toContain('500')
+    expect(row.breakdown[6]!.result).toContain('200')
+    expect(row.commissionBase).toBeCloseTo(200)
   })
 
   it('omits the custom-rate line when the pair has no manual rate', () => {
     const report = buildCommissionReport(accounts, transfers, [], [], settings)
     const row = report.rows.find((r) => r.id === 'transfer-t1')!
     expect(row.breakdown).toHaveLength(6)
-    expect(
-      row.breakdown.some((line) => line.label.includes('кастомному')),
-    ).toBe(false)
+    expect(row.breakdown.some((line) => line.label.includes('ручному'))).toBe(false)
   })
 
   it('builds an expense breakdown: CBR, custom, actual, actual rate and frozen reference', () => {
@@ -167,6 +166,22 @@ describe('buildCommissionReport', () => {
     expect(row.breakdown[5]!.expression).toContain('−')
     expect(row.breakdown[5]!.result).toContain('50')
     expect(row.breakdown[5]!.emphasize).toBe(true)
+  })
+
+  it('uses a dated buy quote for the transfer commission', () => {
+    const report = buildCommissionReport(
+      accounts,
+      transfers,
+      [],
+      [],
+      settings,
+      { '2026-03-05': { RUB: 1, USD: 90 } },
+      undefined,
+      [{ date: '2026-03-05', currency: 'USD', buyRate: 80, sellRate: 90 }],
+    )
+    const row = report.rows.find((r) => r.id === 'transfer-t1')!
+    expect(row.commissionBase).toBeCloseTo(-500)
+    expect(row.amountBase).toBeCloseTo(8000)
   })
 
   it('adds a base-conversion step for an expense on a foreign-currency account', () => {

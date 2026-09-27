@@ -184,6 +184,8 @@ export function TransferCreatePanel({ open, onClose, onCreated }: TransferCreate
           toAccount,
           settings,
           rateBook,
+          manualRates,
+          fxOverrides,
         )
       : 0
 

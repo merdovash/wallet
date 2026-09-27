@@ -83,6 +83,18 @@ describe('expenseCommission', () => {
       ),
     ).toBeCloseTo(50)
   })
+
+  it('uses the dated buy quote as the expense reference', () => {
+    expect(
+      expenseCommission(
+        { amount: 10, currency: 'USD', accountAmount: 850, accountCurrency: 'RUB', date: '2026-03-02' },
+        [],
+        settings,
+        { '2026-03-02': { RUB: 1, USD: 90 } },
+        [{ date: '2026-03-02', currency: 'USD', buyRate: 80, sellRate: 90 }],
+      ),
+    ).toBeCloseTo(50)
+  })
 })
 
 describe('expenseChargeBase', () => {

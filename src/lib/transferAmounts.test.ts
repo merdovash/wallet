@@ -66,6 +66,37 @@ describe('transferSpreadBase', () => {
     ).toBeCloseTo(-500)
   })
 
+  it('uses the undated manual pair rate instead of the official quote', () => {
+    const from = account({ id: 'a', name: 'A', currency: 'USD' })
+    const to = account({ id: 'b', name: 'B' })
+    expect(
+      transferSpreadBase(
+        { date: '2026-03-01', fromAccountId: 'a', toAccountId: 'b', amount: 100, toAmount: 8500 },
+        from,
+        to,
+        settings,
+        undefined,
+        [{ fromCurrency: 'USD', toCurrency: 'RUB', rate: 85 }],
+      ),
+    ).toBeCloseTo(0)
+  })
+
+  it('uses the dated buy quote when converting foreign currency to base', () => {
+    const from = account({ id: 'a', name: 'A', currency: 'USD' })
+    const to = account({ id: 'b', name: 'B' })
+    expect(
+      transferSpreadBase(
+        { date: '2026-03-01', fromAccountId: 'a', toAccountId: 'b', amount: 100, toAmount: 8500 },
+        from,
+        to,
+        settings,
+        { '2026-03-01': { RUB: 1, USD: 90 } },
+        [],
+        [{ date: '2026-03-01', currency: 'USD', buyRate: 80, sellRate: 90 }],
+      ),
+    ).toBeCloseTo(500)
+  })
+
   it('is positive when the receive side is better than the official rate', () => {
     const from = account({ id: 'a', name: 'A' })
     const to = account({ id: 'b', name: 'B', currency: 'USD' })
