@@ -29,6 +29,8 @@ describe('buildAccountPeriodReturn', () => {
     ]
     const result = buildAccountPeriodReturn('f', accounts, snapshots, [], settings)
     expect(result?.growthPct).toBeCloseTo(0.1)
+    expect(result?.growth).toBe(100)
+    expect(result?.growthBase).toBe(100)
     expect(result?.days).toBeGreaterThanOrEqual(MIN_ANNUALIZE_DAYS)
     expect(result?.annualizedPct).not.toBeNull()
     expect(result?.nativeGrowthPct).toBeNull()
@@ -60,6 +62,8 @@ describe('buildAccountPeriodReturn', () => {
     ]
     const result = buildAccountPeriodReturn('f', accounts, snapshots, transfers, settings)
     expect(result?.growthPct).toBeCloseTo(0.078, 2)
+    expect(result?.growth).toBe(100)
+    expect(result?.growthBase).toBe(100)
   })
 
   it('does not annualize periods shorter than 30 days', () => {
@@ -101,6 +105,8 @@ describe('buildAccountPeriodReturn', () => {
     ]
     const result = buildAccountPeriodReturn('usd', accounts, snapshots, [], fxSettings, rateBook)
     expect(result?.nativeGrowthPct).toBeCloseTo(0.1)
+    expect(result?.growth).toBe(10)
+    expect(result?.growthBase).toBe(1900)
     expect(result?.nativeAnnualizedPct).not.toBeNull()
     expect(result?.growthPct).toBeCloseTo(1900 / 8000)
     expect(result?.growthPct).not.toBeCloseTo(0.1, 2)
@@ -138,5 +144,6 @@ describe('buildAccountPeriodReturn', () => {
     ]
     const result = buildAccountPeriodReturn('usd', accounts, snapshots, transfers, fxSettings)
     expect(result?.nativeGrowthPct).toBeCloseTo(0.078, 2)
+    expect(result?.growth).toBe(10)
   })
 })

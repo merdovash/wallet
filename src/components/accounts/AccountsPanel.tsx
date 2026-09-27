@@ -29,7 +29,7 @@ import { CASHBACK_CURRENCY } from '../../lib/cashbackReport'
 import { CURRENCY_OPTIONS, toBase } from '../../lib/currency'
 import { resolvePivotForDate } from '../../lib/cbrRates'
 import { planAccountTodayCheckIn } from '../../lib/accountTodayCheckIn'
-import { formatIsoToRu, formatCurrency, formatPercent, todayIsoDate } from '../../lib/format'
+import { formatIsoToRu, formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
@@ -699,6 +699,23 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
           </div>
         )}
 
+        {detailReturn != null && (
+          <p className="text-sm text-slate-700 dark:text-slate-300" {...dataQa('account-detail-delta')}>
+            Прирост:{' '}
+            <span className={`font-medium ${deltaTone(detailReturn.growthBase)}`}>
+              {signedAmount(detailReturn.growthBase, settings.baseCurrency)}
+            </span>
+            {account.currency !== settings.baseCurrency ? (
+              <>
+                {' '}
+                ·{' '}
+                <span className={`font-medium ${deltaTone(detailReturn.growth)}`}>
+                  {signedAmount(detailReturn.growth, account.currency)}
+                </span>
+              </>
+            ) : null}
+          </p>
+        )}
         {detailReturn?.growthPct != null && (
           <p className="text-sm text-slate-700 dark:text-slate-300">
             Доходность (Modified Dietz):{' '}
@@ -834,6 +851,12 @@ function CreditDetailStats({
       )}
     </div>
   )
+}
+
+function deltaTone(amount: number): string {
+  if (amount > 0) return 'text-emerald-700 dark:text-emerald-400'
+  if (amount < 0) return 'text-red-600'
+  return 'text-slate-500 dark:text-slate-400'
 }
 
 function BaseApprox({
@@ -1084,20 +1107,30 @@ function AccountListItem({
                   <span className="text-[11px] text-slate-400 dark:text-slate-500">
                     долг {formatCurrency(creditDebt(account.creditLimit, balance), account.currency)}
                   </span>
-                ) : periodReturn?.growthPct != null || periodReturn?.nativeGrowthPct != null ? (
+                ) : periodReturn != null ? (
                   <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                    {periodReturn.growthPct != null ? (
-                      <span className="block" {...dataQa(`account-return-${account.id}`)}>
-                        {formatPercent(periodReturn.growthPct)}
-                        {periodReturn.nativeGrowthPct != null ? ` ${baseCurrency}` : ''}
-                        {periodReturn.annualizedPct != null
-                          ? ` · ${formatPercent(periodReturn.annualizedPct)} год.`
+                    <span
+                      className={`block ${deltaTone(periodReturn.growthBase)}`}
+                      {...dataQa(`account-delta-${account.id}`)}
+                    >
+                      {signedAmount(periodReturn.growthBase, baseCurrency)}
+                      {periodReturn.growthPct != null
+                        ? ` · ${formatPercent(periodReturn.growthPct)}`
+                        : ''}
+                      {periodReturn.nativeGrowthPct != null ? ` ${baseCurrency}` : ''}
+                      {periodReturn.annualizedPct != null
+                        ? ` · ${formatPercent(periodReturn.annualizedPct)} год.`
+                        : ''}
+                    </span>
+                    {account.currency !== baseCurrency ? (
+                      <span
+                        className={`block ${deltaTone(periodReturn.growth)}`}
+                        {...dataQa(`account-delta-native-${account.id}`)}
+                      >
+                        {signedAmount(periodReturn.growth, account.currency)}
+                        {periodReturn.nativeGrowthPct != null
+                          ? ` · ${formatPercent(periodReturn.nativeGrowthPct)}`
                           : ''}
-                      </span>
-                    ) : null}
-                    {periodReturn.nativeGrowthPct != null ? (
-                      <span className="block" {...dataQa(`account-return-native-${account.id}`)}>
-                        {formatPercent(periodReturn.nativeGrowthPct)} {account.currency}
                         {periodReturn.nativeAnnualizedPct != null
                           ? ` · ${formatPercent(periodReturn.nativeAnnualizedPct)} год.`
                           : ''}

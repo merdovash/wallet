@@ -18,6 +18,10 @@ export interface AccountPeriodReturn {
   startDate: string
   endDate: string
   days: number
+  /** Transfer-adjusted growth in the account currency. */
+  growth: number
+  /** Transfer-adjusted growth in base currency (includes FX). */
+  growthBase: number
   /** Modified Dietz in base currency (includes FX). */
   growthPct: number | null
   annualizedPct: number | null
@@ -119,11 +123,13 @@ export function buildAccountPeriodReturn(
     startDate,
     rateBook,
   )
-  const growth =
+  const growthBase =
     accountGrowthBase(accountId, startDate, endDate, snapshots, transfers, accounts, settings, rateBook) ??
     0
+  const growth =
+    accountGrowth(accountId, startDate, endDate, snapshots, transfers, accounts, settings, rateBook) ?? 0
   const flows = accountCapitalFlows(accountId, startDate, endDate, transfers, accounts, settings, rateBook)
-  const { growthPct } = modifiedDietzReturn(startTotal, growth, startDate, endDate, flows)
+  const { growthPct } = modifiedDietzReturn(startTotal, growthBase, startDate, endDate, flows)
   const days = daysBetween(startDate, endDate)
   const annualizedPct =
     growthPct != null && days >= MIN_ANNUALIZE_DAYS ? annualizePeriodReturn(growthPct, days) : null
@@ -132,9 +138,6 @@ export function buildAccountPeriodReturn(
   let nativeAnnualizedPct: number | null = null
   if (account.currency !== settings.baseCurrency) {
     const startNative = netWorthAmount(account, startRec)
-    const growthNative =
-      accountGrowth(accountId, startDate, endDate, snapshots, transfers, accounts, settings, rateBook) ??
-      0
     const nativeFlows = accountCapitalFlowsNative(
       accountId,
       startDate,
@@ -146,7 +149,7 @@ export function buildAccountPeriodReturn(
     )
     nativeGrowthPct = modifiedDietzReturn(
       startNative,
-      growthNative,
+      growth,
       startDate,
       endDate,
       nativeFlows,
@@ -157,5 +160,15 @@ export function buildAccountPeriodReturn(
         : null
   }
 
-  return { startDate, endDate, days, growthPct, annualizedPct, nativeGrowthPct, nativeAnnualizedPct }
+  return {
+    startDate,
+    endDate,
+    days,
+    growth,
+    growthBase,
+    growthPct,
+    annualizedPct,
+    nativeGrowthPct,
+    nativeAnnualizedPct,
+  }
 }
