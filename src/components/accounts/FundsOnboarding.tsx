@@ -10,6 +10,7 @@ import {
   type FundOnboardingLine,
 } from '../../lib/fundOnboarding'
 import { formatCurrency } from '../../lib/format'
+import { commitOpenMoneyFormulas, useFormulaModeActive } from '../../lib/moneyFieldRegistry'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import type { Account } from '../../types/wallet'
 import { Button, Card, EmptyState, Field, Input, Select } from '../ui/FormControls'
@@ -28,6 +29,7 @@ export function FundsOnboarding({
   asOfDate: string
   onCreate: (drafts: (FundOnboardingDraft & { accountId: string })[]) => Promise<void>
 }) {
+  const formulaActive = useFormulaModeActive()
   const monthKeys = useMemo(() => onboardingMonthKeys(asOfDate), [asOfDate])
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [lines, setLines] = useState<FundOnboardingLine[]>(() => [createOnboardingLine()])
@@ -183,8 +185,11 @@ export function FundsOnboarding({
 
       <Button
         type="button"
-        onClick={() => void handleSave()}
-        disabled={!canSave}
+        onClick={() => {
+          if (!commitOpenMoneyFormulas()) return
+          void handleSave()
+        }}
+        disabled={!canSave && !formulaActive}
         dataQa="funds-onboarding-save"
       >
         {saving ? 'Сохранение…' : 'Сохранить'}

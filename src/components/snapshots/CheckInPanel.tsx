@@ -2,6 +2,7 @@
 import { balanceOnDate } from '../../engine/growthEngine'
 import { formatCurrency, todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
+import { commitOpenMoneyFormulas } from '../../lib/moneyFieldRegistry'
 import { suggestCheckInCashflow } from '../../lib/suggestCheckInCashflow'
 import { collectIndexValueEntries, indexValueToInput, parseIndexValueInput } from '../../lib/indexValueInput'
 import { isManualIndex } from '../../lib/marketIndex'
@@ -670,6 +671,7 @@ export function CheckInPanel({
         {...dataQa('check-in-form')}
         onSubmit={(e) => {
           e.preventDefault()
+          if (!commitOpenMoneyFormulas()) return
           void handleSave()
         }}
       >

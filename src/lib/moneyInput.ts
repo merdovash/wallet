@@ -1,3 +1,5 @@
+import { evaluateMoneyFormula, hasFormulaSyntax, roundFormulaNumber } from './moneyFormula'
+
 /** Keep only characters valid in a money amount: digits, one `.`/`,`, optional leading `-`. */
 export function sanitizeMoneyInput(
   raw: string,
@@ -77,10 +79,24 @@ export function caretPosAfterMoneyUnits(formatted: string, units: number): numbe
   return formatted.length
 }
 
-/** Parse sanitized / grouped money text to number; empty → null. */
+/** Format an evaluated formula with thousand separators and a comma decimal. */
+export function formatFormulaResult(value: number): string {
+  const rounded = roundFormulaNumber(value)
+  const negative = rounded < 0
+  const abs = Math.abs(rounded)
+  let text = abs.toFixed(10)
+  if (text.includes('.')) text = text.replace(/0+$/, '').replace(/\.$/, '')
+  if (!text) text = '0'
+  return formatMoneyInput(`${negative ? '-' : ''}${text.replace('.', ',')}`)
+}
+
+/** Parse sanitized / grouped money text to number; empty → null. Formulas evaluate. */
 export function parseMoneyInput(raw: string): number | null {
-  const trimmed = raw.trim().replace(/\s/g, '')
+  const trimmed = raw.trim()
   if (!trimmed || trimmed === '-' || trimmed === '.' || trimmed === ',') return null
-  const value = Number(trimmed.replace(',', '.'))
+  if (hasFormulaSyntax(trimmed)) return evaluateMoneyFormula(trimmed)
+  const compact = trimmed.replace(/\s/g, '')
+  if (!compact || compact === '-' || compact === '.' || compact === ',') return null
+  const value = Number(compact.replace(',', '.'))
   return Number.isFinite(value) ? value : null
 }

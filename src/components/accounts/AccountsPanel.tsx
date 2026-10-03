@@ -31,6 +31,7 @@ import { resolvePivotForDate } from '../../lib/cbrRates'
 import { planAccountTodayCheckIn } from '../../lib/accountTodayCheckIn'
 import { formatIsoToRu, formatCurrency, formatPercent, signedAmount, todayIsoDate } from '../../lib/format'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
+import { commitOpenMoneyFormulas } from '../../lib/moneyFieldRegistry'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRateBook } from '../../lib/useRateBook'
@@ -631,6 +632,7 @@ function AccountDetailPanel({ accountId, onClose }: { accountId: string; onClose
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault()
+          if (!commitOpenMoneyFormulas()) return
           void handleSave()
         }}
       >

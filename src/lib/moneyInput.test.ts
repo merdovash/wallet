@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   caretPosAfterMoneyUnits,
+  formatFormulaResult,
   formatMoneyInput,
   moneySignificantCount,
   normalizeMoneyInput,
@@ -67,5 +68,19 @@ describe('parseMoneyInput', () => {
   it('parses grouped thousands', () => {
     expect(parseMoneyInput('1 000,50')).toBe(1000.5)
     expect(parseMoneyInput('1\u00A0234')).toBe(1234)
+  })
+
+  it('evaluates formulas', () => {
+    expect(parseMoneyInput('1 000 + 20')).toBe(1020)
+    expect(parseMoneyInput('100+')).toBeNull()
+  })
+})
+
+describe('formatFormulaResult', () => {
+  it('groups the result and uses a comma decimal', () => {
+    expect(formatFormulaResult(1000)).toBe('1 000')
+    expect(formatFormulaResult(2.5)).toBe('2,5')
+    expect(formatFormulaResult(-2500)).toBe('-2 500')
+    expect(formatFormulaResult(0.1 + 0.2)).toBe('0,3')
   })
 })

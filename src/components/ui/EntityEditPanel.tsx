@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { useRef } from 'react'
+import { commitOpenMoneyFormulas, useFormulaModeActive } from '../../lib/moneyFieldRegistry'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
 import { Button } from './FormControls'
 import { StackPanel } from './StackPanel'
@@ -42,15 +44,26 @@ export function EntityEditPanel({
   dataQa = 'entity-edit',
   children,
 }: EntityEditPanelProps) {
+  const formulaActive = useFormulaModeActive()
+  const onSaveRef = useRef(onSave)
+  const saveDisabledRef = useRef(saveDisabled)
+  onSaveRef.current = onSave
+  saveDisabledRef.current = saveDisabled
+  const canAttemptSave = !saveDisabled || formulaActive
+
+  function runSave() {
+    if (!commitOpenMoneyFormulas()) return
+    if (saveDisabledRef.current) return
+    void onSaveRef.current()
+  }
+
   useRegisterPrimaryAction(open && saveActive, {
     id: saveActionId,
     label: saveLabel,
     scope: 'panel',
-    disabled: saveDisabled,
+    disabled: !canAttemptSave,
     title: saveTitle,
-    onClick: () => {
-      void onSave()
-    },
+    onClick: runSave,
   })
 
   return (
@@ -65,10 +78,10 @@ export function EntityEditPanel({
           <Button
             type="button"
             className="!hidden !px-3 !py-1.5 md:!inline-flex"
-            disabled={saveDisabled}
+            disabled={!canAttemptSave}
             title={saveTitle}
             dataQa={`${dataQa}-save`}
-            onClick={() => void onSave()}
+            onClick={runSave}
           >
             {saveLabel}
           </Button>

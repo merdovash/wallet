@@ -31,6 +31,7 @@ import {
   resolveIndexCurrency,
 } from '../../lib/marketIndex'
 import { formatMoneyInput, parseMoneyInput } from '../../lib/moneyInput'
+import { commitOpenMoneyFormulas, useFormulaModeActive } from '../../lib/moneyFieldRegistry'
 import { indexValueInputsDiffer, indexValueToInput } from '../../lib/indexValueInput'
 import { useRestoreFocusOnResume } from '../../lib/useRestoreFocusOnResume'
 import { useRegisterPrimaryAction } from '../../lib/useRegisterPrimaryAction'
@@ -324,6 +325,7 @@ function IndexDetailPanel({
   upsertIndexValues: (date: string, values: Array<{ indexId: string; value: number }>) => Promise<void>
 }) {
   const index = allIndices.find((item) => item.id === indexId) ?? null
+  const formulaActive = useFormulaModeActive()
   const [editingMode, setEditingMode] = useState(false)
   const [name, setName] = useState('')
   const [kind, setKind] = useState<IndexKind>('amount')
@@ -503,7 +505,7 @@ function IndexDetailPanel({
           <Button
             type="button"
             className="!hidden !px-3 !py-1.5 md:!inline-flex"
-            disabled={editingMode ? saveDisabled : todaySaveDisabled}
+            disabled={(editingMode ? saveDisabled : todaySaveDisabled) && !formulaActive}
             title={
               editManualIndex && parsedTodayValue == null
                 ? 'Введите значение на сегодня'
@@ -513,6 +515,7 @@ function IndexDetailPanel({
             }
             dataQa="index-detail-save"
             onClick={() => {
+              if (!commitOpenMoneyFormulas()) return
               if (editingMode) void handleSave()
               else void handleSaveToday()
             }}
@@ -525,7 +528,10 @@ function IndexDetailPanel({
             variant="secondary"
             className="!hidden !px-3 !py-1.5 md:!inline-flex"
             dataQa="index-detail-edit"
-            onClick={() => setEditingMode(true)}
+            onClick={() => {
+              if (!commitOpenMoneyFormulas()) return
+              setEditingMode(true)
+            }}
           >
             Изменить
           </Button>
@@ -539,6 +545,7 @@ function IndexDetailPanel({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault()
+              if (!commitOpenMoneyFormulas()) return
               void handleSave()
             }}
           >

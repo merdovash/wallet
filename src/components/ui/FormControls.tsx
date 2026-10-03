@@ -7,6 +7,7 @@
   MouseEvent,
 } from 'react'
 import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import {
   DATE_RU_PLACEHOLDER,
   caretPosAfterRuDateDigits,
@@ -17,9 +18,16 @@ import {
 } from '../../lib/format'
 import {
   caretPosAfterMoneyUnits,
+  formatFormulaResult,
   moneySignificantCount,
   normalizeMoneyInput,
 } from '../../lib/moneyInput'
+import { evaluateMoneyFormula, sanitizeFormulaInput } from '../../lib/moneyFormula'
+import {
+  notifyFormulaMode,
+  registerMoneyField,
+  revealInvalidMoneyField,
+} from '../../lib/moneyFieldRegistry'
 import { dataQaFromProps, type DataQaProps } from '../../lib/dataQa'
 
 interface FieldProps {
@@ -70,22 +78,61 @@ interface MoneyInputProps extends Omit<
   dataQa?: string
 }
 
-/** Text input with thousand separators (triads) for easier entry. */
+/** Text input with thousand separators (triads) and an optional in-field formula. */
 export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function MoneyInput(
-  { value, onChange, allowNegative = true, className = '', onFocus, onBlur, dataQa, ...rest },
+  {
+    value,
+    onChange,
+    allowNegative = true,
+    className = '',
+    onFocus,
+    onBlur,
+    onKeyDown,
+    disabled,
+    readOnly,
+    dataQa,
+    ...rest
+  },
   ref,
 ) {
+  const rootRef = useRef<HTMLDivElement>(null)
   const localRef = useRef<HTMLInputElement>(null)
   const caretRef = useRef<number | null>(null)
-  const displayValue = normalizeMoneyInput(value, { allowNegative })
+  const ignoreBlurRef = useRef(false)
+  const [formulaMode, setFormulaMode] = useState(false)
+  const [invalid, setInvalid] = useState(false)
+  const formulaModeRef = useRef(false)
+  const valueRef = useRef(value)
+  const onChangeRef = useRef(onChange)
+  const allowNegativeRef = useRef(allowNegative)
+  formulaModeRef.current = formulaMode
+  valueRef.current = value
+  onChangeRef.current = onChange
+  allowNegativeRef.current = allowNegative
+
+  const locked = Boolean(disabled || readOnly)
+  const displayValue = formulaMode ? value : normalizeMoneyInput(value, { allowNegative })
 
   useLayoutEffect(() => {
+    if (formulaMode) return
     const el = localRef.current
     const caret = caretRef.current
     if (!el || caret === null) return
     el.setSelectionRange(caret, caret)
     caretRef.current = null
-  }, [displayValue])
+  }, [displayValue, formulaMode])
+
+  useEffect(() => {
+    notifyFormulaMode()
+  }, [formulaMode])
+
+  useEffect(() => {
+    return registerMoneyField({
+      isFormulaMode: () => formulaModeRef.current,
+      commit: () => applyCommit(),
+      element: () => rootRef.current,
+    })
+  }, [])
 
   function setRefs(node: HTMLInputElement | null) {
     localRef.current = node
@@ -93,34 +140,191 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(function
     else if (ref) ref.current = node
   }
 
-  function commit(raw: string, selectionStart: number) {
+  function commitAmount(raw: string, selectionStart: number) {
     const units = moneySignificantCount(raw.slice(0, selectionStart))
     const next = normalizeMoneyInput(raw, { allowNegative })
     caretRef.current = caretPosAfterMoneyUnits(next, units)
     onChange(next)
   }
 
+  function applyCommit(): boolean {
+    if (!formulaModeRef.current) return true
+    const raw = valueRef.current
+    if (!raw.trim()) {
+      formulaModeRef.current = false
+      setFormulaMode(false)
+      setInvalid(false)
+      if (raw !== '') onChangeRef.current('')
+      return true
+    }
+    const result = evaluateMoneyFormula(raw, { allowNegative: allowNegativeRef.current })
+    if (result == null) {
+      setInvalid(true)
+      return false
+    }
+    formulaModeRef.current = false
+    setFormulaMode(false)
+    setInvalid(false)
+    onChangeRef.current(formatFormulaResult(result))
+    return true
+  }
+
+  function commitThisField() {
+    let ok = true
+    flushSync(() => {
+      ok = applyCommit()
+    })
+    if (!ok) revealInvalidMoneyField(rootRef.current, false)
+    return ok
+  }
+
+  function enableFormula() {
+    const el = localRef.current
+    const wasFocused = el != null && document.activeElement === el
+    ignoreBlurRef.current = true
+    flushSync(() => {
+      formulaModeRef.current = true
+      setFormulaMode(true)
+      setInvalid(false)
+    })
+    if (wasFocused) el?.blur()
+    el?.focus()
+    const len = el?.value.length ?? 0
+    try {
+      el?.setSelectionRange(len, len)
+    } catch {
+      /* decimal input may reject selection before mode switches */
+    }
+    ignoreBlurRef.current = false
+  }
+
+  const widthClass =
+    className.includes('w-') || className.includes('flex-1') || className.includes('flex-')
+      ? className
+      : `w-full ${className}`.trim()
+
   return (
-    <Input
-      {...rest}
-      {...dataQaFromProps(dataQa)}
-      ref={setRefs}
-      type="text"
-      inputMode="decimal"
-      autoComplete="off"
-      value={displayValue}
-      className={className}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      onChange={(e) => commit(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-      onPaste={(e) => {
-        e.preventDefault()
-        const text = e.clipboardData.getData('text')
-        commit(text, text.length)
-      }}
-    />
+    <div
+      ref={rootRef}
+      className={`relative min-w-0 scroll-mt-16 ${widthClass}`}
+      data-formula-mode={formulaMode ? 'true' : 'false'}
+      data-money-invalid={invalid ? 'true' : 'false'}
+    >
+      <Input
+        {...rest}
+        {...dataQaFromProps(dataQa)}
+        ref={setRefs}
+        type="text"
+        inputMode={formulaMode ? 'text' : 'decimal'}
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        disabled={disabled}
+        readOnly={readOnly}
+        value={displayValue}
+        aria-invalid={invalid || undefined}
+        className={`w-full ${locked ? '' : '!pr-9'} ${
+          invalid
+            ? '!border-red-500 focus:!border-red-500 focus:!ring-red-100 dark:!border-red-400 dark:focus:!ring-red-900/50'
+            : ''
+        }`}
+        onFocus={onFocus}
+        onBlur={(e) => {
+          if (ignoreBlurRef.current) return
+          if (formulaModeRef.current) commitThisField()
+          onBlur?.(e)
+        }}
+        onKeyDown={(e) => {
+          onKeyDown?.(e)
+          if (e.defaultPrevented || e.key !== 'Enter' || !formulaModeRef.current) return
+          e.preventDefault()
+          if (!commitThisField()) return
+          const el = e.currentTarget
+          ignoreBlurRef.current = true
+          el.blur()
+          el.focus()
+          ignoreBlurRef.current = false
+        }}
+        onChange={(e) => {
+          if (formulaModeRef.current) {
+            setInvalid(false)
+            onChange(sanitizeFormulaInput(e.target.value))
+            return
+          }
+          commitAmount(e.target.value, e.target.selectionStart ?? e.target.value.length)
+        }}
+        onPaste={(e) => {
+          e.preventDefault()
+          const text = e.clipboardData.getData('text')
+          if (formulaModeRef.current) {
+            const el = e.currentTarget
+            const start = el.selectionStart ?? valueRef.current.length
+            const end = el.selectionEnd ?? start
+            setInvalid(false)
+            onChange(sanitizeFormulaInput(valueRef.current.slice(0, start) + text + valueRef.current.slice(end)))
+            return
+          }
+          commitAmount(text, text.length)
+        }}
+      />
+      {!locked && (
+        <button
+          type="button"
+          tabIndex={-1}
+          title={formulaMode ? 'Вычислить' : 'Формула'}
+          aria-label={formulaMode ? 'Вычислить' : 'Формула'}
+          aria-pressed={formulaMode}
+          className={`absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-lg ${
+            formulaMode
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200'
+          }`}
+          {...dataQaFromProps(dataQa ? `${dataQa}-calc` : undefined)}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onClick={() => {
+            if (!formulaModeRef.current) {
+              enableFormula()
+              return
+            }
+            if (!commitThisField()) return
+            const el = localRef.current
+            ignoreBlurRef.current = true
+            el?.blur()
+            el?.focus()
+            ignoreBlurRef.current = false
+          }}
+        >
+          {formulaMode ? <EnterIcon className="h-4 w-4" /> : <CalculatorIcon className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
   )
 })
+
+function CalculatorIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className={className} aria-hidden>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path strokeLinecap="round" d="M8 7.5h8" />
+      <path
+        strokeLinecap="round"
+        d="M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"
+      />
+    </svg>
+  )
+}
+
+function EnterIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className={className} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7v4a2 2 0 0 1-2 2H7" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m10 10-3 3 3 3" />
+    </svg>
+  )
+}
 
 interface DateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> {
   value: string
